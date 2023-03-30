@@ -1,0 +1,17 @@
+version: "3.7"
+services:
+  cimo_ms_ocr:
+    container_name: cimo_ms_ocr
+    build:
+      context: ./
+      dockerfile: Dockerfile_local
+    env_file:
+      - ./env/local.env
+    ports:
+      - 127.0.0.1:2000:2000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/home/root/
+      - ms_cronjob-volume:/home/root/certificate/
+volumes:
+  ms_cronjob-volume:

@@ -1,0 +1,32 @@
+FROM node:18.13.0
+
+ARG ENV_NAME
+ARG DOMAIN
+
+ENV ENV_NAME=${ENV_NAME}
+ENV DOMAIN=${DOMAIN}
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NOWARNINGS=yes
+ENV TZ="Asia/Tokyo"
+
+RUN cd ~ \
+    # No root
+    && mkdir -p /home/root/ \
+    && chown -R node:node /home/root/ /usr/local/lib/node_modules/ \
+    && chmod 775 /home/root/ /usr/local/lib/node_modules/ \
+    # Apt
+    && apt-get update && apt-get install -y \
+    # Clean
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean -y \
+    && apt-get autoclean -y \
+    && apt-get autoremove -y
+
+USER node
+
+WORKDIR /home/root/
+
+CMD npm install && npm run execute
+
+EXPOSE 1980
