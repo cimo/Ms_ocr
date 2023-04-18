@@ -5,6 +5,7 @@ import * as ModelHelper from "../Model/Helper";
 
 export const checkEnv = (key: string, value: string | undefined): string => {
     if (value === undefined) {
+        // eslint-disable-next-line no-console
         console.log("Helper.ts - checkEnv - error:", `${key} is not defined!`);
     }
 
@@ -13,17 +14,18 @@ export const checkEnv = (key: string, value: string | undefined): string => {
 
 export const ENV_NAME = checkEnv("ENV_NAME", process.env.ENV_NAME);
 export const DOMAIN = checkEnv("DOMAIN", process.env.DOMAIN);
-export const DEBUG = checkEnv("MS_A_DEBUG", process.env.MS_A_DEBUG);
-export const CORS_ORIGIN_URL = checkEnv("MS_A_CORS_ORIGIN_URL", process.env.MS_A_CORS_ORIGIN_URL);
-export const SERVER_PORT = checkEnv("MS_A_SERVER_PORT", process.env.MS_A_SERVER_PORT);
-export const MIME_TYPE = checkEnv("MS_A_MIME_TYPE", process.env.MS_A_MIME_TYPE);
-export const FILE_SIZE_MB = checkEnv("MS_A_FILE_SIZE_MB", process.env.MS_A_FILE_SIZE_MB);
-export const TOKEN = checkEnv("MS_A_TOKEN", process.env.MS_A_TOKEN);
-export const PATH_STATIC = checkEnv("MS_A_PATH_STATIC", process.env.MS_A_PATH_STATIC);
-export const PATH_LOG = checkEnv("MS_A_PATH_LOG", process.env.MS_A_PATH_LOG);
-export const PATH_FILE_INPUT = checkEnv("MS_A_PATH_FILE_INPUT", process.env.MS_A_PATH_FILE_INPUT);
-export const PATH_CERTIFICATE_FILE_KEY = checkEnv("MS_A_PATH_CERTIFICATE_FILE_KEY", process.env.MS_A_PATH_CERTIFICATE_FILE_KEY);
-export const PATH_CERTIFICATE_FILE_CRT = checkEnv("MS_A_PATH_CERTIFICATE_FILE_CRT", process.env.MS_A_PATH_CERTIFICATE_FILE_CRT);
+export const DEBUG = checkEnv("MS_OCR_DEBUG", process.env.MS_OCR_DEBUG);
+export const CORS_ORIGIN_URL = checkEnv("MS_OCR_CORS_ORIGIN_URL", process.env.MS_OCR_CORS_ORIGIN_URL);
+export const SERVER_PORT = checkEnv("MS_OCR_SERVER_PORT", process.env.MS_OCR_SERVER_PORT);
+export const MIME_TYPE = checkEnv("MS_OCR_MIME_TYPE", process.env.MS_OCR_MIME_TYPE);
+export const FILE_SIZE_MB = checkEnv("MS_OCR_FILE_SIZE_MB", process.env.MS_OCR_FILE_SIZE_MB);
+export const TOKEN = checkEnv("MS_OCR_TOKEN", process.env.MS_OCR_TOKEN);
+export const PATH_STATIC = checkEnv("MS_OCR_PATH_STATIC", process.env.MS_OCR_PATH_STATIC);
+export const PATH_LOG = checkEnv("MS_OCR_PATH_LOG", process.env.MS_OCR_PATH_LOG);
+export const PATH_FILE_INPUT = checkEnv("MS_OCR_PATH_FILE_INPUT", process.env.MS_OCR_PATH_FILE_INPUT);
+export const PATH_FILE_OUTPUT = checkEnv("MS_OCR_PATH_FILE_OUTPUT", process.env.MS_OCR_PATH_FILE_OUTPUT);
+export const PATH_CERTIFICATE_FILE_KEY = checkEnv("MS_OCR_PATH_CERTIFICATE_FILE_KEY", process.env.MS_OCR_PATH_CERTIFICATE_FILE_KEY);
+export const PATH_CERTIFICATE_FILE_CRT = checkEnv("MS_OCR_PATH_CERTIFICATE_FILE_CRT", process.env.MS_OCR_PATH_CERTIFICATE_FILE_CRT);
 
 const circularReplacer = (): ModelHelper.circularReplacer => {
     const seen = new WeakSet();
@@ -48,6 +50,7 @@ export const objectOutput = (obj: unknown): string => {
 export const writeLog = (tag: string, value: string): void => {
     if (DEBUG === "true" && PATH_LOG) {
         Fs.appendFile(`${PATH_LOG}debug.log`, `${tag}: ${value}\n`, () => {
+            // eslint-disable-next-line no-console
             console.log(`WriteLog => ${tag}: `, value);
         });
     }

@@ -1,26 +1,28 @@
+/*eslint-env node*/
 module.exports = {
+    parser: "@typescript-eslint/parser",
+    parserOptions: {
+        project: true,
+        tsconfigRootDir: "./",
+        sourceType: "module"
+    },
+    plugins: ["@typescript-eslint", "prettier"],
     extends: [
         "eslint:recommended",
         "plugin:@typescript-eslint/recommended",
         "plugin:@typescript-eslint/recommended-requiring-type-checking",
-        "plugin:prettier/recommended",
+        "prettier"
     ],
-    parser: "@typescript-eslint/parser",
-    plugins: ["@typescript-eslint", "prettier"],
-    ignorePatterns: ["**/*.js", "dist", "node_modules", "public"],
+    ignorePatterns: ["dist", "node_modules", "public"],
     root: true,
-    parserOptions: {
-        project: true,
-        tsconfigRootDir: __dirname,
-    },
     rules: {
-        "no-console": process.env.NODE_ENV === "production" ? "warn" : "off",
-        "no-debugger": process.env.NODE_ENV === "production" ? "warn" : "off",
+        "no-console": "error",
+        "no-debugger": "error",
         "prettier/prettier": [
             "error",
             {
                 proseWrap: "always",
-                printWidth: 300,
+                printWidth: 150,
                 arrowParens: "always",
                 bracketSpacing: true,
                 embeddedLanguageFormatting: "auto",
@@ -29,8 +31,8 @@ module.exports = {
                 semicolons: true,
                 singleQuote: false,
                 trailingComma: "none",
-                endOfLine: "lf",
-            },
-        ],
-    },
+                endOfLine: "lf"
+            }
+        ]
+    }
 };

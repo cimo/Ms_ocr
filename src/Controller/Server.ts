@@ -6,7 +6,7 @@ import Cors from "cors";
 
 // Source
 import * as ControllerHelper from "../Controller/Helper";
-import * as ControllerAntivirus from "../Controller/Antivirus";
+import * as ControllerOcr from "../Controller/Ocr";
 import * as ModelServer from "../Model/Server";
 
 const corsOption: ModelServer.Cors = {
@@ -43,8 +43,8 @@ server.listen(ControllerHelper.SERVER_PORT, () => {
     ControllerHelper.writeLog("Server.ts - server.listen", `Port ${ControllerHelper.SERVER_PORT || ""} - Time: ${serverTime}`);
 
     app.get("/", (request, response) => {
-        response.status(200).send("ms_antivirus");
+        response.status(200).send("ms_ocr");
     });
 
-    ControllerAntivirus.execute(app);
+    ControllerOcr.execute(app);
 });

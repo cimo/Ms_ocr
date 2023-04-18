@@ -8,7 +8,7 @@ services:
     env_file:
       - ./env/local.env
     ports:
-      - 127.0.0.1:2000:2000
+      - 127.0.0.1:${MS_OCR_SERVER_PORT}:${MS_OCR_SERVER_PORT}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./:/home/root/

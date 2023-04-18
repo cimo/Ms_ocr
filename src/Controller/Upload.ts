@@ -42,7 +42,10 @@ const checkRequest = (formDataList: FormDataParser.Iinput[]): boolean => {
         parameterNotFound = "file";
     }
 
-    ControllerHelper.writeLog("Upload.ts - checkRequest", `tokenWrong: ${tokenWrong.toString()} - fileWrong: ${fileWrong.toString()} - parameterNotFound: ${parameterNotFound}`);
+    ControllerHelper.writeLog(
+        "Upload.ts - checkRequest",
+        `tokenWrong: ${tokenWrong.toString()} - fileWrong: ${fileWrong.toString()} - parameterNotFound: ${parameterNotFound}`
+    );
 
     // Result
     const result = tokenWrong === false && fileWrong === "" && parameterNotFound === "" ? true : false;
@@ -69,13 +72,17 @@ export const execute = (request: Express.Request): Promise<Record<string, string
                     for (const value of formDataList) {
                         if (value.name === "file" && value.filename && value.buffer) {
                             const input = `${ControllerHelper.PATH_FILE_INPUT}${value.filename}`;
+                            const output = `${ControllerHelper.PATH_FILE_OUTPUT}${value.filename.split(".")[0]}.txt`;
 
                             await ControllerHelper.fileWriteStream(input, value.buffer)
                                 .then(() => {
-                                    resolve({ input });
+                                    resolve({ input, output });
                                 })
                                 .catch((error: Error) => {
-                                    ControllerHelper.writeLog("Upload.ts - ControllerHelper.fileWriteStream - catch error", ControllerHelper.objectOutput(error));
+                                    ControllerHelper.writeLog(
+                                        "Upload.ts - ControllerHelper.fileWriteStream - catch error",
+                                        ControllerHelper.objectOutput(error)
+                                    );
                                 });
 
                             break;
