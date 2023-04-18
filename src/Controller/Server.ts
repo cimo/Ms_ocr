@@ -42,7 +42,7 @@ server.listen(ControllerHelper.SERVER_PORT, () => {
 
     ControllerHelper.writeLog("Server.ts - server.listen", `Port ${ControllerHelper.SERVER_PORT || ""} - Time: ${serverTime}`);
 
-    app.get("/", (request, response) => {
+    app.get("/", (request: Express.Request, response: Express.Response) => {
         response.status(200).send("ms_ocr");
     });
 
