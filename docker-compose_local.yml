@@ -5,6 +5,8 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile_local
+      args:
+        SERVER_PORT: ${MS_OCR_SERVER_PORT}
     env_file:
       - ./env/local.env
     ports:

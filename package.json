@@ -10,7 +10,7 @@
     },
     "main": "./src/Controller/Server.ts",
     "scripts": {
-        "preinstall": "npm install --package-lock-only --ignore-scripts --no-audit && npx npm-force-resolutions@0.0.3",
+        "preinstall": "npm install --package-lock-only --ignore-scripts --no-audit && npx --yes npm-force-resolutions@0.0.3",
         "link": "npm link /home/root/project/form-data_parser/root/",
         "check": "eslint . --fix",
         "execute": "npm run check && nodemon --watch src --ext ts --exec 'tsc && node ./dist/Controller/Server.js'",
