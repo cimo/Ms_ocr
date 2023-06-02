@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "ES2015",
+        "target": "ES2018",
         "module": "commonjs",
         "strict": true,
         "importHelpers": true,
@@ -15,7 +15,5 @@
         "baseUrl": "./",
         "outDir": "./dist/",
         "lib": ["ES2016", "DOM", "DOM.Iterable"]
-    },
-    "include": ["src/**/*.ts", "/**/*.js", ".eslintrc.js"],
-    "exclude": ["dist", "node_modules", "public"]
+    }
 }

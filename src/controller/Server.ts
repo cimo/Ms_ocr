@@ -5,11 +5,11 @@ import CookieParser from "cookie-parser";
 import Cors from "cors";
 
 // Source
-import * as ControllerHelper from "../Controller/Helper";
-import * as ControllerOcr from "../Controller/Ocr";
-import * as ModelServer from "../Model/Server";
+import * as ControllerHelper from "../controller/Helper";
+import * as ControllerOcr from "../controller/Ocr";
+import * as ModelServer from "../model/Server";
 
-const corsOption: ModelServer.Cors = {
+const corsOption: ModelServer.Icors = {
     originList: ControllerHelper.CORS_ORIGIN_URL,
     methodList: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
     preflightContinue: false,
@@ -43,7 +43,7 @@ server.listen(ControllerHelper.SERVER_PORT, () => {
     ControllerHelper.writeLog("Server.ts - server.listen", `Port ${ControllerHelper.SERVER_PORT || ""} - Time: ${serverTime}`);
 
     app.get("/", (request: Express.Request, response: Express.Response) => {
-        response.status(200).send("ms_ocr");
+        ControllerHelper.responseBody("ms_ocr", "", response, 200);
     });
 
     ControllerOcr.execute(app);

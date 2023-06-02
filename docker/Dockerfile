@@ -43,6 +43,6 @@ RUN npm install && npm run build
 
 CMD tesseract --version \
     && tesseract --list-langs \
-    && node /home/root/dist/Controller/Server.js
+    && node /home/root/dist/controller/Server.js
 
 EXPOSE ${MS_OCR_SERVER_PORT}

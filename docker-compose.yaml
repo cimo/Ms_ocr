@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  cimo_ms_ocr:
+    container_name: cimo-ms-ocr
+    build:
+      context: ./
+      dockerfile: ./docker/${DOCKERFILE}
+      args:
+        _ENV_NAME: ${ENV_NAME}
+        _DOMAIN: ${DOMAIN}
+        _TIMEZONE: ${TIMEZONE}
+        _SERVER_PORT: ${SERVER_PORT}
+        _PROXY_HTTP: ${PROXY_HTTP}
+        _PROXY_HTTPS: ${PROXY_HTTPS}
+        _PROXY_CERTIFICATE: ${PROXY_CERTIFICATE}
+    env_file:
+      - ./env/local.env
+    ports:
+      - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/home/root/
+      - ms_cronjob-volume:/home/root/certificate/
+volumes:
+  ms_cronjob-volume:
