@@ -16,6 +16,7 @@ pnpm-debug.log*
 # cimo +
 .cache/*
 .config/*
+.local/*
 .npm/*
 .pki/*
 certificate/*

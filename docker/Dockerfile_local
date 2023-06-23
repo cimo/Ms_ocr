@@ -27,10 +27,15 @@ RUN cd ~ \
     # Apt
     && apt-get update && apt-get install -y \
     ca-certificates \
-    tesseract-ocr \
     libtesseract-dev \
+    tesseract-ocr \
+    python3-pip \
     # Certificate
     && update-ca-certificates \
+    # Python
+    pip3 install easyocr \
+    pip3 uninstall opencv-python opencv-python-headless \
+    pip3 install opencv-python \
     # Clean
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean -y \

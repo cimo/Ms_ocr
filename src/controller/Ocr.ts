@@ -50,22 +50,23 @@ export const execute = (app: Express.Express): void => {
             await ControllerUpload.execute(request)
                 .then((result) => {
                     const fileName = Path.parse(result).name;
-                    const output = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}.pdf`;
+                    const output = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}.txt`;
 
-                    exec(
-                        `tesseract "${result}" "${output.split(".")[0]}" -l eng+jpn+lat --psm 3 --oem 1 --dpi 600 -c preserve_interword_spaces=1 txt`,
-                        (error, stdout, stderr) => {
-                            if (stdout !== "" && stderr === "") {
+                    //Japanese - Japanese_vert
+                    //Latin+eng
+                    exec("python3 /home/root/src/library/preprocess.py", (error, stdout, stderr) => {
+                        /*if (stdout !== "" && stderr === "") {
                                 outputFile(result, output, response);
-                            } else if (stdout === "" && stderr !== "") {
-                                ControllerHelper.writeLog("Ocr.ts - exec('tesseract... - stderr", stderr);
+                            } else if (stdout === "" && stderr !== "") {*/
+                        //ControllerHelper.writeLog("Ocr.ts - exec('tesseract... - stderr", stderr);
 
-                                removeFile(result, output, response);
-                            } else {
+                        //outputFile(result, output, response);
+
+                        ControllerHelper.responseBody(stdout, stderr, response, 200);
+                        /*} else {
                                 outputFile(result, output, response);
-                            }
-                        }
-                    );
+                            }*/
+                    });
                 })
                 .catch((error: Error) => {
                     ControllerHelper.writeLog("Ocr.ts - msocr/extract - catch error: ", ControllerHelper.objectOutput(error));
