@@ -1,4 +1,5 @@
 import Express from "express";
+import Fs from "fs";
 import * as FormDataParser from "@cimo/form-data_parser";
 
 // Source
@@ -55,7 +56,7 @@ const checkRequest = (formDataList: FormDataParser.Iinput[]): boolean => {
     return result;
 };
 
-export const execute = (request: Express.Request): Promise<string> => {
+export const execute = (request: Express.Request): Promise<FormDataParser.Iinput[]> => {
     return new Promise((resolve, reject) => {
         const chunkList: Buffer[] = [];
 
@@ -75,18 +76,26 @@ export const execute = (request: Express.Request): Promise<string> => {
                         if (value.name === "file" && value.filename && value.buffer) {
                             const input = `${ControllerHelper.PATH_FILE_INPUT}${value.filename}`;
 
-                            await ControllerHelper.fileWriteStream(input, value.buffer)
-                                .then(() => {
-                                    resolve(input);
-                                })
-                                .catch((error: Error) => {
-                                    ControllerHelper.writeLog(
-                                        "Upload.ts - ControllerHelper.fileWriteStream() - catch error: ",
-                                        ControllerHelper.objectOutput(error)
-                                    );
-                                });
+                            if (!Fs.existsSync(input)) {
+                                await ControllerHelper.fileWriteStream(input, value.buffer)
+                                    .then(() => {
+                                        resolve(formDataList);
+                                    })
+                                    .catch((error: Error) => {
+                                        ControllerHelper.writeLog(
+                                            "Upload.ts - ControllerHelper.fileWriteStream() - catch error: ",
+                                            ControllerHelper.objectOutput(error)
+                                        );
+                                    });
 
-                            break;
+                                break;
+                            } else {
+                                reject("File exists.");
+
+                                ControllerHelper.writeLog("Upload.ts - ControllerHelper.existsSync() - error: ", "File exists.");
+
+                                break;
+                            }
                         }
                     }
                 } else {

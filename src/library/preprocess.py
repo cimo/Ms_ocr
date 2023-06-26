@@ -5,10 +5,11 @@ from PIL import ImageOps as PilImageOps
 from PIL import ImageChops as PilImageChops
 import easyocr as easyOcr
 import os
+import sys
 
 
 def load(fileName):
-    return Cv2.imread(f"/home/root/file/input/{fileName}.png")
+    return Cv2.imread(f"/home/root/file/input/{fileName}")
 
 
 def Rescale(image, unit):
@@ -35,7 +36,7 @@ def FindText(image, langList, textOutput):
     )
 
     if textOutput:
-        with open("/home/root/file/output/invoice_1_jp.txt", "w") as element:
+        with open("/home/root/file/output/debug.txt", "w") as element:
             for result in resultList:
                 print(result, file=element)
 
@@ -97,7 +98,8 @@ def CropFix(image):
 
     if (pixelPercent >= 0.5 or pixelPercent == 0.0) and pixelTotalA == 0:
         imageThreshold = Binarization(image, 91, 255, 0, True)
-        image = addBorder(imageThreshold, (255, 255, 255), 2)
+
+        image = addBorder(imageThreshold, (255, 255, 255), 3)
     else:
         image = Binarization(image, 91, 255, 5, False)
 
@@ -107,7 +109,7 @@ def CropFix(image):
 
 
 def NoiseRemove(image, unit):
-    kernel = Numpy.ones((1, 1), Numpy.uint8)
+    kernel = Numpy.ones((unit, unit), Numpy.uint8)
 
     return Cv2.morphologyEx(image, Cv2.MORPH_CLOSE, kernel)
 
@@ -130,8 +132,11 @@ def FontDown(image, unit):
     return Cv2.bitwise_not(image)
 
 
-def Main(filename):
-    image = load(filename)
+def Main():
+    fileName = sys.argv[1]
+    language = sys.argv[2]
+
+    image = load(fileName)
     imageRescale = Rescale(image, 4)
     imageGray = Cv2.cvtColor(imageRescale, Cv2.COLOR_BGR2GRAY)
 
@@ -141,9 +146,22 @@ def Main(filename):
     imageResult = imageGray.copy()
     imageResult.fill(255)
 
-    textList = FindText(imageRescale, ["ja", "en"], False)
+    languageCraft = ""
+    languageOcr = ""
+    psmOcr = "6"
 
-    index = 0
+    if language == "en":
+        languageCraft = "en"
+        languageOcr = "eng"
+    elif language == "jp":
+        languageCraft = "ja"
+        languageOcr = "Japanese"
+    elif language == "jp_vert":
+        languageCraft = "ja"
+        languageOcr = "Japanese_vert"
+        psmOcr = 3
+
+    textList = FindText(imageRescale, [languageCraft], False)
 
     for text in textList:
         coordinate = text[0]
@@ -154,61 +172,25 @@ def Main(filename):
         bottom = int(coordinate[2][0])
         right = int(coordinate[2][1])
 
-        imageRectangle = Cv2.rectangle(
+        """imageRectangle = Cv2.rectangle(
             imageGray, (top, left), (bottom, right), (0, 0, 0), 1
-        )
+        )"""
 
         imageCrop = imageGray[left:right, top:bottom]
         imageCropFix = CropFix(imageCrop)
 
-        """if index == 0:
-            test = Rescale(imageCropFix, 13)
-            imagePil = PilImage.fromarray(
-                test
-            )  # .convert("1", dither=PilImage.Dither.NONE)
-            imagePil.save(f"/home/root/file/output/word_{index}.png", dpi=(300, 300))
-
-            os.system(
-                f"tesseract '/home/root/file/output/word_{index}.png' '/home/root/file/output/word_{index}' -l Japanese --oem 3 --psm 7 txt"
-            )"""
-
         imageResult[left:right, top:bottom] = imageCropFix
 
-        index += 1
+    """imagePil = PilImage.fromarray(imageRectangle)
+    imagePil.save(f"/home/root/file/output/{fileName}_box.png", dpi=(300, 300))"""
 
-    # imageRectangle = Cv2.cvtColor(imageRectangle, Cv2.COLOR_BGR2RGB)
-    # imageResult = Cv2.cvtColor(imageResult, Cv2.COLOR_BGR2RGB)
+    imagePil = PilImage.fromarray(imageResult).convert("1", dither=PilImage.Dither.NONE)
+    imagePil.save(f"/home/root/file/output/{fileName}", dpi=(300, 300))
 
-    imagePil = PilImage.fromarray(
-        imageRectangle
-    )  # .convert("1", dither=PilImage.Dither.NONE)
-    imagePil.save(f"/home/root/file/output/rectangle.png", dpi=(300, 300))
-    imagePil = PilImage.fromarray(
-        imageResult
-    )  # .convert("1", dither=PilImage.Dither.NONE)
-    imagePil.save(f"/home/root/file/output/result.png", dpi=(300, 300))
-
-    # 0    Orientation and script detection (OSD) only.
-    # 1    Automatic page segmentation with OSD.
-    # 2    Automatic page segmentation, but no OSD, or OCR. (not implemented)
-    # 3    Fully automatic page segmentation, but no OSD. (Default)
-    # 4    Assume a single column of text of variable sizes.
-    # 5    Assume a single uniform block of vertically aligned text.
-    # 6    Assume a single uniform block of text.
-    # 7    Treat the image as a single text line.
-    # 8    Treat the image as a single word.
-    # 9    Treat the image as a single word in a circle.
-    # 10    Treat the image as a single character.
-    # 11    Sparse text. Find as much text as possible in no particular order.
-    # 12    Sparse text with OSD.
-    # 13    Raw line. Treat the image as a single text line, bypassing hacks that are Tesseract-specific.
     os.system(
-        "tesseract '/home/root/file/output/result.png' '/home/root/file/output/invoice_1_jp' -l Japanese --oem 3 --psm 6 -c preserve_interword_spaces=1 -c tessedit_char_blacklist='〇,' txt"
+        f"tesseract '/home/root/file/output/{fileName}' '/home/root/file/output/{fileName}' -l {languageOcr} --oem 3 --psm {psmOcr} -c preserve_interword_spaces=1 -c tessedit_char_blacklist='〇,' txt"
     )
 
 
-# TO DO - Pass the argument
-Main("invoice_1_jp")
-
-Cv2.waitKey(0)
-Cv2.destroyAllWindows()
+# TO DO - Integrate dewrap
+Main()
