@@ -42,10 +42,6 @@ RUN cd ~ \
     python3-pip \
     # Certificate
     && update-ca-certificates \
-    # Python
-    pip3 install easyocr \
-    pip3 uninstall opencv-python opencv-python-headless \
-    pip3 install opencv-python-headless \
     # Clean
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean -y \
@@ -56,7 +52,9 @@ USER node
 
 WORKDIR /home/root/
 
-CMD tesseract --version \
+CMD python3 -m pip install pip --upgrade \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r /home/root/src/library/requirements.txt \
+    && tesseract --version \
     && tesseract --list-langs \
     && npm install && npm run execute
 

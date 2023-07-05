@@ -14,7 +14,6 @@ ENV VERSION_TAG=${_VERSION_TAG}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NOWARNINGS=yes
 
-COPY ./docker/nodejs_18_setup.sh /home/nodejs_18_setup.sh
 COPY ./ /home/root/
 
 RUN cd ~ \
@@ -30,15 +29,13 @@ RUN cd ~ \
     # Apt
     && apt-get update && apt-get install -y \
     ca-certificates \
-    libtesseract-dev \
+    fonts-noto \
+    fonts-noto-cjk \
+    libgl1 \
     tesseract-ocr \
     python3-pip \
     # Certificate
     && update-ca-certificates \
-    # Python
-    pip3 install easyocr \
-    pip3 uninstall opencv-python opencv-python-headless \
-    pip3 install opencv-python \
     # Clean
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean -y \
@@ -49,7 +46,9 @@ USER node
 
 WORKDIR /home/root/
 
-RUN npm install && npm run build
+RUN python3 -m pip install pip --upgrade \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r /home/root/src/library/requirements.txt \
+    && npm install && npm run build
 
 CMD tesseract --version \
     && tesseract --list-langs \
