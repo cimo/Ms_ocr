@@ -14,6 +14,8 @@ ENV VERSION_TAG=${_VERSION_TAG}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NOWARNINGS=yes
 
+COPY ./docker/nodejs_18_setup.sh /home/nodejs_18_setup.sh
+COPY ./docker/tessdata_best/* /usr/share/tesseract-ocr/4.00/tessdata/
 COPY ./ /home/root/
 
 RUN cd ~ \

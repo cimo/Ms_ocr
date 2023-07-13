@@ -34,4 +34,18 @@ DOCKERFILE="Dockerfile_local_proxy" docker-compose -f docker-compose.yaml --env-
 
 ## API (Postman)
 
-Work in progress...
+1. Extract
+
+```
+url = https://localhost:1000/msocr/extract
+
+form-data
+
+key             value
+---             ---
+token_api       1234
+file_name       test
+file            "upload field"
+language        jp
+result          pdf
+```

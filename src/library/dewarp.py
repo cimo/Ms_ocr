@@ -1,14 +1,3 @@
-#!/usr/bin/env python
-######################################################################
-# page_dewarp.py - Proof-of-concept of page-dewarping based on a
-# "cubic sheet" model. Requires OpenCV (version 3 or greater),
-# PIL/Pillow, and scipy.optimize.
-######################################################################
-# Author:  Matt Zucker
-# Date:    July 2016
-# License: MIT License (see LICENSE.txt)
-######################################################################
-
 import os
 import sys
 import datetime

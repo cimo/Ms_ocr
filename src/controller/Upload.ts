@@ -56,7 +56,7 @@ const checkRequest = (formDataList: FormDataParser.Iinput[]): boolean => {
     return result;
 };
 
-export const execute = (request: Express.Request): Promise<FormDataParser.Iinput[]> => {
+export const execute = (request: Express.Request, isExists: boolean): Promise<FormDataParser.Iinput[]> => {
     return new Promise((resolve, reject) => {
         const chunkList: Buffer[] = [];
 
@@ -76,7 +76,11 @@ export const execute = (request: Express.Request): Promise<FormDataParser.Iinput
                         if (value.name === "file" && value.filename && value.buffer) {
                             const input = `${ControllerHelper.PATH_FILE_INPUT}${value.filename}`;
 
-                            if (!Fs.existsSync(input)) {
+                            if (isExists && Fs.existsSync(input)) {
+                                reject("Upload.ts - end - reject error: File exists.");
+
+                                break;
+                            } else {
                                 await ControllerHelper.fileWriteStream(input, value.buffer)
                                     .then(() => {
                                         resolve(formDataList);
@@ -89,17 +93,11 @@ export const execute = (request: Express.Request): Promise<FormDataParser.Iinput
                                     });
 
                                 break;
-                            } else {
-                                reject("File exists.");
-
-                                ControllerHelper.writeLog("Upload.ts - ControllerHelper.existsSync() - error: ", "File exists.");
-
-                                break;
                             }
                         }
                     }
                 } else {
-                    reject(check);
+                    reject("Upload.ts - end - reject error: checkRequest()");
                 }
             })();
         });
