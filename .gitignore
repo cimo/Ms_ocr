@@ -25,6 +25,8 @@ certificate/*
 certificate/proxy/*
 !certificate/proxy/.gitkeep
 dist/*
+env/*
+!env/local.env.public
 file/*
 !file/**/
 file/input/*

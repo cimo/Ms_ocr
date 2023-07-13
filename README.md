@@ -4,6 +4,8 @@ Microservice OCR.
 
 Depend from Ms_cronjob (use the volume "ms_cronjob-volume" for share the certificate).
 
+Rename "/env/local.env.public" in "/env/local.env" and adjust the variable for your environment.
+
 ## Setup WSL
 
 1. Wrinte on terminal:
