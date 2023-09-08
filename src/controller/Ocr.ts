@@ -25,8 +25,7 @@ export const execute = (app: Express.Express): void => {
                     }
 
                     const input = `${ControllerHelper.PATH_FILE_INPUT}${fileName}`;
-                    const output1 = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}`;
-                    const output2 = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}.${result}`;
+                    const output = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}.${result}`;
 
                     exec(
                         `python3 '/home/root/src/library/preprocess.py' '${fileName}' '${language}' '${result}' '${ControllerHelper.DEBUG}'`,
@@ -42,20 +41,11 @@ export const execute = (app: Express.Express): void => {
                                             );
                                         });
 
-                                    await ControllerHelper.fileRemove(output1)
+                                    await ControllerHelper.fileRemove(output)
                                         .then()
                                         .catch((error: Error) => {
                                             ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output1) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
-                                            );
-                                        });
-
-                                    await ControllerHelper.fileRemove(output2)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output2) - catch error: ",
+                                                "Ocr.ts - ControllerHelper.fileRemove(output) - catch error: ",
                                                 ControllerHelper.objectOutput(error)
                                             );
                                         });
@@ -64,13 +54,13 @@ export const execute = (app: Express.Express): void => {
                                 } else if (stdout === "" && stderr !== "") {
                                     ControllerHelper.writeLog("Ocr.ts - python3 /home/root/... - stderr", stderr);
 
-                                    await ControllerHelper.fileReadStream(output2)
+                                    await ControllerHelper.fileReadStream(output)
                                         .then((buffer) => {
                                             ControllerHelper.responseBody("", buffer.toString("base64"), response, 200);
                                         })
                                         .catch((error: Error) => {
                                             ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileReadStream(output2) - catch error: ",
+                                                "Ocr.ts - ControllerHelper.fileReadStream(output) - catch error: ",
                                                 ControllerHelper.objectOutput(error)
                                             );
 
@@ -86,20 +76,11 @@ export const execute = (app: Express.Express): void => {
                                             );
                                         });
 
-                                    await ControllerHelper.fileRemove(output1)
+                                    await ControllerHelper.fileRemove(output)
                                         .then()
                                         .catch((error: Error) => {
                                             ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output1) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
-                                            );
-                                        });
-
-                                    await ControllerHelper.fileRemove(output2)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output2) - catch error: ",
+                                                "Ocr.ts - ControllerHelper.fileRemove(output) - catch error: ",
                                                 ControllerHelper.objectOutput(error)
                                             );
                                         });

@@ -10,9 +10,6 @@ services:
         _DOMAIN: ${DOMAIN}
         _TIMEZONE: ${TIMEZONE}
         _SERVER_PORT: ${SERVER_PORT}
-        _PROXY_HTTP: ${PROXY_HTTP}
-        _PROXY_HTTPS: ${PROXY_HTTPS}
-        _PROXY_CERTIFICATE: ${PROXY_CERTIFICATE}
     env_file:
       - ./env/local.env
     ports:
