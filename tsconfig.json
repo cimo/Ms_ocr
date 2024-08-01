@@ -1,19 +1,19 @@
 {
     "compilerOptions": {
-        "target": "ES2018",
-        "module": "commonjs",
-        "strict": true,
-        "importHelpers": true,
+        "target": "ES2022",
+        "module": "CommonJS",
         "moduleResolution": "node",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "outDir": "./dist/",
+        "baseUrl": "./",
+        "strict": true,
+        "importHelpers": false,
         "experimentalDecorators": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
-        "sourceMap": true,
         "removeComments": true,
         "noImplicitAny": false,
-        "baseUrl": "./",
-        "outDir": "./dist/",
-        "lib": ["ES2016", "DOM", "DOM.Iterable"]
+        "sourceMap": true
     }
 }

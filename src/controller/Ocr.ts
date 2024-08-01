@@ -1,99 +1,130 @@
-import Express from "express";
-import { exec } from "child_process";
+import Express, { Request, Response } from "express";
+import { execFile } from "child_process";
+import { Ca } from "@cimo/authentication";
 
 // Source
-import * as ControllerHelper from "../controller/Helper";
-import * as ControllerUpload from "../controller/Upload";
+import * as HelperSrc from "../HelperSrc";
+import ControllerUpload from "./Upload";
 
-export const execute = (app: Express.Express): void => {
-    app.post("/msocr/extract", (request: Express.Request, response: Express.Response) => {
-        void (async () => {
-            await ControllerUpload.execute(request, true)
-                .then((resultList) => {
-                    let fileName = "";
-                    let language = "";
-                    let result = "";
+export default class ControllerAntivirus {
+    // Variable
+    private app: Express.Express;
+    private controllerUpload: ControllerUpload;
 
-                    for (const value of resultList) {
-                        if (value.name === "file" && value.filename) {
-                            fileName = value.filename;
-                        } else if (value.name === "language" && value.buffer) {
-                            language = value.buffer.toString().match("^(jp|jp_vert|en)$") ? value.buffer.toString() : "";
-                        } else if (value.name === "result" && value.buffer) {
-                            result = value.buffer.toString().match("^(txt|hocr|tsv|pdf)$") ? value.buffer.toString() : "";
+    // Method
+    constructor(app: Express.Express) {
+        this.app = app;
+        this.controllerUpload = new ControllerUpload();
+    }
+
+    api = (): void => {
+        this.app.post("/api/extract", Ca.authenticationMiddleware, (request: Request, response: Response) => {
+            void (async () => {
+                await this.controllerUpload
+                    .execute(request, true)
+                    .then((resultControllerUploadList) => {
+                        let filename = "";
+                        let language = "";
+                        let result = "";
+                        let debug = "";
+
+                        for (const resultControllerUpload of resultControllerUploadList) {
+                            if (resultControllerUpload.name === "file" && resultControllerUpload.filename) {
+                                filename = resultControllerUpload.filename;
+                            } else if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
+                                language = resultControllerUpload.buffer.toString().match("^(jp|jp_vert|en)$")
+                                    ? resultControllerUpload.buffer.toString()
+                                    : "";
+                            } else if (resultControllerUpload.name === "result" && resultControllerUpload.buffer) {
+                                result = resultControllerUpload.buffer.toString().match("^(txt|hocr|tsv|pdf)$")
+                                    ? resultControllerUpload.buffer.toString()
+                                    : "";
+                            } else if (resultControllerUpload.name === "debug" && resultControllerUpload.buffer) {
+                                debug = resultControllerUpload.buffer.toString().match("^(true|false)$")
+                                    ? resultControllerUpload.buffer.toString()
+                                    : "";
+                            }
                         }
-                    }
 
-                    const input = `${ControllerHelper.PATH_FILE_INPUT}${fileName}`;
-                    const output = `${ControllerHelper.PATH_FILE_OUTPUT}${fileName}.${result}`;
+                        const input = `${HelperSrc.PATH_FILE_INPUT}${filename}`;
+                        const outputResult = `${HelperSrc.PATH_FILE_OUTPUT}${filename}_result.png`;
+                        const output = `${HelperSrc.PATH_FILE_OUTPUT}${filename}.${result}`;
 
-                    exec(
-                        `python3 '/home/root/src/library/preprocess.py' '${fileName}' '${language}' '${result}' '${ControllerHelper.DEBUG}'`,
-                        (error, stdout, stderr) => {
-                            void (async () => {
-                                if ((stdout !== "" && stderr === "") || (stdout !== "" && stderr !== "")) {
-                                    await ControllerHelper.fileRemove(input)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(input) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
-                                            );
-                                        });
+                        const execCommand = `. ${HelperSrc.PATH_FILE_SCRIPT}command1.sh`;
+                        const execArgumentList = [`"${filename}"`, `"${language}"`, `"${result}"`, `"${debug}"`];
 
-                                    await ControllerHelper.fileRemove(output)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
-                                            );
-                                        });
+                        execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout, stderr) => {
+                            // Tesseract use always stderr for the output
+                            if (stdout === "" || stderr !== "" || (stdout !== "" && stderr !== "")) {
+                                HelperSrc.fileReadStream(output, (resultFileReadStream) => {
+                                    if (Buffer.isBuffer(resultFileReadStream)) {
+                                        HelperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
+                                    } else {
+                                        HelperSrc.writeLog(
+                                            "Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => fileReadStream()",
+                                            resultFileReadStream.toString()
+                                        );
 
-                                    ControllerHelper.responseBody(stdout, stderr, response, 500);
-                                } else if (stdout === "" && stderr !== "") {
-                                    ControllerHelper.writeLog("Ocr.ts - python3 /home/root/... - stderr", stderr);
+                                        HelperSrc.responseBody("", resultFileReadStream.toString(), response, 500);
+                                    }
 
-                                    await ControllerHelper.fileReadStream(output)
-                                        .then((buffer) => {
-                                            ControllerHelper.responseBody("", buffer.toString("base64"), response, 200);
-                                        })
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileReadStream(output) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
+                                    HelperSrc.fileRemove(input, (resultFileRemove) => {
+                                        if (typeof resultFileRemove !== "boolean") {
+                                            HelperSrc.writeLog(
+                                                "Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => fileReadStream() => fileRemove(input)",
+                                                resultFileRemove.toString()
                                             );
 
-                                            ControllerHelper.responseBody("", error, response, 500);
-                                        });
+                                            HelperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                        }
+                                    });
 
-                                    await ControllerHelper.fileRemove(input)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(input) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
+                                    HelperSrc.fileRemove(outputResult, (resultFileRemove) => {
+                                        if (typeof resultFileRemove !== "boolean") {
+                                            HelperSrc.writeLog(
+                                                "Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => fileReadStream() => fileRemove(outputResult)",
+                                                resultFileRemove.toString()
                                             );
-                                        });
 
-                                    await ControllerHelper.fileRemove(output)
-                                        .then()
-                                        .catch((error: Error) => {
-                                            ControllerHelper.writeLog(
-                                                "Ocr.ts - ControllerHelper.fileRemove(output) - catch error: ",
-                                                ControllerHelper.objectOutput(error)
+                                            HelperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                        }
+                                    });
+
+                                    HelperSrc.fileRemove(output, (resultFileRemove) => {
+                                        if (typeof resultFileRemove !== "boolean") {
+                                            HelperSrc.writeLog(
+                                                "Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => fileReadStream() => fileRemove(output)",
+                                                resultFileRemove.toString()
                                             );
-                                        });
-                                }
-                            })();
-                        }
-                    );
-                })
-                .catch((error: Error) => {
-                    ControllerHelper.writeLog("Ocr.ts - ControllerUpload.execute() - catch error: ", ControllerHelper.objectOutput(error));
 
-                    ControllerHelper.responseBody("", error, response, 500);
-                });
-        })();
-    });
-};
+                                            HelperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                        }
+                                    });
+                                });
+                            } else if (stdout !== "" || stderr === "") {
+                                HelperSrc.writeLog("Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => stdout", stdout);
+
+                                HelperSrc.fileRemove(input, (resultFileRemove) => {
+                                    if (typeof resultFileRemove !== "boolean") {
+                                        stderr += resultFileRemove;
+
+                                        HelperSrc.writeLog(
+                                            "Ocr.ts - api() => post(/api/extract) => execute() => execFile(python3) => fileRemove(input)",
+                                            resultFileRemove.toString()
+                                        );
+                                    }
+                                });
+
+                                HelperSrc.responseBody(stdout, "", response, 500);
+                            }
+                        });
+                    })
+                    .catch((error: Error) => {
+                        HelperSrc.writeLog("Ocr.ts - api() => post(/api/extract) => execute() => catch()", error);
+
+                        HelperSrc.responseBody("", error, response, 500);
+                    });
+            })();
+        });
+    };
+}

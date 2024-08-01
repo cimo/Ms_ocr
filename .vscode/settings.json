@@ -2,8 +2,10 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-        "source.fixAll": true
+        "source.fixAll": "explicit"
     },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
     "eslint.format.enable": true,
     "javascript.validate.enable": false,
     "docker.commands.attach": "${containerCommand} exec -it ${containerId} bash",
@@ -19,7 +21,25 @@
     "[javascript]": {
         "editor.formatOnSave": false
     },
+    "[html]": {
+        "editor.defaultFormatter": "vscode.html-language-features"
+    },
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+    },
+    "l13Diff.exclude": [
+        ".git",
+        ".cache",
+        ".config",
+        ".local",
+        ".npm",
+        ".pki",
+        "node_modules",
+        "log",
+        "dist"
+    ],
+    "l13Diff.ignoreEndOfLine": false,
+    "l13Diff.ignoreTrimWhitespace": "default",
+    "l13Diff.ignoreByteOrderMark": false,
+    "diffEditor.ignoreTrimWhitespace": false
 }

@@ -1,50 +1,105 @@
-import Express from "express";
-import * as Fs from "fs";
-import * as Https from "https";
+import Express, { Request, Response, NextFunction } from "express";
+import { rateLimit } from "express-rate-limit";
 import CookieParser from "cookie-parser";
 import Cors from "cors";
+import * as Https from "https";
+import Fs from "fs";
+import { Ca } from "@cimo/authentication";
 
 // Source
-import * as ControllerHelper from "../controller/Helper";
-import * as ControllerOcr from "../controller/Ocr";
+import * as HelperSrc from "../HelperSrc";
 import * as ModelServer from "../model/Server";
+import ControllerOcr from "./Ocr";
 
-const corsOption: ModelServer.Icors = {
-    originList: ControllerHelper.CORS_ORIGIN_URL,
-    methodList: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
-    preflightContinue: false,
-    optionsSuccessStatus: 200
-};
+export default class ControllerServer {
+    // Variable
+    private corsOption: ModelServer.Icors;
+    private limiterOption: ModelServer.Ilimiter;
+    private app: Express.Express;
 
-const app = Express();
-app.use(Express.json());
-app.use(Express.urlencoded({ extended: true }));
-app.use(Express.static(ControllerHelper.PATH_STATIC));
-app.use(CookieParser());
-app.use(
-    Cors({
-        origin: corsOption.originList,
-        methods: corsOption.methodList,
-        optionsSuccessStatus: corsOption.optionsSuccessStatus
-    })
-);
+    // Method
+    constructor() {
+        this.corsOption = {
+            originList: HelperSrc.URL_CORS_ORIGIN,
+            methodList: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
+            preflightContinue: false,
+            optionsSuccessStatus: 200
+        };
 
-const server = Https.createServer(
-    {
-        key: Fs.readFileSync(ControllerHelper.PATH_CERTIFICATE_FILE_KEY),
-        cert: Fs.readFileSync(ControllerHelper.PATH_CERTIFICATE_FILE_CRT)
-    },
-    app
-);
+        this.limiterOption = {
+            windowMs: 15 * 60 * 1000,
+            limit: 100
+        };
 
-server.listen(ControllerHelper.SERVER_PORT, () => {
-    const serverTime = ControllerHelper.serverTime();
+        this.app = Express();
+    }
 
-    ControllerHelper.writeLog("Server.ts - server.listen", `Port ${ControllerHelper.SERVER_PORT || ""} - Time: ${serverTime}`);
+    createSetting = (): void => {
+        this.app.use(Express.json());
+        this.app.use(Express.urlencoded({ extended: true }));
+        this.app.use(Express.static(HelperSrc.PATH_PUBLIC));
+        this.app.use(CookieParser());
+        this.app.use(
+            Cors({
+                origin: this.corsOption.originList,
+                methods: this.corsOption.methodList,
+                optionsSuccessStatus: this.corsOption.optionsSuccessStatus
+            })
+        );
+        this.app.use((request: ModelServer.Irequest, _, next: NextFunction) => {
+            const headerForwarded = request.headers["x-forwarded-for"] ? request.headers["x-forwarded-for"][0] : "";
+            const removeAddress = request.socket.remoteAddress ? request.socket.remoteAddress : "";
 
-    app.get("/", (request: Express.Request, response: Express.Response) => {
-        ControllerHelper.responseBody("ms_ocr", "", response, 200);
-    });
+            request.clientIp = headerForwarded || removeAddress;
 
-    ControllerOcr.execute(app);
-});
+            next();
+        });
+        this.app.use(
+            rateLimit({
+                windowMs: this.limiterOption.windowMs,
+                limit: this.limiterOption.limit
+            })
+        );
+    };
+
+    createServer = (): void => {
+        const server = Https.createServer(
+            {
+                key: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_KEY),
+                cert: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_CRT)
+            },
+            this.app
+        );
+
+        server.listen(HelperSrc.SERVER_PORT, () => {
+            const controllerOcr = new ControllerOcr(this.app);
+            controllerOcr.api();
+
+            const serverTime = HelperSrc.serverTime();
+
+            HelperSrc.writeLog("Server.ts - createServer() => listen()", `Port: ${HelperSrc.SERVER_PORT} - Time: ${serverTime}`);
+
+            this.app.get("/info", (request: ModelServer.Irequest, response: Response) => {
+                HelperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
+            });
+
+            this.app.get("/login", (_, response: Response) => {
+                Ca.writeCookie(`${HelperSrc.LABEL}_authentication`, response);
+
+                HelperSrc.responseBody("Logged.", "", response, 200);
+            });
+
+            this.app.get("/logout", Ca.authenticationMiddleware, (request: Request, response: Response) => {
+                Ca.removeCookie(`${HelperSrc.LABEL}_authentication`, request, response);
+
+                HelperSrc.responseBody("Unlogged.", "", response, 200);
+            });
+        });
+    };
+}
+
+const controllerServer = new ControllerServer();
+controllerServer.createSetting();
+controllerServer.createServer();
+
+HelperSrc.keepProcess();

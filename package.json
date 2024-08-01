@@ -10,15 +10,18 @@
     },
     "scripts": {
         "preinstall": "([ ! -f package-lock.json ] && npm install --package-lock-only --ignore-scripts --no-audit); npx npm-force-resolutions",
-        "check": "eslint . --fix",
-        "execute": "nodemon --config nodemon.json",
-        "build": "npm run check && tsc --build -clean && tsc --build tsconfig.build.json"
+        "remove_dist": "node -e \"const fs = require('fs'); try{ fs.rmdirSync('./dist/', { recursive: true }) } catch{}; process.exit(0);\"",
+        "check": "eslint --fix",
+        "build": "npm run remove_dist && npm run check && tsc --build tsconfig.build.json",
+        "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/form-data_parser": "1.1.7",
+        "@cimo/authentication": "1.1.11",
+        "@cimo/form-data_parser": "1.1.19",
         "cookie-parser": "1.4.6",
         "cors": "2.8.5",
-        "express": "4.18.1"
+        "express": "4.19.0",
+        "express-rate-limit": "7.2.0"
     },
     "devDependencies": {
         "@types/cookie-parser": "1.4.3",

@@ -1,111 +1,88 @@
-import Express from "express";
+import { Request } from "express";
 import Fs from "fs";
-import * as FormDataParser from "@cimo/form-data_parser";
+import { Cfdp, CfdpModel } from "@cimo/form-data_parser";
 
 // Source
-import * as ControllerHelper from "../controller/Helper";
+import * as HelperSrc from "../HelperSrc";
 
-const checkRequest = (formDataList: FormDataParser.Iinput[]): boolean => {
-    const parameterList: string[] = [];
-    let tokenWrong = false;
-    let fileProblem = "";
-    let parameterNotFound = "";
+export default class ControllerUpload {
+    // Variable
 
-    for (const value of formDataList) {
-        if (value.name === "token_api") {
-            if (!ControllerHelper.checkToken(value.buffer.toString())) {
-                tokenWrong = true;
-            }
-        }
-
-        if (value.name === "file") {
-            if (value.filename === "" || value.mimeType === "" || value.size === "") {
-                fileProblem = "empty";
-            } else if (!ControllerHelper.checkMymeType(value.mimeType)) {
-                fileProblem = "mimeType";
-            } else if (!ControllerHelper.checkFileSize(value.size)) {
-                fileProblem = "size";
-            }
-        }
-
-        parameterList.push(value.name);
+    // Method
+    constructor() {
+        //...
     }
 
-    if (!parameterList.includes("token_api")) {
-        parameterNotFound = "token_api";
-    }
+    execute = (request: Request, isFileExists: boolean): Promise<CfdpModel.Iinput[]> => {
+        return new Promise((resolve, reject) => {
+            const chunkList: Buffer[] = [];
 
-    if (!parameterList.includes("file_name")) {
-        parameterNotFound = "file_name";
-    }
+            request.on("data", (data: Buffer) => {
+                chunkList.push(data);
+            });
 
-    if (!parameterList.includes("file")) {
-        parameterNotFound = "file";
-    }
-
-    // Result
-    const result = tokenWrong === false && fileProblem === "" && parameterNotFound === "" ? true : false;
-
-    if (!result) {
-        ControllerHelper.writeLog(
-            "Upload.ts - checkRequest",
-            `tokenWrong: ${tokenWrong.toString()} - fileProblem: ${fileProblem.toString()} - parameterNotFound: ${parameterNotFound}`
-        );
-    }
-
-    return result;
-};
-
-export const execute = (request: Express.Request, isExists: boolean): Promise<FormDataParser.Iinput[]> => {
-    return new Promise((resolve, reject) => {
-        const chunkList: Buffer[] = [];
-
-        request.on("data", (data: Buffer) => {
-            chunkList.push(data);
-        });
-
-        request.on("end", () => {
-            void (async () => {
+            request.on("end", () => {
                 const buffer = Buffer.concat(chunkList);
-                const formDataList = FormDataParser.readInput(buffer, request.headers["content-type"]);
+                const formDataList = Cfdp.readInput(buffer, request.headers["content-type"]);
 
-                const check = checkRequest(formDataList);
+                const resultCheckRequest = this.checkRequest(formDataList);
 
-                if (check) {
-                    for (const value of formDataList) {
-                        if (value.name === "file" && value.filename && value.buffer) {
-                            const input = `${ControllerHelper.PATH_FILE_INPUT}${value.filename}`;
+                if (resultCheckRequest === "") {
+                    for (const formData of formDataList) {
+                        if (formData.name === "file" && formData.filename && formData.buffer) {
+                            const input = `${HelperSrc.PATH_FILE_INPUT}${formData.filename}`;
 
-                            if (isExists && Fs.existsSync(input)) {
-                                reject("Upload.ts - end - reject error: File exists.");
-
-                                break;
+                            if (isFileExists && Fs.existsSync(input)) {
+                                reject("File exists.");
                             } else {
-                                await ControllerHelper.fileWriteStream(input, value.buffer)
-                                    .then(() => {
+                                HelperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
+                                    if (resultFileWriteStream) {
                                         resolve(formDataList);
-                                    })
-                                    .catch((error: Error) => {
-                                        ControllerHelper.writeLog(
-                                            "Upload.ts - ControllerHelper.fileWriteStream() - catch error: ",
-                                            ControllerHelper.objectOutput(error)
-                                        );
-                                    });
-
-                                break;
+                                    } else {
+                                        reject(resultFileWriteStream);
+                                    }
+                                });
                             }
+
+                            break;
                         }
                     }
                 } else {
-                    reject("Upload.ts - end - reject error: checkRequest()");
+                    reject(resultCheckRequest);
                 }
-            })();
-        });
+            });
 
-        request.on("error", (error: Error) => {
-            ControllerHelper.writeLog("Upload.ts - execute() - error: ", ControllerHelper.objectOutput(error));
-
-            reject(error);
+            request.on("error", (error: Error) => {
+                reject(error);
+            });
         });
-    });
-};
+    };
+
+    private checkRequest = (formDataList: CfdpModel.Iinput[]): string => {
+        let result = "";
+
+        const parameterList: string[] = [];
+
+        for (const formData of formDataList) {
+            parameterList.push(formData.name);
+
+            if (formData.name === "file") {
+                if (formData.filename === "" || formData.mimeType === "" || formData.size === "") {
+                    result += "File input empty.";
+                } else if (!HelperSrc.fileCheckMimeType(formData.mimeType)) {
+                    result += "Mime type are not allowed.";
+                } else if (!HelperSrc.fileCheckSize(formData.size)) {
+                    result += "File size exceeds limit.";
+                }
+            }
+        }
+
+        if (!parameterList.includes("filename")) {
+            result += "Filename parameter missing.";
+        } else if (!parameterList.includes("file")) {
+            result += "File parameter missing.";
+        }
+
+        return result;
+    };
+}

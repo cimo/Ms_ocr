@@ -4,6 +4,10 @@ from PIL import Image as PilImage
 import easyocr as easyOcr
 import os
 import sys
+import warnings
+
+# FutureWarning: You are using `torch.load` with `weights_only=False
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def load(fileName):
@@ -216,5 +220,6 @@ def Main():
         print(f"File not exists!")
 
 
+# TO DO - Create craft
 # TO DO - Integrate dewarp
 Main()

@@ -1,23 +1,23 @@
 {
+    "root": true,
     "env": {
+        "browser": true,
         "node": true,
         "es6": true
     },
     "parserOptions": {
-        "project": false,
-        "ecmaVersion": 2018,
+        "project": "./tsconfig.json",
+        "tsconfigRootDir": "./",
         "sourceType": "module"
     },
+    "ignorePatterns": [
+        "./**/*",
+        "!./file/**/*",
+        "!./src/**/*",
+        "!./webpack.build.js"
+    ],
     "plugins": ["prettier"],
     "extends": ["eslint:recommended", "prettier"],
-    "ignorePatterns": [
-        "/*",
-        "!src",
-        "!file",
-        "!webpack.execute.js",
-        "!webpack.build.js"
-    ],
-    "root": true,
     "rules": {
         "no-console": "error",
         "no-debugger": "error",
@@ -40,13 +40,8 @@
     },
     "overrides": [
         {
-            "files": ["src/**/*.ts", "file/**/*.ts"],
+            "files": ["./src/**/*.ts", "./file/**/*.ts"],
             "parser": "@typescript-eslint/parser",
-            "parserOptions": {
-                "project": "./tsconfig.json",
-                "tsconfigRootDir": "./",
-                "sourceType": "module"
-            },
             "plugins": ["@typescript-eslint", "prettier"],
             "extends": [
                 "eslint:recommended",

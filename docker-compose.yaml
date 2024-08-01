@@ -17,6 +17,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./:/home/root/
-      - ms_cronjob-volume:/home/root/certificate/
+      - ms_cronjob-volume:/home/root/.ms_cronjob-volume/:ro
 volumes:
   ms_cronjob-volume:
