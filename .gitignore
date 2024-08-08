@@ -30,6 +30,8 @@ public/file/*
 !public/file/.gitkeep
 public/js/*
 !public/js/.gitkeep
+public/style/*
+!public/style/.gitkeep
 public/index.html
 node_modules
 package-lock.json
