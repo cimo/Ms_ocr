@@ -4,7 +4,7 @@ import Fs from "fs";
 // Source
 import * as ModelHelperSrc from "./model/HelperSrc";
 
-export const writeLog = (tag: string, value: string | Error): void => {
+export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
     if (process.env.MS_O_DEBUG === "true") {
         if (typeof process !== "undefined" && process.env.MS_O_PATH_LOG) {
             Fs.appendFile(`${process.env.MS_O_PATH_LOG}debug.log`, `${tag}: ${value.toString()}\n`, () => {
