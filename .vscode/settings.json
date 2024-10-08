@@ -36,7 +36,16 @@
         ".pki",
         "node_modules",
         "log",
-        "dist"
+        "dist",
+        "file/document",
+        "file/input",
+        "file/output",
+        "file/web_app",
+        "public",
+        "src",
+        "apps",
+        "middleware",
+        "fixture"
     ],
     "l13Diff.ignoreEndOfLine": false,
     "l13Diff.ignoreTrimWhitespace": "default",
