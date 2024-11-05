@@ -16,8 +16,8 @@
         "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/authentication": "1.1.11",
-        "@cimo/form-data_parser": "1.1.19",
+        "@cimo/authentication": "1.1.12",
+        "@cimo/form-data_parser": "1.1.20",
         "cookie-parser": "1.4.6",
         "cors": "2.8.5",
         "express": "4.20.0",
