@@ -14,6 +14,11 @@ ENV VERSION_TAG=${_VERSION_TAG}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NOWARNINGS=yes
 ENV NODE_OPTIONS=--use-openssl-ca
+ENV PATH="${PATH}:/home/root/.local/bin/:/root/.local/bin/"
+ENV PYTHONPATH="/home/root/"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
 COPY ./ /home/root/
