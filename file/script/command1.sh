@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python3 "/home/root/src/library/preprocess.py" "${1}" "${2}" "${3}" "${4}"
+python3 "${PATH_ROOT}src/library/preprocess.py" "${1}" "${2}" "${3}" "${4}"

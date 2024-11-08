@@ -10,13 +10,14 @@ services:
         _DOMAIN: ${DOMAIN}
         _TIMEZONE: ${TIMEZONE}
         _SERVER_PORT: ${SERVER_PORT}
+        _PATH_ROOT: ${PATH_ROOT}
     env_file:
       - ./env/local.env
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./:/home/root/
-      - ms_cronjob-volume:/home/root/.ms_cronjob-volume/:ro
+      - ./:${PATH_ROOT}
+      - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
 volumes:
   ms_cronjob-volume:
