@@ -9,6 +9,7 @@ ARG _PATH_ROOT
 ENV ENV_NAME=${_ENV_NAME}
 ENV DOMAIN=${_DOMAIN}
 ENV TZ=${_TIMEZONE}
+ENV SERVER_PORT=${_SERVER_PORT}
 ENV PATH_ROOT=${_PATH_ROOT}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,6 +20,7 @@ ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV SUDO_FORCE_REMOVE=yes
 
 COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
 COPY ./docker/tessdata_best/* /usr/share/tesseract-ocr/4.00/tessdata/
@@ -67,4 +69,4 @@ CMD cp -r ${PATH_ROOT}.ms_cronjob-volume/certificate/* ${PATH_ROOT}certificate/ 
     # Npm
     && npm install && npm run execute
 
-EXPOSE ${_SERVER_PORT}
+EXPOSE ${SERVER_PORT}

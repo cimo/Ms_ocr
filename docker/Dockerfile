@@ -4,11 +4,14 @@ ARG _ENV_NAME
 ARG _DOMAIN
 ARG _TIMEZONE
 ARG _SERVER_PORT
+ARG _PATH_ROOT
 ARG _VERSION_TAG
 
 ENV ENV_NAME=${_ENV_NAME}
 ENV DOMAIN=${_DOMAIN}
 ENV TZ=${_TIMEZONE}
+ENV SERVER_PORT=${_SERVER_PORT}
+ENV PATH_ROOT=${_PATH_ROOT}
 ENV VERSION_TAG=${_VERSION_TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,6 +22,7 @@ ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV SUDO_FORCE_REMOVE=yes
 
 COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
 COPY ./docker/tessdata_best/* /usr/share/tesseract-ocr/4.00/tessdata/
@@ -69,4 +73,4 @@ CMD tesseract --version \
     # Npm
     && node ${PATH_ROOT}dist/controller/Server.js
 
-EXPOSE ${_SERVER_PORT}
+EXPOSE ${SERVER_PORT}
