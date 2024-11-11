@@ -41,11 +41,10 @@
         "file/input",
         "file/output",
         "file/web_app",
-        "public",
-        "src",
-        "apps",
-        "middleware",
-        "fixture"
+        "public/file",
+        "public/js",
+        "public/style",
+        "kubernetes"
     ],
     "l13Diff.ignoreEndOfLine": false,
     "l13Diff.ignoreTrimWhitespace": "default",
