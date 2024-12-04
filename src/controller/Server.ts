@@ -2,6 +2,7 @@ import Express, { Request, Response, NextFunction } from "express";
 import { rateLimit } from "express-rate-limit";
 import CookieParser from "cookie-parser";
 import Cors from "cors";
+import * as Http from "http";
 import * as Https from "https";
 import Fs from "fs";
 import { Ca } from "@cimo/authentication";
@@ -63,13 +64,21 @@ export default class ControllerServer {
     };
 
     createServer = (): void => {
-        const server = Https.createServer(
-            {
-                key: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_KEY),
-                cert: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_CRT)
-            },
-            this.app
-        );
+        let creation: Http.Server | Https.Server;
+
+        if (HelperSrc.SERVER_LOCATION === "jp") {
+            creation = Https.createServer(
+                {
+                    key: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_KEY),
+                    cert: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_CRT)
+                },
+                this.app
+            );
+        } else {
+            creation = Http.createServer(this.app);
+        }
+
+        const server = creation;
 
         server.listen(HelperSrc.SERVER_PORT, () => {
             const controllerOcr = new ControllerOcr(this.app);
@@ -77,13 +86,13 @@ export default class ControllerServer {
 
             const serverTime = HelperSrc.serverTime();
 
-            HelperSrc.writeLog("Server.ts - createServer() => listen()", `Port: ${HelperSrc.SERVER_PORT} - Time: ${serverTime}`);
+            HelperSrc.writeLog("Server.ts => createServer() => listen()", `Port: ${HelperSrc.SERVER_PORT} - Time: ${serverTime}`);
 
             this.app.get("/info", (request: ModelServer.Irequest, response: Response) => {
                 HelperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
             });
 
-            this.app.get("/login", (_, response: Response) => {
+            this.app.get("/login", (_request: Request, response: Response) => {
                 Ca.writeCookie(`${HelperSrc.LABEL}_authentication`, response);
 
                 HelperSrc.responseBody("Logged.", "", response, 200);
@@ -92,7 +101,7 @@ export default class ControllerServer {
             this.app.get("/logout", Ca.authenticationMiddleware, (request: Request, response: Response) => {
                 Ca.removeCookie(`${HelperSrc.LABEL}_authentication`, request, response);
 
-                HelperSrc.responseBody("Unlogged.", "", response, 200);
+                response.redirect("info");
             });
         });
     };

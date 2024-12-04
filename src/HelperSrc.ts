@@ -20,7 +20,7 @@ export const writeLog = (tag: string, value: string | Record<string, unknown> | 
 
 const checkEnv = (key: string, value: string | undefined): string => {
     if (typeof process !== "undefined" && value === undefined) {
-        writeLog("HelperSrc.ts - checkEnv()", `${key} is not defined!`);
+        writeLog("HelperSrc.ts => checkEnv()", `${key} is not defined!`);
     }
 
     return value ? value : "";
@@ -30,6 +30,7 @@ export const ENV_NAME = checkEnv("ENV_NAME", process.env.ENV_NAME);
 export const DOMAIN = checkEnv("DOMAIN", process.env.DOMAIN);
 export const TIMEZONE = checkEnv("TIMEZONE", process.env.TIMEZONE);
 export const SERVER_PORT = checkEnv("SERVER_PORT", process.env.SERVER_PORT);
+export const SERVER_LOCATION = checkEnv("SERVER_LOCATION", process.env.SERVER_LOCATION);
 export const PATH_ROOT = checkEnv("PATH_ROOT", process.env.PATH_ROOT);
 export const NAME = checkEnv("MS_O_NAME", process.env.MS_O_NAME);
 export const LABEL = checkEnv("MS_O_LABEL", process.env.MS_O_LABEL);
@@ -141,7 +142,7 @@ export const responseBody = (stdoutValue: string, stderrValue: string | Error, r
 export const keepProcess = (): void => {
     for (const event of ["uncaughtException", "unhandledRejection"]) {
         process.on(event, (error: Error) => {
-            writeLog("HelperSrc.ts - keepProcess()", `Event: ${event} - Error: ${error.toString()}`);
+            writeLog("HelperSrc.ts => keepProcess()", `Event: ${event} - Error: ${error.toString()}`);
         });
     }
 };

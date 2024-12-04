@@ -10,6 +10,7 @@ services:
         _DOMAIN: ${DOMAIN}
         _TIMEZONE: ${TIMEZONE}
         _SERVER_PORT: ${SERVER_PORT}
+        _SERVER_LOCATION: ${SERVER_LOCATION}
         _PATH_ROOT: ${PATH_ROOT}
     env_file:
       - ./env/local.env
