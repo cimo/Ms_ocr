@@ -20,19 +20,15 @@ export const DEBUG = Ce.checkVariable("MS_O_DEBUG") || (process.env.MS_O_DEBUG a
 export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
 export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
 export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
-export const URL_TEST = Ce.checkVariable("MS_O_URL_TEST") || (process.env.MS_O_URL_TEST as string);
 export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
 export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
 export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
 export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
 export const PATH_FILE_INPUT = Ce.checkVariable("MS_O_PATH_FILE_INPUT");
 export const PATH_FILE_OUTPUT = Ce.checkVariable("MS_O_PATH_FILE_OUTPUT");
-export const PATH_FILE_DOWNLOAD = Ce.checkVariable("MS_O_PATH_FILE_DOWNLOAD");
 export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
 export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
-export const WS_ADRESS = Ce.checkVariable("MS_O_WS_ADDRESS") || (process.env.MS_O_WS_ADDRESS as string);
-export const SECRET_KEY = Ce.checkVariable("MS_O_SECRET_KEY");
 
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
     if (DEBUG === "true") {
