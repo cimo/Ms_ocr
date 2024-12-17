@@ -31,21 +31,20 @@ COPY ./docker/tessdata_best/* /usr/share/tesseract-ocr/4.00/tessdata/
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
+    # No root
+    && mkdir -p ${PATH_ROOT} \
+    && useradd -U node -d ${PATH_ROOT} -s /bin/bash \
+    && chown -R node:node ${PATH_ROOT} \
+    && chmod -R 775 ${PATH_ROOT} \
+    # Update
     && VERSION_CODENAME=$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2) \
     && chmod -R 0644 /usr/local/share/ca-certificates/ \
-    && apt-get update && apt-get install -y ca-certificates gnupg curl \
+    && apt-get update && apt-get install -y ca-certificates curl \
     && update-ca-certificates \
     # NodeJs
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update && apt-get install -y nodejs \
-    # No root
-    && groupadd -g 1000 node \
-    && useradd -d ${PATH_ROOT} -s /bin/bash -u 1000 -g 1000 node \
-    && mkdir -p ${PATH_ROOT} /usr/local/lib/node_modules/ /usr/local/bin/ \
-    && chown -R node:node ${PATH_ROOT} /usr/local/lib/node_modules/ /usr/local/bin/ \
-    && chmod -R 775 ${PATH_ROOT} /usr/local/lib/node_modules/ /usr/local/bin/ \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm@latest \
     # Apt
     && apt-get update && apt-get install -y \
     fonts-noto \
@@ -54,6 +53,7 @@ RUN cd ~ \
     tesseract-ocr \
     python3-pip \
     # Clean
+    && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean -y \
     && apt-get autoclean -y \
@@ -67,12 +67,13 @@ WORKDIR ${PATH_ROOT}
 RUN python3 -m pip install pip --upgrade \
     && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Npm
-    && npm install && npm run build
+    && npm install \
+    && npm run build
 
 # Tesseract
 CMD tesseract --version \
     && tesseract --list-langs \
-    # Npm
+    # Node
     && node ${PATH_ROOT}dist/controller/Server.js
 
 EXPOSE ${SERVER_PORT}

@@ -16,8 +16,8 @@
         "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/authentication": "1.1.12",
-        "@cimo/form-data_parser": "1.1.20",
+        "@cimo/authentication": "1.1.13",
+        "@cimo/form-data_parser": "1.1.21",
         "cookie-parser": "1.4.6",
         "cors": "2.8.5",
         "express": "4.20.0",
@@ -40,8 +40,10 @@
     "resolutions": {
         "node-fetch": "2.6.7",
         "**/node-fetch": "2.6.7",
-        "path-to-regexp": "0.1.10",
-        "**/path-to-regexp": "0.1.10",
+        "crypto-js": "4.2.0",
+        "**/crypto-js": "4.2.0",
+        "path-to-regexp": "0.1.12",
+        "**/path-to-regexp": "0.1.12",
         "send": "0.19.0",
         "**/send": "0.19.0",
         "serve-static": "1.16.0",

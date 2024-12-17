@@ -46,11 +46,11 @@ export default class ControllerAntivirus {
                             }
                         }
 
-                        const input = `${HelperSrc.PATH_FILE_INPUT}${filename}`;
-                        const outputResult = `${HelperSrc.PATH_FILE_OUTPUT}${filename}_result.png`;
-                        const output = `${HelperSrc.PATH_FILE_OUTPUT}${filename}.${result}`;
+                        const input = `${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_INPUT}${filename}`;
+                        const outputResult = `${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_OUTPUT}${filename}_result.png`;
+                        const output = `${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_OUTPUT}${filename}.${result}`;
 
-                        const execCommand = `. ${HelperSrc.PATH_FILE_SCRIPT}command1.sh`;
+                        const execCommand = `. ${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_SCRIPT}command1.sh`;
                         const execArgumentList = [`"${filename}"`, `"${language}"`, `"${result}"`, `"${debug}"`];
 
                         execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout, stderr) => {

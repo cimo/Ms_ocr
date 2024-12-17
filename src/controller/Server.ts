@@ -38,7 +38,7 @@ export default class ControllerServer {
     createSetting = (): void => {
         this.app.use(Express.json());
         this.app.use(Express.urlencoded({ extended: true }));
-        this.app.use(Express.static(HelperSrc.PATH_PUBLIC));
+        this.app.use(Express.static(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_PUBLIC}`));
         this.app.use(CookieParser());
         this.app.use(
             Cors({
@@ -69,8 +69,8 @@ export default class ControllerServer {
         if (HelperSrc.SERVER_LOCATION === "jp") {
             creation = Https.createServer(
                 {
-                    key: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_KEY),
-                    cert: Fs.readFileSync(HelperSrc.PATH_CERTIFICATE_CRT)
+                    key: Fs.readFileSync(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_CERTIFICATE_KEY}`),
+                    cert: Fs.readFileSync(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_CERTIFICATE_CRT}`)
                 },
                 this.app
             );

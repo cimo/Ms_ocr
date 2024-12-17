@@ -1,13 +1,43 @@
-import { Response } from "express";
 import Fs from "fs";
+import { Response } from "express";
+import { Ce } from "@cimo/environment";
 
 // Source
 import * as ModelHelperSrc from "./model/HelperSrc";
 
+export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env.ENV_NAME as string);
+
+Ce.loadFile(`./env/${ENV_NAME}.env`);
+
+export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
+export const TIMEZONE = Ce.checkVariable("TIMEZONE") || (process.env.TIMEZONE as string);
+export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
+export const SERVER_LOCATION = Ce.checkVariable("SERVER_LOCATION") || (process.env.SERVER_LOCATION as string);
+export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
+export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
+export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
+export const DEBUG = Ce.checkVariable("MS_O_DEBUG") || (process.env.MS_O_DEBUG as string);
+export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
+export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
+export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
+export const URL_TEST = Ce.checkVariable("MS_O_URL_TEST") || (process.env.MS_O_URL_TEST as string);
+export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
+export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
+export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
+export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
+export const PATH_FILE_INPUT = Ce.checkVariable("MS_O_PATH_FILE_INPUT");
+export const PATH_FILE_OUTPUT = Ce.checkVariable("MS_O_PATH_FILE_OUTPUT");
+export const PATH_FILE_DOWNLOAD = Ce.checkVariable("MS_O_PATH_FILE_DOWNLOAD");
+export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
+export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
+export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
+export const WS_ADRESS = Ce.checkVariable("MS_O_WS_ADDRESS") || (process.env.MS_O_WS_ADDRESS as string);
+export const SECRET_KEY = Ce.checkVariable("MS_O_SECRET_KEY");
+
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
-    if (process.env.MS_O_DEBUG === "true") {
-        if (typeof process !== "undefined" && process.env.MS_O_PATH_LOG) {
-            Fs.appendFile(`${process.env.MS_O_PATH_LOG}debug.log`, `${tag}: ${value.toString()}\n`, () => {
+    if (DEBUG === "true") {
+        if (typeof process !== "undefined") {
+            Fs.appendFile(`${PATH_ROOT}${PATH_LOG}debug.log`, `${tag}: ${value.toString()}\n`, () => {
                 // eslint-disable-next-line no-console
                 console.log(`WriteLog => ${tag}: `, value);
             });
@@ -17,36 +47,6 @@ export const writeLog = (tag: string, value: string | Record<string, unknown> | 
         }
     }
 };
-
-const checkEnv = (key: string, value: string | undefined): string => {
-    if (typeof process !== "undefined" && value === undefined) {
-        writeLog("HelperSrc.ts => checkEnv()", `${key} is not defined!`);
-    }
-
-    return value ? value : "";
-};
-
-export const ENV_NAME = checkEnv("ENV_NAME", process.env.ENV_NAME);
-export const DOMAIN = checkEnv("DOMAIN", process.env.DOMAIN);
-export const TIMEZONE = checkEnv("TIMEZONE", process.env.TIMEZONE);
-export const SERVER_PORT = checkEnv("SERVER_PORT", process.env.SERVER_PORT);
-export const SERVER_LOCATION = checkEnv("SERVER_LOCATION", process.env.SERVER_LOCATION);
-export const PATH_ROOT = checkEnv("PATH_ROOT", process.env.PATH_ROOT);
-export const NAME = checkEnv("MS_O_NAME", process.env.MS_O_NAME);
-export const LABEL = checkEnv("MS_O_LABEL", process.env.MS_O_LABEL);
-export const DEBUG = checkEnv("MS_O_DEBUG", process.env.MS_O_DEBUG);
-export const NODE_ENV = checkEnv("MS_O_NODE_ENV", process.env.MS_O_NODE_ENV);
-export const URL_ROOT = checkEnv("MS_O_URL_ROOT", process.env.MS_O_URL_ROOT);
-export const URL_CORS_ORIGIN = checkEnv("MS_O_URL_CORS_ORIGIN", process.env.MS_O_URL_CORS_ORIGIN);
-export const PATH_CERTIFICATE_KEY = checkEnv("MS_O_PATH_CERTIFICATE_KEY", process.env.MS_O_PATH_CERTIFICATE_KEY);
-export const PATH_CERTIFICATE_CRT = checkEnv("MS_O_PATH_CERTIFICATE_CRT", process.env.MS_O_PATH_CERTIFICATE_CRT);
-export const PATH_PUBLIC = checkEnv("MS_O_PATH_PUBLIC", process.env.MS_O_PATH_PUBLIC);
-export const PATH_LOG = checkEnv("MS_O_PATH_LOG", process.env.MS_O_PATH_LOG);
-export const PATH_FILE_INPUT = checkEnv("MS_O_PATH_FILE_INPUT", process.env.MS_O_PATH_FILE_INPUT);
-export const PATH_FILE_OUTPUT = checkEnv("MS_O_PATH_FILE_OUTPUT", process.env.MS_O_PATH_FILE_OUTPUT);
-export const PATH_FILE_SCRIPT = checkEnv("MS_O_PATH_FILE_SCRIPT", process.env.MS_O_PATH_FILE_SCRIPT);
-export const MIME_TYPE = checkEnv("MS_O_MIME_TYPE", process.env.MS_O_MIME_TYPE);
-export const FILE_SIZE_MB = checkEnv("MS_O_FILE_SIZE_MB", process.env.MS_O_FILE_SIZE_MB);
 
 export const serverTime = (): string => {
     const currentDate = new Date();

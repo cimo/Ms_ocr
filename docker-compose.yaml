@@ -2,6 +2,8 @@ version: "3.8"
 services:
   cimo_ms_ocr:
     container_name: cimo-ms-ocr
+    env_file:
+      - ./env/local.env
     build:
       context: ./
       dockerfile: ./docker/${DOCKERFILE}
@@ -12,8 +14,6 @@ services:
         _SERVER_PORT: ${SERVER_PORT}
         _SERVER_LOCATION: ${SERVER_LOCATION}
         _PATH_ROOT: ${PATH_ROOT}
-    env_file:
-      - ./env/local.env
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
     volumes:

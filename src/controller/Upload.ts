@@ -30,7 +30,7 @@ export default class ControllerUpload {
                 if (resultCheckRequest === "") {
                     for (const formData of formDataList) {
                         if (formData.name === "file" && formData.filename && formData.buffer) {
-                            const input = `${HelperSrc.PATH_FILE_INPUT}${formData.filename}`;
+                            const input = `${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_INPUT}${formData.filename}`;
 
                             if (isFileExists && Fs.existsSync(input)) {
                                 reject("File exists.");
