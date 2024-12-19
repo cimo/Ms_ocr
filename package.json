@@ -11,32 +11,32 @@
     "scripts": {
         "preinstall": "([ ! -f package-lock.json ] && npm install --package-lock-only --ignore-scripts --no-audit); npx npm-force-resolutions",
         "remove_dist": "node -e \"const fs = require('fs'); try{ fs.rmdirSync('./dist/', { recursive: true }) } catch{}; process.exit(0);\"",
-        "check": "eslint --fix",
-        "build": "npm run remove_dist && npm run check && tsc --build tsconfig.build.json",
+        "check": "eslint --no-cache --config eslint.config.js --fix",
+        "build": "npm run remove_dist && npm run check && tsc --build tsconfig.build.json && npm audit",
         "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/authentication": "1.1.13",
+        "@cimo/authentication": "1.1.15",
         "@cimo/form-data_parser": "1.1.21",
-        "@cimo/environment": "1.0.4",
-        "cookie-parser": "1.4.6",
+        "@cimo/environment": "1.0.6",
+        "cookie-parser": "1.4.7",
         "cors": "2.8.5",
-        "express": "4.20.0",
-        "express-rate-limit": "7.2.0"
+        "express": "4.21.2",
+        "express-rate-limit": "7.5.0"
     },
     "devDependencies": {
-        "@types/node": "18.14.4",
-        "@types/express": "4.17.17",
-        "@types/cookie-parser": "1.4.3",
-        "@types/cors": "2.8.13",
-        "@typescript-eslint/eslint-plugin": "5.54.0",
-        "@typescript-eslint/parser": "5.54.0",
-        "eslint": "8.35.0",
-        "eslint-plugin-prettier": "4.2.1",
-        "eslint-config-prettier": "8.8.0",
-        "prettier": "2.8.7",
-        "typescript": "4.9.4",
-        "nodemon": "2.0.21"
+        "typescript": "5.7.2",
+        "nodemon": "3.1.9",
+        "eslint": "9.17.0",
+        "@typescript-eslint/parser": "8.18.1",
+        "@typescript-eslint/eslint-plugin": "8.18.1",
+        "eslint-plugin-prettier": "5.2.1",
+        "globals": "15.13.0",
+        "prettier": "3.4.2",
+        "@types/node": "22.10.2",
+        "@types/express": "5.0.0",
+        "@types/cookie-parser": "1.4.8",
+        "@types/cors": "2.8.17"
     },
     "resolutions": {
         "node-fetch": "2.6.7",
