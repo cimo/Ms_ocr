@@ -1,27 +1,24 @@
 const globals = require("globals");
 const tsParser = require("@typescript-eslint/parser");
 const tsPlugin = require("@typescript-eslint/eslint-plugin");
-const prettierPlugin = require('eslint-plugin-prettier');
+const prettierPlugin = require("eslint-plugin-prettier");
 
 const configCommon = {
     ignores: ["./**/*", "!./file/**/*", "!./src/**/*", "!./webpack.build.js"]
-}
+};
 
-const configFile = {
-    files: ["**/*.{ts, js}"],
+const configBase = {
     languageOptions: {
         globals: Object.assign({}, globals.browser, globals.node),
         parser: tsParser,
         sourceType: "module",
         parserOptions: {
-            ecmaVersion: 2015,
-            project: "./tsconfig.json",
-            tsconfigRootDir: "./"
+            ecmaVersion: 2015
         }
     },
     plugins: {
-        '@typescript-eslint': tsPlugin,
-        'prettier': prettierPlugin
+        "@typescript-eslint": tsPlugin,
+        prettier: prettierPlugin
     },
     rules: {
         "no-console": "error",
@@ -44,9 +41,25 @@ const configFile = {
             }
         ]
     }
-}
+};
 
-module.exports = [
-	configCommon,
-	configFile
-]
+const configFile = {
+    ...configBase,
+    files: ["**/*.{ts,js}"],
+    ignores: [".cache/**/*", "public/**/*", "eslint.config.js", "webpack.build.js"],
+    languageOptions: {
+        ...configBase.languageOptions,
+        parserOptions: {
+            ...configBase.languageOptions.parserOptions,
+            project: "./tsconfig.json",
+            tsconfigRootDir: "./"
+        }
+    }
+};
+
+const configFileIgnored = {
+    ...configBase,
+    files: ["eslint.config.js", "webpack.build.js"]
+};
+
+module.exports = [configCommon, configFile, configFileIgnored];
