@@ -3,6 +3,7 @@ FROM ubuntu:22.04
 ARG _ENV_NAME
 ARG _DOMAIN
 ARG _TIMEZONE
+ARG _LANG
 ARG _SERVER_PORT
 ARG _SERVER_LOCATION
 ARG _PATH_ROOT
@@ -10,6 +11,7 @@ ARG _PATH_ROOT
 ENV ENV_NAME=${_ENV_NAME}
 ENV DOMAIN=${_DOMAIN}
 ENV TZ=${_TIMEZONE}
+ENV LANG=${_LANG}
 ENV SERVER_PORT=${_SERVER_PORT}
 ENV SERVER_LOCATION=${_SERVER_LOCATION}
 ENV PATH_ROOT=${_PATH_ROOT}
@@ -41,7 +43,6 @@ RUN cd ~ \
     # NodeJs
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest \
     # Apt
     && apt-get update && apt-get install -y \
     fonts-noto \
