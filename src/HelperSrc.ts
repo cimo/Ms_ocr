@@ -11,6 +11,7 @@ Ce.loadFile(`./env/${ENV_NAME}.env`);
 
 export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
 export const TIMEZONE = Ce.checkVariable("TIMEZONE") || (process.env.TIMEZONE as string);
+export const LANG = Ce.checkVariable("LANG") || (process.env.LANG as string);
 export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
 export const SERVER_LOCATION = Ce.checkVariable("SERVER_LOCATION") || (process.env.SERVER_LOCATION as string);
 export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
