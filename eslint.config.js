@@ -13,7 +13,7 @@ const configBase = {
         parser: tsParser,
         sourceType: "module",
         parserOptions: {
-            ecmaVersion: 2015
+            ecmaVersion: 2022
         }
     },
     plugins: {
