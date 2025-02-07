@@ -66,7 +66,7 @@ export default class ControllerServer {
     createServer = (): void => {
         let creation: Http.Server | Https.Server;
 
-        if (HelperSrc.SERVER_LOCATION === "jp") {
+        if (HelperSrc.locationFromEnvName() === "jp") {
             creation = Https.createServer(
                 {
                     key: Fs.readFileSync(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_CERTIFICATE_KEY}`),

@@ -10,10 +10,9 @@ export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env.ENV_NAME as
 Ce.loadFile(`./env/${ENV_NAME}.env`);
 
 export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
-export const TIMEZONE = Ce.checkVariable("TIMEZONE") || (process.env.TIMEZONE as string);
+export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env.TIME_ZONE as string);
 export const LANG = Ce.checkVariable("LANG") || (process.env.LANG as string);
 export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
-export const SERVER_LOCATION = Ce.checkVariable("SERVER_LOCATION") || (process.env.SERVER_LOCATION as string);
 export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
 export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
 export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
@@ -157,4 +156,14 @@ export const removeAnsiEscape = (text: string) => {
     const regex = new RegExp(["\x1b", "[", "[0-9;]*", "[a-zA-Z]"].join(""), "g");
 
     return text.replace(regex, "");
+};
+
+export const locationFromEnvName = () => {
+    let result = ENV_NAME.split("_").pop();
+
+    if (result === "local") {
+        result = "jp";
+    }
+
+    return result;
 };

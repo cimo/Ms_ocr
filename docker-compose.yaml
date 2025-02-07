@@ -10,10 +10,9 @@ services:
       args:
         _ENV_NAME: ${ENV_NAME}
         _DOMAIN: ${DOMAIN}
-        _TIMEZONE: ${TIMEZONE}
+        _TIME_ZONE: ${TIME_ZONE}
         _LANG: ${LANG}
         _SERVER_PORT: ${SERVER_PORT}
-        _SERVER_LOCATION: ${SERVER_LOCATION}
         _PATH_ROOT: ${PATH_ROOT}
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
