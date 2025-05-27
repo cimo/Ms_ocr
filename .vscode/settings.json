@@ -9,7 +9,7 @@
     "typescript.tsdk": "node_modules/typescript/lib",
     "typescript.enablePromptUseWorkspaceTsdk": true,
     "eslint.format.enable": true,
-    "docker.commands.attach": "${containerCommand} exec -it ${containerId} bash",
+    "containers.commands.attach": "${containerCommand} exec -it ${containerId} bash",
     "[dockercompose]": {
         "editor.defaultFormatter": "ms-azuretools.vscode-docker"
     },
