@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   cimo_ms_ocr:
     container_name: cimo-ms-ocr
