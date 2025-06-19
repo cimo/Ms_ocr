@@ -9,7 +9,7 @@
         "url": "https://github.com/cimo/Ms_ocr.git"
     },
     "scripts": {
-        "preinstall": "([ ! -f package-lock.json ] && npm install --package-lock-only --ignore-scripts --no-audit); npx npm-force-resolutions",
+        "preinstall": "npx npm-force-resolutions",
         "remove_dist": "node -e \"const fs = require('fs'); try{ fs.rmdirSync('./dist/', { recursive: true }) } catch{}; process.exit(0);\"",
         "check": "eslint --no-cache --config eslint.config.js --fix",
         "build": "npm run remove_dist && npm run check && tsc --build tsconfig.build.json && npm audit",
