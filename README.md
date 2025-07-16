@@ -24,15 +24,14 @@ docker compose -f docker-compose.yaml --env-file ./env/local.env up --detach --p
 1. Remove this from the root:
 
     - .cache
-    - .config
     - .local
-    - .npm
-    - .pki
     - .ms_cronjob-volume
+    - .npm
     - node_modules
     - package-lock.json
     - certificate/tls.crt
     - certificate/tls.key
+    - certificate/tls.pem
 
 2. Follow the "Installation" instructions.
 
