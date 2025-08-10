@@ -8,7 +8,7 @@ from onnx_tf.backend import prepare
 torchModel = CRAFT(pretrained=False)
 modelStateDict = copyStateDict(
     Torch.load(
-        "/home/root/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.pth",
+        "/home/app/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.pth",
         map_location="cpu",
     )
 )
@@ -20,12 +20,12 @@ input = Torch.randn(1, 3, 480, 640)
 Torch.onnx.export(
     torchModel,
     input,
-    "/home/root/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.onnx",
+    "/home/app/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.onnx",
 )
 
 # To tensorflow
 onnx_model = Onnx.load(
-    "/home/root/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.onnx"
+    "/home/app/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.onnx"
 )
 tf_rep = prepare(onnx_model)
 tf_rep.export_graph("output_path")

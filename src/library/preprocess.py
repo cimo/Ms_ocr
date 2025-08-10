@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 def load(fileName):
     result = False
 
-    path = f"/home/root/file/input/{fileName}"
+    path = f"/home/app/file/input/{fileName}"
 
     if os.path.isfile(path) and os.access(path, os.R_OK):
         image = Cv2.imread(path)
@@ -67,7 +67,7 @@ def FindText(image, langList, debug):
     )
 
     if debug == "true":
-        with open("/home/root/file/output/debug.txt", "w") as element:
+        with open("/home/app/file/output/debug.txt", "w") as element:
             for result in resultList:
                 print(result, file=element)
 
@@ -206,15 +206,15 @@ def Main():
             imageResult[left:right, top:bottom] = imageCropFix
 
         if debug == "true":
-            Cv2.imwrite(f"/home/root/file/output/{fileName}_box.png", imageRectangle)
+            Cv2.imwrite(f"/home/app/file/output/{fileName}_box.png", imageRectangle)
 
         imagePil = PilImage.fromarray(imageResult).convert(
             "1", dither=PilImage.Dither.NONE
         )
-        imagePil.save(f"/home/root/file/output/{fileName}_result.png", dpi=(300, 300))
+        imagePil.save(f"/home/app/file/output/{fileName}_result.png", dpi=(300, 300))
 
         os.system(
-            f"tesseract '/home/root/file/output/{fileName}_result.png' '/home/root/file/output/{fileName}' -l {languageOcr} --oem 1 --psm {psmOcr} -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇,' {result}"
+            f"tesseract '/home/app/file/output/{fileName}_result.png' '/home/app/file/output/{fileName}' -l {languageOcr} --oem 1 --psm {psmOcr} -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇,' {result}"
         )
     else:
         print(f"File not exists!")

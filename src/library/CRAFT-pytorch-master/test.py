@@ -49,7 +49,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description="CRAFT Text Detection")
 parser.add_argument(
     "--trained_model",
-    default="/home/root/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.pth",
+    default="/home/app/src/library/CRAFT-pytorch-master/model/craft_mlt_25k.pth",
     type=str,
     help="pretrained model",
 )
@@ -77,7 +77,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--test_folder",
-    default="/home/root/src/library/CRAFT-pytorch-master/data/",
+    default="/home/app/src/library/CRAFT-pytorch-master/data/",
     type=str,
     help="folder path to input images",
 )
@@ -86,7 +86,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--refiner_model",
-    default="/home/root/src/library/CRAFT-pytorch-master/model/craft_refiner_CTW1500.pth",
+    default="/home/app/src/library/CRAFT-pytorch-master/model/craft_refiner_CTW1500.pth",
     type=str,
     help="pretrained refiner model",
 )
@@ -97,7 +97,7 @@ args = parser.parse_args()
 """ For test images in a folder """
 image_list, _, _ = file_utils.get_files(args.test_folder)
 
-result_folder = "/home/root/src/library/CRAFT-pytorch-master/result/"
+result_folder = "/home/app/src/library/CRAFT-pytorch-master/result/"
 if not os.path.isdir(result_folder):
     os.mkdir(result_folder)
 

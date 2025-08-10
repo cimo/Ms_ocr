@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # read image
-img = cv2.imread("/home/root/file/input/Deskew_1.jpg")
+img = cv2.imread("/home/app/file/input/Deskew_1.jpg")
 hh, ww = img.shape[:2]
 
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

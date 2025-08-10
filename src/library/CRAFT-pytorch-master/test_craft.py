@@ -10,7 +10,7 @@ def download_east_model():
     Download the pre-trained EAST text detector
     """
     model_url = "https://github.com/oyyd/frozen_east_text_detection.pb/raw/master/frozen_east_text_detection.pb"
-    model_path = "/home/root/src/library/CRAFT-pytorch-master/model/frozen_east_text_detection.pb"
+    model_path = "/home/app/src/library/CRAFT-pytorch-master/model/frozen_east_text_detection.pb"
 
     if not os.path.exists(model_path):
         print("Downloading EAST text detection model...")
@@ -182,7 +182,7 @@ def visualize_detections(image_path, boxes):
 # Example usage
 if __name__ == "__main__":
     # Path to your image
-    image_path = "/home/root/src/library/CRAFT-pytorch-master/data/test_2.jpg"
+    image_path = "/home/app/src/library/CRAFT-pytorch-master/data/test_2.jpg"
 
     # Detect text
     boxes = detect_text(image_path, min_confidence=0.1)
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # Visualize results
     result_image = visualize_detections(image_path, boxes)
     cv2.imwrite(
-        "/home/root/src/library/CRAFT-pytorch-master/result/detection_result.jpg",
+        "/home/app/src/library/CRAFT-pytorch-master/result/detection_result.jpg",
         result_image,
     )
     print(f"Found {len(boxes)} text regions")
