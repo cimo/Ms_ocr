@@ -144,12 +144,13 @@ export const keepProcess = (): void => {
 };
 
 export const isJson = (value: string): boolean => {
-    return /^[\],:{}\s]*$/.test(
-        value
-            .replace(/\\["\\/bfnrtu]/g, "@")
-            .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?/g, "]")
-            .replace(/(?:^|:|,)(?:\s*\[)+/g, "")
-    );
+    try {
+        JSON.parse(value);
+
+        return true;
+    } catch {
+        return false;
+    }
 };
 
 export const removeAnsiEscape = (text: string) => {
