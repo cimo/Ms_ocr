@@ -2,18 +2,18 @@
     "l13Diff.exclude": [
         ".git",
         ".cache",
+        ".config",
         ".local",
         ".ms_cronjob-volume",
         ".npm",
+        ".pki",
         "dist",
-        "file/input",
-        "file/output",
+        "file",
         "log",
         "node_modules",
         "public/file",
         "public/js",
-        "public/style",
-        "kubernetes"
+        "public/style"
     ],
     "l13Diff.ignoreEndOfLine": false,
     "l13Diff.ignoreTrimWhitespace": "default",

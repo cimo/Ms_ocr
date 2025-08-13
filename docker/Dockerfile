@@ -76,6 +76,6 @@ RUN python3 -m pip install pip --upgrade \
 CMD tesseract --version \
     && tesseract --list-langs \
     # Node
-    && node ${PATH_ROOT}dist/controller/Server.js
+    && node ${PATH_ROOT}dist/src/controller/Server.js
 
 EXPOSE ${SERVER_PORT}

@@ -5,7 +5,7 @@ import Cors from "cors";
 import * as Http from "http";
 import * as Https from "https";
 import Fs from "fs";
-import { Ca } from "@cimo/authentication";
+import { Ca } from "@cimo/authentication/dist/src/Main";
 
 // Source
 import * as HelperSrc from "../HelperSrc";
@@ -21,7 +21,7 @@ export default class ControllerServer {
     // Method
     constructor() {
         this.corsOption = {
-            originList: HelperSrc.URL_CORS_ORIGIN,
+            originList: [HelperSrc.URL_CORS_ORIGIN],
             methodList: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
             preflightContinue: false,
             optionsSuccessStatus: 200

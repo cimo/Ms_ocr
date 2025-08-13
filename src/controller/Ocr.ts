@@ -1,6 +1,6 @@
 import Express, { Request, Response } from "express";
 import { execFile } from "child_process";
-import { Ca } from "@cimo/authentication";
+import { Ca } from "@cimo/authentication/dist/src/Main";
 
 // Source
 import * as HelperSrc from "../HelperSrc";

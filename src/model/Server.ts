@@ -1,7 +1,7 @@
 import { Request } from "express";
 
 export interface Icors {
-    originList: string | string[] | undefined;
+    originList: string[];
     methodList: string[];
     preflightContinue: boolean;
     optionsSuccessStatus: number;

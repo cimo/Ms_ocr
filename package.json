@@ -6,19 +6,20 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/cimo/Ms_ocr.git"
+        "url": "git+https://github.com/cimo/Ms_ocr.git"
     },
     "scripts": {
         "preinstall": "npx npm-force-resolutions",
         "remove_dist": "node -e \"const fs = require('fs'); try{ fs.rmdirSync('./dist/', { recursive: true }) } catch{}; process.exit(0);\"",
-        "check": "eslint --no-cache --config eslint.config.js --fix",
-        "build": "npm run remove_dist && npm run check && tsc --build tsconfig.build.json && npm audit",
+        "check": "eslint --no-cache --config eslint.config.js",
+        "build_tsc": "npm run remove_dist && tsc --build tsconfig.tsc.json && npm run check",
+        "build": "npm audit && npm run build_tsc",
         "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/authentication": "1.1.19",
-        "@cimo/form-data_parser": "1.1.25",
-        "@cimo/environment": "1.0.11",
+        "@cimo/authentication": "1.1.22",
+        "@cimo/form-data_parser": "1.1.28",
+        "@cimo/environment": "1.0.14",
         "express": "4.21.2",
         "express-rate-limit": "7.5.0",
         "cookie-parser": "1.4.7",
@@ -26,7 +27,7 @@
     },
     "devDependencies": {
         "typescript": "5.7.2",
-        "eslint": "9.20.1",
+        "eslint": "9.31.0",
         "@typescript-eslint/parser": "8.24.1",
         "@typescript-eslint/eslint-plugin": "8.24.1",
         "eslint-plugin-prettier": "5.2.1",

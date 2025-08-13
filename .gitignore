@@ -22,9 +22,11 @@ pnpm-debug.log*
 
 # cimo +
 .cache
+.config
 .local
 .ms_cronjob-volume
 .npm
+.pki
 certificate/*
 !certificate/**/
 certificate/proxy/*

@@ -1,6 +1,6 @@
 import { Request } from "express";
 import Fs from "fs";
-import { Cfdp, CfdpModel } from "@cimo/form-data_parser";
+import { Cfdp, CfdpModel } from "@cimo/form-data_parser/dist/src/Main";
 
 // Source
 import * as HelperSrc from "../HelperSrc";

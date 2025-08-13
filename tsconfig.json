@@ -6,14 +6,26 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "outDir": "./dist/",
         "baseUrl": "./",
-        "strict": true,
-        "importHelpers": false,
-        "experimentalDecorators": true,
-        "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
+        "importHelpers": false,
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "experimentalDecorators": true,
+        "skipLibCheck": true,
         "removeComments": true,
-        "noImplicitAny": false,
         "sourceMap": true
-    }
+    },
+    "include": [
+        "eslint.customRule.ts",
+        "global.d.ts",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "file/input/**/*.ts",
+        "file/input/**/*.tsx"
+    ],
+    "exclude": ["dist", "node_modules", "public"]
 }

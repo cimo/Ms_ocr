@@ -1,6 +1,6 @@
 {
-    "ext": "ts,js,scss",
+    "ext": "ts,tsx,js,jsx,scss",
     "watch": ["src"],
     "ignore": [],
-    "exec": "npm run build && node ./dist/controller/Server.js"
+    "exec": "npm run build && node ./dist/src/controller/Server.js"
 }
