@@ -8,20 +8,20 @@ import Fs from "fs";
 import { Ca } from "@cimo/authentication/dist/src/Main";
 
 // Source
-import * as HelperSrc from "../HelperSrc";
-import * as ModelServer from "../model/Server";
+import * as helperSrc from "../HelperSrc";
+import * as modelServer from "../model/Server";
 import ControllerOcr from "./Ocr";
 
 export default class ControllerServer {
     // Variable
-    private corsOption: ModelServer.Icors;
-    private limiterOption: ModelServer.Ilimiter;
+    private corsOption: modelServer.Icors;
+    private limiterOption: modelServer.Ilimiter;
     private app: Express.Express;
 
     // Method
     constructor() {
         this.corsOption = {
-            originList: [HelperSrc.URL_CORS_ORIGIN],
+            originList: [helperSrc.URL_CORS_ORIGIN],
             methodList: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
             preflightContinue: false,
             optionsSuccessStatus: 200
@@ -38,7 +38,7 @@ export default class ControllerServer {
     createSetting = (): void => {
         this.app.use(Express.json());
         this.app.use(Express.urlencoded({ extended: true }));
-        this.app.use(Express.static(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_PUBLIC}`));
+        this.app.use(Express.static(`${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}`));
         this.app.use(CookieParser());
         this.app.use(
             Cors({
@@ -47,7 +47,7 @@ export default class ControllerServer {
                 optionsSuccessStatus: this.corsOption.optionsSuccessStatus
             })
         );
-        this.app.use((request: ModelServer.Irequest, _, next: NextFunction) => {
+        this.app.use((request: modelServer.Irequest, _, next: NextFunction) => {
             const headerForwarded = request.headers["x-forwarded-for"] ? request.headers["x-forwarded-for"][0] : "";
             const removeAddress = request.socket.remoteAddress ? request.socket.remoteAddress : "";
 
@@ -66,11 +66,11 @@ export default class ControllerServer {
     createServer = (): void => {
         let creation: Http.Server | Https.Server;
 
-        if (HelperSrc.locationFromEnvName() === "jp") {
+        if (helperSrc.locationFromEnvName() === "jp") {
             creation = Https.createServer(
                 {
-                    key: Fs.readFileSync(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_CERTIFICATE_KEY}`),
-                    cert: Fs.readFileSync(`${HelperSrc.PATH_ROOT}${HelperSrc.PATH_CERTIFICATE_CRT}`)
+                    key: Fs.readFileSync(`${helperSrc.PATH_ROOT}${helperSrc.PATH_CERTIFICATE_KEY}`),
+                    cert: Fs.readFileSync(`${helperSrc.PATH_ROOT}${helperSrc.PATH_CERTIFICATE_CRT}`)
                 },
                 this.app
             );
@@ -80,26 +80,26 @@ export default class ControllerServer {
 
         const server = creation;
 
-        server.listen(HelperSrc.SERVER_PORT, () => {
+        server.listen(helperSrc.SERVER_PORT, () => {
             const controllerOcr = new ControllerOcr(this.app);
             controllerOcr.api();
 
-            const serverTime = HelperSrc.serverTime();
+            const serverTime = helperSrc.serverTime();
 
-            HelperSrc.writeLog("Server.ts => createServer() => listen()", `Port: ${HelperSrc.SERVER_PORT} - Time: ${serverTime}`);
+            helperSrc.writeLog("Server.ts - createServer() - listen()", `Port: ${helperSrc.SERVER_PORT} - Time: ${serverTime}`);
 
-            this.app.get("/info", (request: ModelServer.Irequest, response: Response) => {
-                HelperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
+            this.app.get("/info", (request: modelServer.Irequest, response: Response) => {
+                helperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
             });
 
             this.app.get("/login", (_request: Request, response: Response) => {
-                Ca.writeCookie(`${HelperSrc.LABEL}_authentication`, response);
+                Ca.writeCookie(`${helperSrc.LABEL}_authentication`, response);
 
-                HelperSrc.responseBody("Logged.", "", response, 200);
+                helperSrc.responseBody("Logged.", "", response, 200);
             });
 
             this.app.get("/logout", Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                Ca.removeCookie(`${HelperSrc.LABEL}_authentication`, request, response);
+                Ca.removeCookie(`${helperSrc.LABEL}_authentication`, request, response);
 
                 response.redirect("info");
             });
@@ -111,4 +111,4 @@ const controllerServer = new ControllerServer();
 controllerServer.createSetting();
 controllerServer.createServer();
 
-HelperSrc.keepProcess();
+helperSrc.keepProcess();

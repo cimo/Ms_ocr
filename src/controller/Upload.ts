@@ -3,7 +3,7 @@ import Fs from "fs";
 import { Cfdp, CfdpModel } from "@cimo/form-data_parser/dist/src/Main";
 
 // Source
-import * as HelperSrc from "../HelperSrc";
+import * as helperSrc from "../HelperSrc";
 
 export default class ControllerUpload {
     // Variable
@@ -30,12 +30,12 @@ export default class ControllerUpload {
                 if (resultCheckRequest === "") {
                     for (const formData of formDataList) {
                         if (formData.name === "file" && formData.filename && formData.buffer) {
-                            const input = `${HelperSrc.PATH_ROOT}${HelperSrc.PATH_FILE_INPUT}${formData.filename}`;
+                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${formData.filename}`;
 
                             if (isFileExists && Fs.existsSync(input)) {
                                 reject("File exists.");
                             } else {
-                                HelperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
+                                helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
                                     if (resultFileWriteStream) {
                                         resolve(formDataList);
                                     } else {
@@ -69,9 +69,9 @@ export default class ControllerUpload {
             if (formData.name === "file") {
                 if (formData.filename === "" || formData.mimeType === "" || formData.size === "") {
                     result += "File input empty.";
-                } else if (!HelperSrc.fileCheckMimeType(formData.mimeType)) {
+                } else if (!helperSrc.fileCheckMimeType(formData.mimeType)) {
                     result += "Mime type are not allowed.";
-                } else if (!HelperSrc.fileCheckSize(formData.size)) {
+                } else if (!helperSrc.fileCheckSize(formData.size)) {
                     result += "File size exceeds limit.";
                 }
             }
