@@ -5,7 +5,7 @@ import { Cfdp, CfdpModel } from "@cimo/form-data_parser/dist/src/Main";
 // Source
 import * as helperSrc from "../HelperSrc";
 
-export default class ControllerUpload {
+export default class Upload {
     // Variable
 
     // Method
@@ -29,8 +29,8 @@ export default class ControllerUpload {
 
                 if (resultCheckRequest === "") {
                     for (const formData of formDataList) {
-                        if (formData.name === "file" && formData.filename && formData.buffer) {
-                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${formData.filename}`;
+                        if (formData.name === "file" && formData.fileName && formData.buffer) {
+                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${formData.fileName}`;
 
                             if (isFileExists && Fs.existsSync(input)) {
                                 reject("File exists.");
@@ -67,20 +67,20 @@ export default class ControllerUpload {
             parameterList.push(formData.name);
 
             if (formData.name === "file") {
-                if (formData.filename === "" || formData.mimeType === "" || formData.size === "") {
+                if (formData.fileName === "" || formData.mimeType === "" || formData.size === "") {
                     result += "File input empty.";
                 } else if (!helperSrc.fileCheckMimeType(formData.mimeType)) {
                     result += "Mime type are not allowed.";
-                } else if (!helperSrc.fileCheckSize(formData.size)) {
+                } else if (!helperSrc.fileCheckSize(parseInt(formData.size))) {
                     result += "File size exceeds limit.";
                 }
             }
         }
 
-        if (!parameterList.includes("filename")) {
-            result += "Filename parameter missing.";
+        if (!parameterList.includes("fileName")) {
+            result += "Parameter 'fileName' is missing.";
         } else if (!parameterList.includes("file")) {
-            result += "File parameter missing.";
+            result += "Parameter 'file' is missing.";
         }
 
         return result;

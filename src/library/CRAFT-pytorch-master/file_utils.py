@@ -13,9 +13,9 @@ def list_files(in_path):
     img_files = []
     mask_files = []
     gt_files = []
-    for (dirpath, dirnames, filenames) in os.walk(in_path):
-        for file in filenames:
-            filename, ext = os.path.splitext(file)
+    for (dirpath, dirnames, fileNames) in os.walk(in_path):
+        for file in fileNames:
+            fileName, ext = os.path.splitext(file)
             ext = str.lower(ext)
             if ext == '.jpg' or ext == '.jpeg' or ext == '.gif' or ext == '.png' or ext == '.pgm':
                 img_files.append(os.path.join(dirpath, file))
@@ -43,11 +43,11 @@ def saveResult(img_file, img, boxes, dirname='./result/', verticals=None, texts=
         img = np.array(img)
 
         # make result file list
-        filename, file_ext = os.path.splitext(os.path.basename(img_file))
+        fileName, file_ext = os.path.splitext(os.path.basename(img_file))
 
         # result directory
-        res_file = dirname + "res_" + filename + '.txt'
-        res_img_file = dirname + "res_" + filename + '.jpg'
+        res_file = dirname + "res_" + fileName + '.txt'
+        res_img_file = dirname + "res_" + fileName + '.jpg'
 
         if not os.path.isdir(dirname):
             os.mkdir(dirname)

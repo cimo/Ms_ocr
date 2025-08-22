@@ -6,7 +6,7 @@ import { Ca } from "@cimo/authentication/dist/src/Main";
 import * as helperSrc from "../HelperSrc";
 import ControllerUpload from "./Upload";
 
-export default class ControllerAntivirus {
+export default class ControllerOcr {
     // Variable
     private app: Express.Express;
     private controllerUpload: ControllerUpload;
@@ -23,14 +23,14 @@ export default class ControllerAntivirus {
                 await this.controllerUpload
                     .execute(request, true)
                     .then((resultControllerUploadList) => {
-                        let filename = "";
+                        let fileName = "";
                         let language = "";
                         let result = "";
                         let debug = "";
 
                         for (const resultControllerUpload of resultControllerUploadList) {
-                            if (resultControllerUpload.name === "file" && resultControllerUpload.filename) {
-                                filename = resultControllerUpload.filename;
+                            if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
+                                fileName = resultControllerUpload.fileName;
                             } else if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
                                 language = resultControllerUpload.buffer.toString().match("^(jp|jp_vert|en)$")
                                     ? resultControllerUpload.buffer.toString()
@@ -46,12 +46,12 @@ export default class ControllerAntivirus {
                             }
                         }
 
-                        const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${filename}`;
-                        const outputResult = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${filename}_result.png`;
-                        const output = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${filename}.${result}`;
+                        const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${fileName}`;
+                        const outputResult = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${fileName}_result.png`;
+                        const output = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${fileName}.${result}`;
 
                         const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_SCRIPT}command1.sh`;
-                        const execArgumentList = [`"${filename}"`, `"${language}"`, `"${result}"`, `"${debug}"`];
+                        const execArgumentList = [`"${fileName}"`, `"${language}"`, `"${result}"`, `"${debug}"`];
 
                         execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout, stderr) => {
                             // Tesseract use always stderr for the output
@@ -61,7 +61,7 @@ export default class ControllerAntivirus {
                                         helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
                                     } else {
                                         helperSrc.writeLog(
-                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - fileReadStream()",
+                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream()",
                                             resultFileReadStream.toString()
                                         );
 
@@ -71,7 +71,7 @@ export default class ControllerAntivirus {
                                     helperSrc.fileRemove(input, (resultFileRemove) => {
                                         if (typeof resultFileRemove !== "boolean") {
                                             helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - fileReadStream() - fileRemove(input)",
+                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - fileRemove(input)",
                                                 resultFileRemove.toString()
                                             );
 
@@ -82,7 +82,7 @@ export default class ControllerAntivirus {
                                     helperSrc.fileRemove(outputResult, (resultFileRemove) => {
                                         if (typeof resultFileRemove !== "boolean") {
                                             helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - fileReadStream() - fileRemove(outputResult)",
+                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - fileRemove(outputResult)",
                                                 resultFileRemove.toString()
                                             );
 
@@ -93,7 +93,7 @@ export default class ControllerAntivirus {
                                     helperSrc.fileRemove(output, (resultFileRemove) => {
                                         if (typeof resultFileRemove !== "boolean") {
                                             helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - fileReadStream() - fileRemove(output)",
+                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - fileRemove(output)",
                                                 resultFileRemove.toString()
                                             );
 
@@ -102,14 +102,14 @@ export default class ControllerAntivirus {
                                     });
                                 });
                             } else if (stdout !== "" || stderr === "") {
-                                helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - stdout", stdout);
+                                helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
                                 helperSrc.fileRemove(input, (resultFileRemove) => {
                                     if (typeof resultFileRemove !== "boolean") {
                                         stderr += resultFileRemove;
 
                                         helperSrc.writeLog(
-                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile(python3) - fileRemove(input)",
+                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileRemove(input)",
                                             resultFileRemove.toString()
                                         );
                                     }

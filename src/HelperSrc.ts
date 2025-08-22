@@ -30,6 +30,40 @@ export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
 export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
 
+export const LOCALE = "jp";
+
+const localeConfiguration: Record<string, { locale: string; currency: string }> = {
+    // Europe
+    it: { locale: "it-IT", currency: "EUR" },
+    fr: { locale: "fr-FR", currency: "EUR" },
+    de: { locale: "de-DE", currency: "EUR" },
+    es: { locale: "es-ES", currency: "EUR" },
+    pt: { locale: "pt-PT", currency: "EUR" },
+    nl: { locale: "nl-NL", currency: "EUR" },
+    ru: { locale: "ru-RU", currency: "RUB" },
+    pl: { locale: "pl-PL", currency: "PLN" },
+    sv: { locale: "sv-SE", currency: "SEK" },
+    // Asia
+    jp: { locale: "ja-JP", currency: "JPY" },
+    cn: { locale: "zh-CN", currency: "CNY" },
+    tw: { locale: "zh-TW", currency: "TWD" },
+    kr: { locale: "ko-KR", currency: "KRW" },
+    in: { locale: "hi-IN", currency: "INR" },
+    th: { locale: "th-TH", currency: "THB" },
+    // America
+    us: { locale: "en-US", currency: "USD" },
+    mx: { locale: "es-MX", currency: "MXN" },
+    br: { locale: "pt-BR", currency: "BRL" },
+    ca: { locale: "fr-CA", currency: "CAD" },
+    // Africa
+    ke: { locale: "sw-KE", currency: "KES" },
+    za: { locale: "af-ZA", currency: "ZAR" },
+    eg: { locale: "ar-EG", currency: "EGP" },
+    // Oceania
+    au: { locale: "en-AU", currency: "AUD" },
+    nz: { locale: "mi-NZ", currency: "NZD" }
+};
+
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
     if (DEBUG === "true") {
         if (typeof process !== "undefined") {
@@ -119,14 +153,14 @@ export const fileCheckMimeType = (value: string): boolean => {
     return false;
 };
 
-export const fileCheckSize = (value: string): boolean => {
-    const fileSizeMb = parseInt(FILE_SIZE_MB ? FILE_SIZE_MB : "0") * 1024 * 1024;
+export const fileCheckSize = (byte: number): boolean => {
+    const maxSizeByte = parseInt(FILE_SIZE_MB) * 1024 * 1024;
 
-    if (fileSizeMb >= parseInt(value)) {
-        return true;
+    if (byte > maxSizeByte) {
+        return false;
     }
 
-    return false;
+    return true;
 };
 
 export const responseBody = (stdoutValue: string, stderrValue: string | Error, response: Response, mode: number): void => {
@@ -153,13 +187,13 @@ export const isJson = (value: string): boolean => {
     }
 };
 
-export const removeAnsiEscape = (text: string) => {
+export const removeAnsiEscape = (text: string): string => {
     const regex = new RegExp(["\x1b", "[", "[0-9;]*", "[a-zA-Z]"].join(""), "g");
 
     return text.replace(regex, "");
 };
 
-export const locationFromEnvName = () => {
+export const locationFromEnvName = (): string | undefined => {
     let result = ENV_NAME.split("_").pop();
 
     if (result === "local") {
@@ -167,4 +201,28 @@ export const locationFromEnvName = () => {
     }
 
     return result;
+};
+
+export const localeFormat = (value: number | Date): string | undefined => {
+    if (typeof value === "number") {
+        const formatOptions: Intl.NumberFormatOptions = {
+            style: "decimal",
+            currency: localeConfiguration[LOCALE].currency
+        };
+
+        return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+    } else if (value instanceof Date) {
+        const formatOptions: Intl.DateTimeFormatOptions = {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        };
+
+        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+    }
+
+    return undefined;
 };
