@@ -53,18 +53,15 @@ export default class Server {
                 limit: this.limiterOption.limit
             })
         );
-        this.app.use((_request: modelServer.Irequest, response: Response, next: NextFunction) => {
+        this.app.use((request: modelServer.Irequest, response: Response, next: NextFunction) => {
             response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
             response.setHeader("Pragma", "no-cache");
             response.setHeader("Expires", "0");
 
-            next();
-        });
-        this.app.use((request: modelServer.Irequest, _, next: NextFunction) => {
             const headerForwarded = request.headers["x-forwarded-for"] ? request.headers["x-forwarded-for"][0] : "";
-            const removeAddress = request.socket.remoteAddress ? request.socket.remoteAddress : "";
+            const remoteAddress = request.socket.remoteAddress ? request.socket.remoteAddress : "";
 
-            request.clientIp = headerForwarded || removeAddress;
+            request.clientIp = headerForwarded || remoteAddress;
 
             next();
         });
@@ -95,34 +92,39 @@ export default class Server {
 
             helperSrc.writeLog("Server.ts - createServer() - listen()", `Port: ${helperSrc.SERVER_PORT} - Time: ${serverTime}`);
 
-            this.app.get("/login", (_request: Request, response: Response) => {
-                Ca.writeCookie(`${helperSrc.LABEL}_authentication`, response);
-
-                helperSrc.responseBody("Logged.", "", response, 200);
+            this.app.get("/", Ca.authenticationMiddleware, (request: Request, response: Response) => {
+                if (request.accepts("html")) {
+                    response.sendFile(`${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}index.html`);
+                } else {
+                    response.status(404).send("/: html not found!");
+                }
             });
 
-            this.app.get("/logout", Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                Ca.removeCookie(`${helperSrc.LABEL}_authentication`, request, response);
+            this.app.get("/file/*", Ca.authenticationMiddleware, (request: Request, response: Response) => {
+                const relativePath = request.path.replace("/file/", "");
+                const filePath = `${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}file/${relativePath}`;
 
-                response.redirect("/info");
+                if (Fs.existsSync(filePath)) {
+                    response.sendFile(filePath);
+                } else {
+                    response.status(404).send("/file/*: file not found!");
+                }
             });
 
             this.app.get("/info", (request: modelServer.Irequest, response: Response) => {
                 helperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
             });
 
-            this.app.get("/file/*", Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                const filePath = `${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}${request.path}`;
+            this.app.get("/login", (_request: Request, response: Response) => {
+                Ca.writeCookie(`${helperSrc.LABEL}_authentication`, response);
 
-                if (Fs.existsSync(filePath)) {
-                    response.sendFile(filePath);
-                } else {
-                    response.status(404).send("File not found!");
-                }
+                response.redirect(`${helperSrc.URL_ROOT}/`);
             });
 
-            this.app.get("*", Ca.authenticationMiddleware, (_request: Request, response: Response) => {
-                response.sendFile(`${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}index.html`);
+            this.app.get("/logout", Ca.authenticationMiddleware, (request: Request, response: Response) => {
+                Ca.removeCookie(`${helperSrc.LABEL}_authentication`, request, response);
+
+                response.redirect(`${helperSrc.URL_ROOT}/info`);
             });
         });
     };
