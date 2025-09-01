@@ -1,8 +1,8 @@
 const global = require("globals");
 const prettierPlugin = require("eslint-plugin-prettier");
+const customRule = require("./dist/eslint.customRule");
 const typescriptParser = require("@typescript-eslint/parser");
 const typescriptPlugin = require("@typescript-eslint/eslint-plugin");
-const customRule = require("./dist/eslint.customRule");
 
 const configIgnore = {
     ignores: ["dist", "node_modules", "public", ".cache", ".config", ".local", ".ms_cronjob-volume", ".npm", ".pki"]
@@ -54,19 +54,19 @@ const configTypescript = {
     },
     plugins: {
         ...configBase.plugins,
-        "@typescript-eslint": typescriptPlugin,
-        "custom-rule": customRule
+        "custom-rule": customRule,
+        "@typescript-eslint": typescriptPlugin
     },
     rules: {
         ...configBase.rules,
+        "custom-rule/no-array-assignment-for-object-type": "error",
         "@typescript-eslint/no-explicit-any": "error",
         "@typescript-eslint/no-unused-vars": [
             "error",
             {
                 varsIgnorePattern: "^jsxFactory$"
             }
-        ],
-        "custom-rule/disallow-array-for-object-type": "error"
+        ]
     }
 };
 

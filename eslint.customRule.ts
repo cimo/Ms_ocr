@@ -2,19 +2,19 @@ import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import { RuleContext } from "@typescript-eslint/utils/dist/ts-eslint";
 
 export const rules = {
-    "disallow-array-for-object-type": {
+    "no-array-assignment-for-object-type": {
         meta: {
             type: "problem",
             docs: {
-                description: "Disallow array for object type.",
+                description: "Safe array assignment for object type.",
                 recommended: false
             },
             messages: {
-                disallowArrayForObjectType: "Array for object type are disallowed."
+                noArrayAssignmentForObjectType: "Array assign for object type is disallowed."
             },
             schema: []
         },
-        create(context: RuleContext<"disallowArrayForObjectType", []>) {
+        create(context: RuleContext<"noArrayAssignmentForObjectType", []>) {
             const parserServices = ESLintUtils.getParserServices(context);
 
             return {
@@ -24,10 +24,11 @@ export const rules = {
                     const type = checker.getTypeAtLocation(tsNode);
 
                     const indexType = type.getStringIndexType();
+
                     if (indexType) {
                         context.report({
                             node,
-                            messageId: "disallowArrayForObjectType"
+                            messageId: "noArrayAssignmentForObjectType"
                         });
                     }
                 }
