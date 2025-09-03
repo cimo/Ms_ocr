@@ -46,8 +46,8 @@ def saveResult(img_file, img, boxes, dirname, verticals=None, texts=None):
         os.makedirs(dirname, exist_ok=True)
 
         # result directory
-        res_file = os.path.join(dirname, f"res_{filename}.txt")
-        res_img_file = os.path.join(dirname, f"res_{filename}.jpg")
+        res_file = os.path.join(dirname, f"{filename}.txt")
+        res_img_file = os.path.join(dirname, f"{filename}.jpg")
 
         with open(res_file, 'w') as f:
             for i, box in enumerate(boxes):

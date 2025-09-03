@@ -1,15 +1,5 @@
 import numpy as np
-from skimage import io
 import cv2
-
-def loadImage(img_file):
-    img = io.imread(img_file)           # RGB order
-    if img.shape[0] == 2: img = img[0]
-    if len(img.shape) == 2 : img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    if img.shape[2] == 4:   img = img[:,:,:3]
-    img = np.array(img)
-
-    return img
 
 def normalizeMeanVariance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
     # should be RGB order
@@ -57,8 +47,3 @@ def resize_aspect_ratio(img, square_size, interpolation, mag_ratio=1):
     size_heatmap = (int(target_w/2), int(target_h/2))
 
     return resized, ratio, size_heatmap
-
-def cvt2HeatmapImg(img):
-    img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
-    img = cv2.applyColorMap(img, cv2.COLORMAP_JET)
-    return img
