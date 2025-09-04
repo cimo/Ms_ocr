@@ -23,12 +23,12 @@ class _DoubleConvolution(torchNN.Module):
         return self.conv(x)
 
 class Craft(torchNN.Module):
-    def _upsampleAndConcatenate(self, x, source):
-        x = torchNNfunctional.interpolate(x, size=source.size()[2:], mode="bilinear", align_corners=False)
+    def _upsampleAndConcatenate(self, scoreMap, basenet):
+        scoreMap = torchNNfunctional.interpolate(scoreMap, size=basenet.size()[2:], mode="bilinear", align_corners=False)
 
-        return torch.cat([x, source], dim=1)
+        return torch.cat([scoreMap, basenet], dim=1)
 
-    def __init__(self, pretrained=False, freeze=False):
+    def __init__(self, pretrained, freeze):
         super(Craft, self).__init__()
 
         self.basenet = Vgg16Bn(pretrained, freeze)
@@ -49,23 +49,23 @@ class Craft(torchNN.Module):
         )
 
         for convolution in [self.upconv1, self.upconv2, self.upconv3, self.upconv4, self.conv_cls]:
-            Vgg16Bn.init_weights(convolution.modules())
+            Vgg16Bn.weight(convolution.modules())
 
-    def forward(self, x):
-        basenetList = self.basenet(x)
+    def forward(self, modelInput):
+        basenetList = self.basenet(modelInput)
 
-        y = torch.cat([basenetList[0], basenetList[1]], dim=1)
-        y = self.upconv1(y)
+        scoreMap = torch.cat([basenetList[0], basenetList[1]], dim=1)
+        scoreMap = self.upconv1(scoreMap)
 
-        y = self._upsampleAndConcatenate(y, basenetList[2])
-        y = self.upconv2(y)
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[2])
+        scoreMap = self.upconv2(scoreMap)
 
-        y = self._upsampleAndConcatenate(y, basenetList[3])
-        y = self.upconv3(y)
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[3])
+        scoreMap = self.upconv3(scoreMap)
 
-        y = self._upsampleAndConcatenate(y, basenetList[4])
-        feature = self.upconv4(y)
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[4])
+        feature = self.upconv4(scoreMap)
 
-        y = self.conv_cls(feature)
+        scoreMap = self.conv_cls(feature)
 
-        return y.permute(0, 2, 3, 1), feature
+        return scoreMap.permute(0, 2, 3, 1), feature
