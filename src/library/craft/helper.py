@@ -15,9 +15,9 @@ imageName = "test_5.jpg"
 weightMain = "craft_mlt_25k.pth"
 weightRefine="craft_refiner_CTW1500.pth"
 sizeMax = 4096
-ratioMultiplier = 2.0
-lowText = 0.2
-thresholdText = 0.4
+ratioMultiplier = 1.0
+lowText = 0.1
+thresholdText = 0.2
 thresholdLink = 0.4
 isCuda=False
 isRefine=True
@@ -178,12 +178,12 @@ def preprocess(image):
 
     imageColor = cv2.cvtColor(invertBA, cv2.COLOR_GRAY2BGR)
 
+    imageResize, ratioWidth, ratioHeight = _imageResize(imageColor)
+
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
     path = os.path.join(pathOutput, f"{fileName}_preprocess{fileExtension}")
-    imageWrite = (numpy.clip(imageColor, 0, 1) * 255).astype(numpy.uint8)
+    imageWrite = numpy.clip(imageResize, 0, 255).astype(numpy.uint8)
     cv2.imwrite(path, imageWrite)
-
-    imageResize, ratioWidth, ratioHeight = _imageResize(imageColor)
 
     return imageColor, imageResize, ratioWidth, ratioHeight
 
