@@ -46,6 +46,4 @@ public/asset/js/*
 public/asset/style/*
 !public/asset/style/.gitkeep
 public/index.html
-src/library/craft/result/*
-src/library/craft/vgg16_bn-6c64b313.pth
 package-lock.json

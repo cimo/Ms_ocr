@@ -11,13 +11,13 @@ pathRoot = os.path.dirname(os.path.abspath(__file__))
 pathInput = os.path.join(pathRoot, "input")
 pathOutput = os.path.join(pathRoot, "output")
 
-imageName = "test_1.jpg"
+imageName = "test_5.jpg"
 weightMain = "craft_mlt_25k.pth"
 weightRefine="craft_refiner_CTW1500.pth"
 sizeMax = 4096
-ratioMultiplier = 3.0
-lowText = 0.4
-thresholdText = 0.7
+ratioMultiplier = 2.0
+lowText = 0.2
+thresholdText = 0.4
 thresholdLink = 0.4
 isCuda=False
 isRefine=True
@@ -25,13 +25,13 @@ isRefine=True
 def _imageResize(image):
     height, width, channel = image.shape
 
-    size = ratioMultiplier * max(width, height)
+    size = ratioMultiplier * max(height, width)
 
     if size > sizeMax:
         size = sizeMax
 
-    ratio = size / max(width, height)
-    
+    ratio = size / max(height, width)
+
     targetWidth = int(width * ratio)
     targetHeight = int(height * ratio)
 
@@ -49,10 +49,10 @@ def _imageResize(image):
     imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
     imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
 
-    ratioWidth = targetWidth / float(width)
-    ratioHeight = targetHeight / float(height)
+    ratioWidth = 1 / ratio
+    ratioHeight = 1 / ratio
 
-    return imageResult, ratio, ratioWidth, ratioHeight
+    return imageResult, ratioWidth, ratioHeight
 
 def _normalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
     imageResult = image.copy().astype(numpy.float32)
@@ -124,15 +124,17 @@ def _boxDetection(scoreTextValue, scoreLinkValue):
 
     return boxList
 
-def _boxRatio(boxListValue, ratio, ratioWidth, ratioHeight):
+def _boxRatio(boxListValue, ratioWidth, ratioHeight):
     if len(boxListValue) > 0:
         boxList = numpy.array(boxListValue)
 
         for index in range(len(boxList)):
             if boxList[index] is not None:
-                boxList[index] *= (ratioWidth * ratio, ratioHeight * ratio)
+                boxList[index] *= (ratioWidth * 2, ratioHeight * 2)
 
-    return boxList
+        return boxList
+    
+    return boxListValue
 
 def removeDataParallel(stateDict):
     if list(stateDict.keys())[0].startswith("module"):
@@ -161,32 +163,29 @@ def preprocess(image):
         imageLoad = imageLoad[:, :, :3]
 
     imageGray = cv2.cvtColor(imageLoad, cv2.COLOR_BGR2GRAY)
-    #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    #imageContrast = clahe.apply(imageGray)
-    imageBlur = cv2.GaussianBlur(imageGray, (91, 91), 0)
-    imageDivide = cv2.divide(imageGray, imageBlur, scale=255)
 
-    imageBinarization = cv2.adaptiveThreshold(
-        imageDivide,
-        255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY,
-        255,
-        0
-    )
+    denoise = cv2.medianBlur(imageGray, 1)
 
-    kernel = numpy.ones((1, 1), numpy.uint8)
-    imageMorphology = cv2.morphologyEx(imageBinarization, cv2.MORPH_CLOSE, kernel)
-    imageColor = cv2.cvtColor(imageMorphology, cv2.COLOR_GRAY2BGR)
+    threshold = cv2.adaptiveThreshold(denoise, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 10)
 
-    imageResize, ratio, ratioWidth, ratioHeight = _imageResize(imageColor)
+    invertAB = cv2.bitwise_not(threshold)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+
+    clean = cv2.morphologyEx(invertAB, cv2.MORPH_OPEN, kernel, iterations=0)
+
+    invertBA = cv2.bitwise_not(clean)
+
+    imageColor = cv2.cvtColor(invertBA, cv2.COLOR_GRAY2BGR)
 
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
     path = os.path.join(pathOutput, f"{fileName}_preprocess{fileExtension}")
-    imageWrite = imageResize.astype(numpy.uint8)
+    imageWrite = (numpy.clip(imageColor, 0, 1) * 255).astype(numpy.uint8)
     cv2.imwrite(path, imageWrite)
 
-    return imageResize, ratio, ratioWidth, ratioHeight
+    imageResize, ratioWidth, ratioHeight = _imageResize(imageColor)
+
+    return imageColor, imageResize, ratioWidth, ratioHeight
 
 def inference(imageValue, craft, refineNet):
     timeStart = time.time()
@@ -217,22 +216,20 @@ def inference(imageValue, craft, refineNet):
     
     print(f"Time inference: {time.time() - timeStart}")
 
-    return scoreText, scoreLink
-
-def postprocess(scoreText, scoreLink):
     scoreTextCopy = scoreText.copy()
     hStack = numpy.hstack((scoreTextCopy, scoreLink))
-    
+
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
-    path = os.path.join(pathOutput, f"{fileName}_postprocess{fileExtension}")
+    path = os.path.join(pathOutput, f"{fileName}_heatmap{fileExtension}")
     imageWrite = (numpy.clip(hStack, 0, 1) * 255).astype(numpy.uint8)
     imageMask = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
     cv2.imwrite(path, imageMask)
 
-def output(scoreText, scoreLink, ratio, ratioWidth, ratioHeight, image):
-    boxList = _boxDetection(scoreText, scoreLink)
+    return scoreText, scoreLink
 
-    boxList = _boxRatio(boxList, ratio, ratioWidth, ratioHeight)
+def output(scoreText, scoreLink, ratioWidth, ratioHeight, image):
+    boxList = _boxDetection(scoreText, scoreLink)
+    boxList = _boxRatio(boxList, ratioWidth, ratioHeight)
 
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
     pathText = os.path.join(pathOutput, f"{fileName}.txt")

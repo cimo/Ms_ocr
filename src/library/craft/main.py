@@ -43,11 +43,9 @@ if __name__ == "__main__":
         refineNet.eval()
 
     print(f"Image: {helper.pathInput}/{helper.imageName}\r")
-    
-    image, ratio, ratioWidth, ratioHeight = helper.preprocess(f"{helper.pathInput}/{helper.imageName}")
 
-    scoreText, scoreLink = helper.inference(image, craft, refineNet)
+    image, imageResize, ratioWidth, ratioHeight = helper.preprocess(f"{helper.pathInput}/{helper.imageName}")
 
-    helper.postprocess(scoreText, scoreLink)
+    scoreText, scoreLink = helper.inference(imageResize, craft, refineNet)
 
-    helper.output(scoreText, scoreLink, ratio, ratioWidth, ratioHeight, image)
+    helper.output(scoreText, scoreLink, ratioWidth, ratioHeight, image)
