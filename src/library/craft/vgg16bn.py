@@ -6,7 +6,7 @@ from torchvision import models as torchvisionModel
 
 class Vgg16Bn(torchNN.Module):
     @staticmethod
-    def weight(moduleList):
+    def weightInit(moduleList):
         for module in moduleList:
             if isinstance(module, torchNN.Conv2d):
                 torchNNinit.xavier_uniform_(module.weight.data)
@@ -59,12 +59,12 @@ class Vgg16Bn(torchNN.Module):
         )
 
         if not pretrained:
-            Vgg16Bn.weight(self.slice1.modules())
-            Vgg16Bn.weight(self.slice2.modules())
-            Vgg16Bn.weight(self.slice3.modules())
-            Vgg16Bn.weight(self.slice4.modules())
+            Vgg16Bn.weightInit(self.slice1.modules())
+            Vgg16Bn.weightInit(self.slice2.modules())
+            Vgg16Bn.weightInit(self.slice3.modules())
+            Vgg16Bn.weightInit(self.slice4.modules())
 
-        Vgg16Bn.weight(self.slice5.modules())
+        Vgg16Bn.weightInit(self.slice5.modules())
 
         if freeze:
             for parameter in self.slice1.parameters():

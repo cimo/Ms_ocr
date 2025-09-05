@@ -38,11 +38,11 @@ class RefineNet(torchNN.Module):
             torchNN.Conv2d(128, 1, kernel_size=1)
         )
 
-        Vgg16Bn.weight(self.last_conv.modules())
-        Vgg16Bn.weight(self.aspp1.modules())
-        Vgg16Bn.weight(self.aspp2.modules())
-        Vgg16Bn.weight(self.aspp3.modules())
-        Vgg16Bn.weight(self.aspp4.modules())
+        Vgg16Bn.weightInit(self.last_conv.modules())
+        Vgg16Bn.weightInit(self.aspp1.modules())
+        Vgg16Bn.weightInit(self.aspp2.modules())
+        Vgg16Bn.weightInit(self.aspp3.modules())
+        Vgg16Bn.weightInit(self.aspp4.modules())
 
     def forward(self, scoreMap, feature):
         refine = torch.cat([scoreMap.permute(0,3,1,2), feature], dim=1)

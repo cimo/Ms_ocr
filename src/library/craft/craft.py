@@ -49,7 +49,7 @@ class Craft(torchNN.Module):
         )
 
         for convolution in [self.upconv1, self.upconv2, self.upconv3, self.upconv4, self.conv_cls]:
-            Vgg16Bn.weight(convolution.modules())
+            Vgg16Bn.weightInit(convolution.modules())
 
     def forward(self, modelInput):
         basenetList = self.basenet(modelInput)

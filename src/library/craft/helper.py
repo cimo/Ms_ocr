@@ -2,73 +2,137 @@ import os
 import time
 import cv2
 import numpy
+import math
 import torch
 from torch.autograd import Variable as torchAutograd
 from collections import OrderedDict as collectionOrderDict
-
-#Source
-import craft_utils
 
 pathRoot = os.path.dirname(os.path.abspath(__file__))
 pathInput = os.path.join(pathRoot, "input")
 pathOutput = os.path.join(pathRoot, "output")
 
-imageName = "test_5.jpg"
-modelMain = "craft_mlt_25k.pth"
-modelRefine="craft_refiner_CTW1500.pth"
+imageName = "test_1.jpg"
+weightMain = "craft_mlt_25k.pth"
+weightRefine="craft_refiner_CTW1500.pth"
+sizeMax = 4096
+ratioMultiplier = 3.0
 lowText = 0.4
 thresholdText = 0.7
 thresholdLink = 0.4
-canvasSize = 4096
-magRatio = 1.0
 isCuda=False
 isRefine=True
-isPoly=False
 
 def _imageResize(image):
     height, width, channel = image.shape
 
-    size = magRatio * max(width, height)
+    size = ratioMultiplier * max(width, height)
 
-    if size > canvasSize:
-        size = canvasSize
-    
+    if size > sizeMax:
+        size = sizeMax
+
     ratio = size / max(width, height)
     
-    widthTarget = int(width * ratio)
-    heightTarget = int(height * ratio)
+    targetWidth = int(width * ratio)
+    targetHeight = int(height * ratio)
 
-    imageResize = cv2.resize(image, (widthTarget, heightTarget), interpolation=cv2.INTER_LINEAR)
+    imageResize = cv2.resize(image, (targetWidth, targetHeight), interpolation=cv2.INTER_LINEAR)
 
-    widthTarget32 = widthTarget
-    heightTarget32 = heightTarget
+    target32Width = targetWidth
+    target32Height = targetHeight
     
-    if heightTarget % 32 != 0:
-        heightTarget32 = heightTarget + (32 - heightTarget % 32)
+    if targetHeight % 32 != 0:
+        target32Height = targetHeight + (32 - targetHeight % 32)
     
-    if widthTarget % 32 != 0:
-        widthTarget32 = widthTarget + (32 - widthTarget % 32)
+    if targetWidth % 32 != 0:
+        target32Width = targetWidth + (32 - targetWidth % 32)
     
-    imageResult = numpy.zeros((heightTarget32, widthTarget32, channel), dtype=numpy.float32)
-    imageResult[0:heightTarget, 0:widthTarget, :] = imageResize
+    imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
+    imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
 
-    return ratio, imageResult
+    ratioWidth = targetWidth / float(width)
+    ratioHeight = targetHeight / float(height)
 
-def _normalizeMeanVariance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
-    # should be RGB order
-    img = in_img.copy().astype(numpy.float32)
-    img -= numpy.array([mean[0] * 255.0, mean[1] * 255.0, mean[2] * 255.0], dtype=numpy.float32)
-    img /= numpy.array([variance[0] * 255.0, variance[1] * 255.0, variance[2] * 255.0], dtype=numpy.float32)
-    return img
+    return imageResult, ratio, ratioWidth, ratioHeight
 
-def _denormalizeMeanVariance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
-    # should be RGB order
-    img = in_img.copy()
-    img *= variance
-    img += mean
-    img *= 255.0
-    img = numpy.clip(img, 0, 255).astype(numpy.uint8)
-    return img
+def _normalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
+    imageResult = image.copy().astype(numpy.float32)
+    imageResult -= numpy.array([mean[0] * 255.0, mean[1] * 255.0, mean[2] * 255.0], dtype=numpy.float32)
+    imageResult /= numpy.array([variance[0] * 255.0, variance[1] * 255.0, variance[2] * 255.0], dtype=numpy.float32)
+    
+    return imageResult
+
+def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
+    imageResult = image.copy()
+    imageResult = (imageResult * variance + mean) * 255.0
+    imageResult = numpy.clip(imageResult, 0, 255).astype(numpy.uint8)
+
+    return imageResult
+
+def _boxDetection(scoreTextValue, scoreLinkValue):
+    scoreText = scoreTextValue.copy()
+    scoreLink = scoreLinkValue.copy()
+
+    imageHeight, imageWidth = scoreText.shape
+
+    _, binaryTextMap = cv2.threshold(scoreText, lowText, 1, 0)
+    _, binaryLinkMap = cv2.threshold(scoreLink, thresholdLink, 1, 0)
+
+    textScoreCombined = numpy.clip(binaryTextMap + binaryLinkMap, 0, 1)
+    componentList, componentMap, componentStats, _ = cv2.connectedComponentsWithStats(textScoreCombined.astype(numpy.uint8), connectivity=4)
+
+    boxList = []
+
+    for index in range(1, componentList):
+        size = componentStats[index, cv2.CC_STAT_AREA]
+
+        if size < 10:
+            continue
+        
+        if numpy.max(scoreText[componentMap == index]) < thresholdText:
+            continue
+
+        segmentMap = numpy.zeros(scoreText.shape, dtype=numpy.uint8)
+        segmentMap[componentMap == index] = 255
+        segmentMap[numpy.logical_and(binaryLinkMap == 1, binaryTextMap == 0)] = 0
+
+        bBoxX, bBoxY = componentStats[index, cv2.CC_STAT_LEFT], componentStats[index, cv2.CC_STAT_TOP]
+        bBoxWidth, bBoxHeight = componentStats[index, cv2.CC_STAT_WIDTH], componentStats[index, cv2.CC_STAT_HEIGHT]
+        paddingSize = int(math.sqrt(size * min(bBoxWidth, bBoxHeight) / (bBoxWidth * bBoxHeight)) * 2)
+
+        startX, endX = max(bBoxX - paddingSize, 0), min(bBoxX + bBoxWidth + paddingSize + 1, imageWidth)
+        startY, endY = max(bBoxY - paddingSize, 0), min(bBoxY + bBoxHeight + paddingSize + 1, imageHeight)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + paddingSize, 1 + paddingSize))
+        segmentMap[startY:endY, startX:endX] = cv2.dilate(segmentMap[startY:endY, startX:endX], kernel)
+
+        contour = numpy.roll(numpy.array(numpy.where(segmentMap != 0)), 1, axis=0).transpose().reshape(-1, 2)
+        rectangle = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rectangle)
+
+        width, height = numpy.linalg.norm(box[0] - box[1]), numpy.linalg.norm(box[1] - box[2])
+        boxRatio = max(width, height) / (min(width, height) + 1e-5)
+
+        if abs(1 - boxRatio) <= 0.1:
+            xMin, xMax = min(contour[:, 0]), max(contour[:, 0])
+            yMin, yMax = min(contour[:, 1]), max(contour[:, 1])
+            box = numpy.array([[xMin, yMin], [xMax, yMin], [xMax, yMax], [xMin, yMax]], dtype=numpy.float32)
+
+        indexStart = box.sum(axis=1).argmin()
+        box = numpy.roll(box, 4 - indexStart, 0)
+
+        boxList.append(box)
+
+    return boxList
+
+def _boxRatio(boxListValue, ratio, ratioWidth, ratioHeight):
+    if len(boxListValue) > 0:
+        boxList = numpy.array(boxListValue)
+
+        for index in range(len(boxList)):
+            if boxList[index] is not None:
+                boxList[index] *= (ratioWidth * ratio, ratioHeight * ratio)
+
+    return boxList
 
 def removeDataParallel(stateDict):
     if list(stateDict.keys())[0].startswith("module"):
@@ -92,6 +156,7 @@ def preprocess(image):
 
     if len(imageLoad.shape) == 2:
         imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
+
     if imageLoad.shape[2] == 4:
         imageLoad = imageLoad[:, :, :3]
 
@@ -114,23 +179,20 @@ def preprocess(image):
     imageMorphology = cv2.morphologyEx(imageBinarization, cv2.MORPH_CLOSE, kernel)
     imageColor = cv2.cvtColor(imageMorphology, cv2.COLOR_GRAY2BGR)
 
-    ratio, imageResize = _imageResize(imageColor)
-    
-    ratioW = 1 / ratio
-    ratioH = 1 / ratio
+    imageResize, ratio, ratioWidth, ratioHeight = _imageResize(imageColor)
 
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
     path = os.path.join(pathOutput, f"{fileName}_preprocess{fileExtension}")
-    imageWrite = (numpy.clip(imageResize, 0, 1) * 255).astype(numpy.uint8)
+    imageWrite = imageResize.astype(numpy.uint8)
     cv2.imwrite(path, imageWrite)
 
-    return imageResize, ratioW, ratioH
+    return imageResize, ratio, ratioWidth, ratioHeight
 
 def inference(imageValue, craft, refineNet):
     timeStart = time.time()
 
     image = numpy.array(imageValue)
-    imageNormalize  = _normalizeMeanVariance(image)
+    imageNormalize  = _normalize(image)
     imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
     modelInput = torchAutograd(imageTensor.unsqueeze(0))
     
@@ -157,37 +219,32 @@ def inference(imageValue, craft, refineNet):
 
     return scoreText, scoreLink
 
-def postprocess(scoreText, scoreLink, ratioW, ratioH):
-    box, polyList = craft_utils.getDetBoxes(scoreText, scoreLink, thresholdText, thresholdLink, lowText, isPoly)
-    box = craft_utils.adjustResultCoordinates(box, ratioW, ratioH)
-    polyList = craft_utils.adjustResultCoordinates(polyList, ratioW, ratioH)
-    
-    for index in range(len(polyList)):
-        if polyList[index] is None: polyList[index] = box[index]
-
+def postprocess(scoreText, scoreLink):
     scoreTextCopy = scoreText.copy()
     hStack = numpy.hstack((scoreTextCopy, scoreLink))
     
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
-    path = os.path.join(pathOutput, f"{fileName}_mask{fileExtension}")
+    path = os.path.join(pathOutput, f"{fileName}_postprocess{fileExtension}")
     imageWrite = (numpy.clip(hStack, 0, 1) * 255).astype(numpy.uint8)
     imageMask = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
     cv2.imwrite(path, imageMask)
 
-    return box, polyList
+def output(scoreText, scoreLink, ratio, ratioWidth, ratioHeight, image):
+    boxList = _boxDetection(scoreText, scoreLink)
 
-def output(polyList, image):
+    boxList = _boxRatio(boxList, ratio, ratioWidth, ratioHeight)
+
     fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
     pathText = os.path.join(pathOutput, f"{fileName}.txt")
     pathImage = os.path.join(pathOutput, f"{fileName}{fileExtension}")
 
     with open(pathText, "w") as file:
-        for _, poly in enumerate(polyList):
-            shapeList = numpy.array(poly).astype(numpy.int32).reshape((-1))
+        for _, box in enumerate(boxList):
+            shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
 
             file.write(",".join([str(shape) for shape in shapeList]) + "\r\n")
 
             cv2.polylines(image, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
 
-    imageWrite = (numpy.clip(image, 0, 1) * 255).astype(numpy.uint8)
+    imageWrite = image.astype(numpy.uint8)
     cv2.imwrite(pathImage, imageWrite)

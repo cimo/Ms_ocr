@@ -11,16 +11,16 @@ if __name__ == "__main__":
 
     craft = Craft(False, False)
 
-    print(f"Loading weight: {helper.modelMain}")
+    print(f"Loading weight: {helper.weightMain}")
 
     if helper.isCuda:
-        craft.load_state_dict(helper.removeDataParallel(torch.load(helper.modelMain)))
+        craft.load_state_dict(helper.removeDataParallel(torch.load(helper.weightMain)))
 
         craft = torch.nn.DataParallel(craft.cuda())
         
         torchBackendCudnn.benchmark = False
     else:
-        craft.load_state_dict(helper.removeDataParallel(torch.load(helper.modelMain, map_location="cpu")))
+        craft.load_state_dict(helper.removeDataParallel(torch.load(helper.weightMain, map_location="cpu")))
 
     craft.eval()
 
@@ -29,25 +29,25 @@ if __name__ == "__main__":
     if helper.isRefine:
         refineNet = RefineNet()
 
-        print(f"Loading weight refineNet: {helper.modelRefine}")
+        print(f"Loading weight refineNet: {helper.weightRefine}")
 
         if helper.isCuda:
-            refineNet.load_state_dict(helper.removeDataParallel(torch.load(helper.modelRefine)))
+            refineNet.load_state_dict(helper.removeDataParallel(torch.load(helper.weightRefine)))
 
             refineNet = torch.nn.DataParallel(refineNet.cuda())
 
             torchBackendCudnn.benchmark = False
         else:
-            refineNet.load_state_dict(helper.removeDataParallel(torch.load(helper.modelRefine, map_location="cpu")))
+            refineNet.load_state_dict(helper.removeDataParallel(torch.load(helper.weightRefine, map_location="cpu")))
 
         refineNet.eval()
 
     print(f"Image: {helper.pathInput}/{helper.imageName}\r")
     
-    image, ratioW, ratioH = helper.preprocess(f"{helper.pathInput}/{helper.imageName}")
+    image, ratio, ratioWidth, ratioHeight = helper.preprocess(f"{helper.pathInput}/{helper.imageName}")
 
     scoreText, scoreLink = helper.inference(image, craft, refineNet)
 
-    _, polyList = helper.postprocess(scoreText, scoreLink, ratioW, ratioH)
+    helper.postprocess(scoreText, scoreLink)
 
-    helper.output(polyList, image)
+    helper.output(scoreText, scoreLink, ratio, ratioWidth, ratioHeight, image)
