@@ -1,26 +1,42 @@
+import sys
 import os
 import time
 import cv2
 import numpy
 import math
 import torch
+import torch.backends.cudnn as torchBackendCudnn
 from torch.autograd import Variable as torchAutograd
 from collections import OrderedDict as collectionOrderDict
 
-pathRoot = os.path.dirname(os.path.abspath(__file__))
-pathInput = os.path.join(pathRoot, "input")
-pathOutput = os.path.join(pathRoot, "output")
-
-imageName = "test_5.jpg"
-weightMain = "craft_mlt_25k.pth"
-weightRefine="craft_refiner_CTW1500.pth"
-sizeMax = 4096
-ratioMultiplier = 1.0
-lowText = 0.1
+pathRoot = sys.argv[1]
+pathInput = sys.argv[2]
+pathOutput = sys.argv[3]
+fileName = sys.argv[4]
+pathWeightMain = os.path.join(os.path.dirname(__file__), "craft_mlt_25k.pth")
+pathWeightRefine = os.path.join(os.path.dirname(__file__), "craft_refiner_CTW1500.pth")
+sizeMax = 2048
+ratioMultiplier = 4.0
+lowText = 0.2
 thresholdText = 0.2
-thresholdLink = 0.4
-isCuda=False
+thresholdLink = 0.6
+isCuda=sys.argv[5].lower() == "true"
 isRefine=True
+isDebug=sys.argv[6].lower() == "true"
+
+def _writeOutputImage(label, image):
+    fileNameSpit, fileExtensionSplit = os.path.splitext(fileName)
+    path = os.path.join(f"{pathRoot}{pathOutput}", f"{fileNameSpit}{label}{fileExtensionSplit}")
+    
+    if not isinstance(image, tuple):
+        imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
+    else:
+        scoreTextValue, scoreLinkValue = image
+        imageHstack = numpy.hstack((scoreTextValue, scoreLinkValue))
+        imageWrite = (numpy.clip(imageHstack, 0, 1) * 255).astype(numpy.uint8)
+        imageResult = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
+
+    cv2.imwrite(path, imageResult)
 
 def _imageResize(image):
     height, width, channel = image.shape
@@ -31,6 +47,8 @@ def _imageResize(image):
         size = sizeMax
 
     ratio = size / max(height, width)
+    ratioWidth = 1 / ratio
+    ratioHeight = 1 / ratio
 
     targetWidth = int(width * ratio)
     targetHeight = int(height * ratio)
@@ -49,9 +67,6 @@ def _imageResize(image):
     imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
     imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
 
-    ratioWidth = 1 / ratio
-    ratioHeight = 1 / ratio
-
     return imageResult, ratioWidth, ratioHeight
 
 def _normalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
@@ -68,9 +83,18 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
     return imageResult
 
-def _boxDetection(scoreTextValue, scoreLinkValue):
-    scoreText = scoreTextValue.copy()
-    scoreLink = scoreLinkValue.copy()
+def _boxDetection(scoreTextValue, scoreLinkValue, ratioWidth, ratioHeight):
+    if isDebug:
+        _writeOutputImage("_heatmap", (scoreTextValue, scoreLinkValue))
+
+    imageHeight, imageWidth = scoreTextValue.shape
+
+    scaleFactor = max(4096 / max(imageHeight, imageWidth), 1.0)
+    width = int(imageWidth * scaleFactor)
+    height = int(imageHeight * scaleFactor)
+
+    scoreText = cv2.resize(scoreTextValue, (width, height), interpolation=cv2.INTER_LINEAR)
+    scoreLink = cv2.resize(scoreLinkValue, (width, height), interpolation=cv2.INTER_LINEAR)
 
     imageHeight, imageWidth = scoreText.shape
 
@@ -78,25 +102,26 @@ def _boxDetection(scoreTextValue, scoreLinkValue):
     _, binaryLinkMap = cv2.threshold(scoreLink, thresholdLink, 1, 0)
 
     textScoreCombined = numpy.clip(binaryTextMap + binaryLinkMap, 0, 1)
-    componentList, componentMap, componentStats, _ = cv2.connectedComponentsWithStats(textScoreCombined.astype(numpy.uint8), connectivity=4)
+
+    labelCount, componentLabelMap, componentStatList, _ = cv2.connectedComponentsWithStats(textScoreCombined.astype(numpy.uint8), connectivity=4)
 
     boxList = []
 
-    for index in range(1, componentList):
-        size = componentStats[index, cv2.CC_STAT_AREA]
+    for index in range(1, labelCount):
+        size = componentStatList[index, cv2.CC_STAT_AREA]
 
         if size < 10:
             continue
         
-        if numpy.max(scoreText[componentMap == index]) < thresholdText:
+        if numpy.max(scoreText[componentLabelMap == index]) < thresholdText:
             continue
 
         segmentMap = numpy.zeros(scoreText.shape, dtype=numpy.uint8)
-        segmentMap[componentMap == index] = 255
+        segmentMap[componentLabelMap == index] = 255
         segmentMap[numpy.logical_and(binaryLinkMap == 1, binaryTextMap == 0)] = 0
 
-        bBoxX, bBoxY = componentStats[index, cv2.CC_STAT_LEFT], componentStats[index, cv2.CC_STAT_TOP]
-        bBoxWidth, bBoxHeight = componentStats[index, cv2.CC_STAT_WIDTH], componentStats[index, cv2.CC_STAT_HEIGHT]
+        bBoxX, bBoxY = componentStatList[index, cv2.CC_STAT_LEFT], componentStatList[index, cv2.CC_STAT_TOP]
+        bBoxWidth, bBoxHeight = componentStatList[index, cv2.CC_STAT_WIDTH], componentStatList[index, cv2.CC_STAT_HEIGHT]
         paddingSize = int(math.sqrt(size * min(bBoxWidth, bBoxHeight) / (bBoxWidth * bBoxHeight)) * 2)
 
         startX, endX = max(bBoxX - paddingSize, 0), min(bBoxX + bBoxWidth + paddingSize + 1, imageWidth)
@@ -106,37 +131,30 @@ def _boxDetection(scoreTextValue, scoreLinkValue):
         segmentMap[startY:endY, startX:endX] = cv2.dilate(segmentMap[startY:endY, startX:endX], kernel)
 
         contour = numpy.roll(numpy.array(numpy.where(segmentMap != 0)), 1, axis=0).transpose().reshape(-1, 2)
-        rectangle = cv2.minAreaRect(contour)
-        box = cv2.boxPoints(rectangle)
 
-        width, height = numpy.linalg.norm(box[0] - box[1]), numpy.linalg.norm(box[1] - box[2])
-        boxRatio = max(width, height) / (min(width, height) + 1e-5)
-
-        if abs(1 - boxRatio) <= 0.1:
-            xMin, xMax = min(contour[:, 0]), max(contour[:, 0])
-            yMin, yMax = min(contour[:, 1]), max(contour[:, 1])
-            box = numpy.array([[xMin, yMin], [xMax, yMin], [xMax, yMax], [xMin, yMax]], dtype=numpy.float32)
+        if contour.shape[0] == 0:
+            continue
+        
+        xMin, xMax = min(contour[:, 0]), max(contour[:, 0])
+        yMin, yMax = min(contour[:, 1]), max(contour[:, 1])
+        box = numpy.array([[xMin, yMin], [xMax, yMin], [xMax, yMax], [xMin, yMax]], dtype=numpy.float32)
 
         indexStart = box.sum(axis=1).argmin()
         box = numpy.roll(box, 4 - indexStart, 0)
 
+        box /= scaleFactor
+
         boxList.append(box)
+    
+    boxList = numpy.array(boxList)
+
+    for index in range(len(boxList)):
+        if boxList[index] is not None:
+            boxList[index] *= (ratioWidth * 2, ratioHeight * 2)
 
     return boxList
 
-def _boxRatio(boxListValue, ratioWidth, ratioHeight):
-    if len(boxListValue) > 0:
-        boxList = numpy.array(boxListValue)
-
-        for index in range(len(boxList)):
-            if boxList[index] is not None:
-                boxList[index] *= (ratioWidth * 2, ratioHeight * 2)
-
-        return boxList
-    
-    return boxListValue
-
-def removeDataParallel(stateDict):
+def _removeDataParallel(stateDict):
     if list(stateDict.keys())[0].startswith("module"):
         indexStart = 1
     else:
@@ -151,10 +169,46 @@ def removeDataParallel(stateDict):
 
     return stateDictNew
 
-def preprocess(image):
-    os.makedirs(pathOutput, exist_ok=True)
+def craftEval(craft):
+    print(f"Loading weight: {pathWeightMain}")
 
-    imageLoad = cv2.imread(image)
+    if isCuda:
+        print(isCuda)
+        craft.load_state_dict(_removeDataParallel(torch.load(pathWeightMain)))
+
+        craft = torch.nn.DataParallel(craft.cuda())
+        
+        torchBackendCudnn.benchmark = False
+    else:
+        craft.load_state_dict(_removeDataParallel(torch.load(pathWeightMain, map_location="cpu")))
+
+    craft.eval()
+
+    return craft
+
+def refineNetEval(refineNet):
+    if isRefine:
+        print(f"Loading weight refineNet: {pathWeightRefine}")
+
+        if isCuda:
+            refineNet.load_state_dict(_removeDataParallel(torch.load(pathWeightRefine)))
+
+            refineNet = torch.nn.DataParallel(refineNet.cuda())
+
+            torchBackendCudnn.benchmark = False
+        else:
+            refineNet.load_state_dict(_removeDataParallel(torch.load(pathWeightRefine, map_location="cpu")))
+
+        refineNet.eval()
+
+        return refineNet
+    else:
+        return None
+
+def preprocess():
+    os.makedirs(f"{pathRoot}{pathOutput}", exist_ok=True)
+
+    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
 
     if len(imageLoad.shape) == 2:
         imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
@@ -180,10 +234,8 @@ def preprocess(image):
 
     imageResize, ratioWidth, ratioHeight = _imageResize(imageColor)
 
-    fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
-    path = os.path.join(pathOutput, f"{fileName}_preprocess{fileExtension}")
-    imageWrite = numpy.clip(imageResize, 0, 255).astype(numpy.uint8)
-    cv2.imwrite(path, imageWrite)
+    if isDebug:
+        _writeOutputImage("_preprocess", imageResize)
 
     return imageColor, imageResize, ratioWidth, ratioHeight
 
@@ -201,8 +253,8 @@ def inference(imageValue, craft, refineNet):
     with torch.no_grad():
         scoreMap, feature = craft(modelInput)
 
-    scoreTextTensor = scoreMap[0,:,:,0]
-    scoreLinkTensor = scoreMap[0,:,:,1]
+    scoreTextTensor = scoreMap[0, :, :, 0]
+    scoreLinkTensor = scoreMap[0, :, :, 1]
 
     scoreText = scoreTextTensor.cpu().numpy()
     scoreLink = scoreLinkTensor.cpu().numpy()
@@ -211,31 +263,19 @@ def inference(imageValue, craft, refineNet):
         with torch.no_grad():
             refineMap = refineNet(scoreMap, feature)
         
-        scoreLinkTensor = refineMap[0,:,:,0]
+        scoreLinkTensor = refineMap[0, :, :, 0]
         scoreLink = scoreLinkTensor.cpu().numpy()
     
     print(f"Time inference: {time.time() - timeStart}")
 
-    scoreTextCopy = scoreText.copy()
-    hStack = numpy.hstack((scoreTextCopy, scoreLink))
-
-    fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
-    path = os.path.join(pathOutput, f"{fileName}_heatmap{fileExtension}")
-    imageWrite = (numpy.clip(hStack, 0, 1) * 255).astype(numpy.uint8)
-    imageMask = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
-    cv2.imwrite(path, imageMask)
-
     return scoreText, scoreLink
 
-def output(scoreText, scoreLink, ratioWidth, ratioHeight, image):
-    boxList = _boxDetection(scoreText, scoreLink)
-    boxList = _boxRatio(boxList, ratioWidth, ratioHeight)
+def result(scoreText, scoreLink, ratioWidth, ratioHeight, image):
+    boxList = _boxDetection(scoreText, scoreLink, ratioWidth, ratioHeight)
 
-    fileName, fileExtension = os.path.splitext(os.path.basename(f"{pathInput}/{imageName}"))
-    pathText = os.path.join(pathOutput, f"{fileName}.txt")
-    pathImage = os.path.join(pathOutput, f"{fileName}{fileExtension}")
+    fileNameSpit, _ = os.path.splitext(fileName)
 
-    with open(pathText, "w") as file:
+    with open(f"{pathRoot}{pathOutput}{fileNameSpit}.txt", "w") as file:
         for _, box in enumerate(boxList):
             shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
 
@@ -243,5 +283,4 @@ def output(scoreText, scoreLink, ratioWidth, ratioHeight, image):
 
             cv2.polylines(image, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
 
-    imageWrite = image.astype(numpy.uint8)
-    cv2.imwrite(pathImage, imageWrite)
+    _writeOutputImage("", image)

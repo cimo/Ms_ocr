@@ -45,7 +45,7 @@ class RefineNet(torchNN.Module):
         Vgg16Bn.weightInit(self.aspp4.modules())
 
     def forward(self, scoreMap, feature):
-        refine = torch.cat([scoreMap.permute(0,3,1,2), feature], dim=1)
+        refine = torch.cat([scoreMap.permute(0, 3, 1, 2), feature], dim=1)
         refine = self.last_conv(refine)
 
         aspp1 = self.aspp1(refine)

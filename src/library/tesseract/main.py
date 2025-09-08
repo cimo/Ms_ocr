@@ -1,15 +1,9 @@
-import cv2 as Cv2
-import numpy as Numpy
-from PIL import Image as PilImage
-import easyocr as easyOcr
-import os
-import sys
-import warnings
+import subprocess
 
-# FutureWarning: You are using `torch.load` with `weights_only=False
-warnings.filterwarnings("ignore", category=FutureWarning)
+# Source
+import helper
 
-
+'''
 def load(fileName):
     result = False
 
@@ -47,7 +41,7 @@ def Rescale(image, unit):
     return Cv2.resize(image, (imageWidthTarget, imageHeightTarget), interpolation=None)
 
 
-def FindText(image, langList, debug):
+def FindTextOld(image, langList, debug):
     easyOcrReader = easyOcr.Reader(langList, gpu=False)
     resultList = easyOcrReader.readtext(
         image,
@@ -151,75 +145,45 @@ def FontDown(image, unit):
     image = Cv2.erode(image, kernel, iterations=unit)
 
     return Cv2.bitwise_not(image)
-
+'''
 
 def Main():
-    fileName = sys.argv[1]
-    language = sys.argv[2]
-    result = sys.argv[3]
-    debug = sys.argv[4]
+    subprocess.run([
+        "python3",
+        "../craft/main.py",
+        helper.PATH_ROOT,
+        helper.PATH_FILE_INPUT,
+        helper.PATH_FILE_OUTPUT,
+        helper.fileName,
+        helper.isCuda,
+        helper.isDebug
+    ], check=True)
 
-    image = load(fileName)
+    print(f"Start: Tesseract.\r")
 
-    if not isinstance(image, bool):
-        imageRescale = Rescale(image, 4)
-        imageGray = Cv2.cvtColor(imageRescale, Cv2.COLOR_BGR2GRAY)
-        imageRectangle = imageGray.copy()
+    imageGray, imageRectangle, imageResult = helper.loadFile()
 
-        imageResult = imageGray.copy()
-        imageResult.fill(255)
+    coordinateList = helper.readBoxCoordinatesFromFile()
 
-        languageCraft = ""
-        languageOcr = ""
-        psmOcr = 6
+    helper.result(coordinateList, imageGray, imageRectangle, imageResult)
 
-        if language == "en":
-            languageCraft = "en"
-            languageOcr = "eng"
-        elif language == "jp":
-            languageCraft = "ja"
-            languageOcr = "Japanese"
-        elif language == "jp_vert":
-            languageCraft = "ja"
-            languageOcr = "Japanese_vert"
-            psmOcr = 3
+    languageOcr = ""
+    psmOcr = 6
 
-        textList = FindText(imageRescale, [languageCraft], debug)
+    if helper.language == "en":
+        languageOcr = "eng"
+    elif helper.language == "jp":
+        languageOcr = "Japanese"
+    elif helper.language == "jp_vert":
+        languageOcr = "Japanese_vert"
+        psmOcr = 3
 
-        for text in textList:
-            coordinate = text[0]
-            # label = text[1]
+    #os.system(
+    #    f"tesseract '/home/app/src/library/craft/output/{fileName}_result.png' '/home/app/src/library/craft/output/{fileName}' -l {languageOcr} --oem 1 --psm {psmOcr} -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇,' {output}"
+    #)
 
-            top = int(coordinate[0][0])
-            left = int(coordinate[0][1])
-            bottom = int(coordinate[2][0])
-            right = int(coordinate[2][1])
-
-            if debug == "true":
-                Cv2.rectangle(
-                    imageRectangle, (top, left), (bottom, right), (0, 0, 0), 1
-                )
-
-            imageCrop = imageGray[left:right, top:bottom]
-            imageCropFix = CropFix(imageCrop)
-
-            imageResult[left:right, top:bottom] = imageCropFix
-
-        if debug == "true":
-            Cv2.imwrite(f"/home/app/src/library/craft/output/{fileName}_box.png", imageRectangle)
-
-        imagePil = PilImage.fromarray(imageResult).convert(
-            "1", dither=PilImage.Dither.NONE
-        )
-        imagePil.save(f"/home/app/src/library/craft/output/{fileName}_result.png", dpi=(300, 300))
-
-        os.system(
-            f"tesseract '/home/app/src/library/craft/output/{fileName}_result.png' '/home/app/src/library/craft/output/{fileName}' -l {languageOcr} --oem 1 --psm {psmOcr} -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇,' {result}"
-        )
-    else:
-        print(f"File not exists!")
-
-
-# TO DO - Create craft
 # TO DO - Integrate dewarp
+
+#python3 main.py "test_1.jpg" "en" "" False True
+
 Main()
