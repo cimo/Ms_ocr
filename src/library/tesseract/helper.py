@@ -36,9 +36,8 @@ def locationFromEnvName():
 
 fileName = sys.argv[1]
 language = sys.argv[2]
-output = sys.argv[3]
-isCuda = sys.argv[4]
-isDebug = sys.argv[5]
+isCuda = sys.argv[3]
+isDebug = sys.argv[4]
 
 sizeMax = 2048
 ratioMultiplier = 4.0
@@ -206,7 +205,7 @@ def result(coordinateList, ratio, imageGray, imageRectangle, imageResult):
 
 def execute():
     resultLanguage = ""
-    resultPsm = 11#6
+    resultPsm = 6
 
     if language == "en":
         resultLanguage = "eng"
@@ -229,6 +228,14 @@ def execute():
         "--psm", str(resultPsm),
         "-c", "preserve_interword_spaces=1",
         "-c", "page_separator=''",
-        "-c", "tessedit_char_blacklist='〇'",
-        output
+        "-c", "tessedit_char_blacklist=''",
+        "-c", "tessedit_create_txt=1",
+        "-c", "tessedit_create_hocr=1",
+        "-c", "tessedit_create_alto=1",
+        "-c", "tessedit_create_page_xml=1",
+        "-c", "tessedit_create_lstmbox=1",
+        "-c", "tessedit_create_tsv=1",
+        "-c", "tessedit_create_wordstrbox=1",
+        "-c", "tessedit_create_pdf=1",
+        "-c", "tessedit_create_boxfile=1"
     ], check=True)

@@ -48,16 +48,10 @@ RUN cd ~ \
     media-types \
     python3-pip \
     cmake \
-    gcc \
     g++ \
     pkg-config \
     libleptonica-dev \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libjpeg-dev \
-    libpng-dev \
     libtiff-dev \
-    libarchive-dev \
     libgl1 \
     # Clean
     && apt-get remove --purge -y sudo \

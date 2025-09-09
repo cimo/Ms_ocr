@@ -27,7 +27,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
-COPY ./docker/tessdata_best/* /usr/share/tesseract-ocr/4.00/tessdata/
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
@@ -50,9 +49,13 @@ RUN cd ~ \
     fonts-noto \
     fonts-noto-cjk \
     media-types \
-    libgl1 \
-    tesseract-ocr \
     python3-pip \
+    cmake \
+    g++ \
+    pkg-config \
+    libleptonica-dev \
+    libtiff-dev \
+    libgl1 \
     # Clean
     && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \
@@ -73,8 +76,8 @@ RUN python3 -m pip install pip --upgrade \
     && npm run build
 
 # Tesseract
-CMD tesseract --version \
-    && tesseract --list-langs \
+CMD ${PATH_ROOT}src/library/tesseract/executable --version \
+    && ${PATH_ROOT}src/library/tesseract/executable --list-langs \
     # Node
     && node ${PATH_ROOT}dist/src/controller/Server.js
 

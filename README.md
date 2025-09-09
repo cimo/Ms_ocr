@@ -37,7 +37,7 @@ docker compose -f docker-compose.yaml --env-file ./env/local.env up --detach --p
 
 2. Follow the "Installation" instructions.
 
-3. Compile deb package:
+3. For compile from source write on terminal:
 
     cd src/library/tesseract/
     tar -xvzf 5.5.1.tar.gz
