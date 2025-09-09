@@ -37,6 +37,15 @@ docker compose -f docker-compose.yaml --env-file ./env/local.env up --detach --p
 
 2. Follow the "Installation" instructions.
 
+3. Compile deb package:
+
+    cd src/library/tesseract/
+    tar -xvzf 5.5.1.tar.gz
+    cd tesseract-5.5.1/
+    mkdir build && cd build
+    cmake .. -DENABLE_NATIVE=OFF -DBUILD_TRAINING_TOOLS=OFF -DHAVE_LIBCURL=OFF -DGRAPHICS_DISABLED=OFF -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+    make -j$(nproc)
+
 ## API (Postman)
 
 1. Info

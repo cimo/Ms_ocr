@@ -26,8 +26,8 @@ isRefine=True
 isDebug=sys.argv[6].lower() == "true"
 
 def _writeOutputImage(label, image):
-    fileNameSpit, fileExtensionSplit = os.path.splitext(fileName)
-    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSpit}{label}{fileExtensionSplit}")
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSplit}{label}{fileExtensionSplit}")
     
     if not isinstance(image, tuple):
         imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
@@ -281,9 +281,9 @@ def inference(imageValue, detector, refineNet):
 def result(scoreText, scoreLink, ratio, image):
     boxList = _boxDetection(scoreText, scoreLink, ratio)
 
-    fileNameSpit, _ = os.path.splitext(fileName)
+    fileNameSplit, _ = os.path.splitext(fileName)
 
-    with open(f"{pathRoot}{pathOutput}craft/{fileNameSpit}.txt", "w") as file:
+    with open(f"{pathRoot}{pathOutput}craft/{fileNameSplit}.txt", "w") as file:
         for _, box in enumerate(boxList):
             shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
 

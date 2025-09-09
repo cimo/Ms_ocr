@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 import logging
 import ast
 import numpy
@@ -43,8 +44,8 @@ sizeMax = 2048
 ratioMultiplier = 4.0
 
 def _writeOutputImage(label, image):
-    fileNameSpit, fileExtensionSplit = os.path.splitext(fileName)
-    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", f"{fileNameSpit}{label}{fileExtensionSplit}")
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", f"{fileNameSplit}{label}{fileExtensionSplit}")
     
     imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
 
@@ -142,6 +143,18 @@ def _loadImage():
     
     return imageLoad
 
+def executeCraft():
+    subprocess.run([
+        "python3",
+        f"{PATH_ROOT}src/library/craft/main.py",
+        PATH_ROOT,
+        PATH_FILE_INPUT,
+        PATH_FILE_OUTPUT,
+        fileName,
+        isCuda,
+        isDebug
+    ], check=True)
+
 def preprocess():
     imageLoad = _loadImage()
 
@@ -158,9 +171,9 @@ def preprocess():
 def readBoxCoordinatesFromFile():
     resultList = []
 
-    fileNameSpit, _ = os.path.splitext(fileName)
+    fileNameSplit, _ = os.path.splitext(fileName)
 
-    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSpit}.txt", "r") as file:
+    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSplit}.txt", "r") as file:
         lineList = file.readlines()
 
     for line in lineList:
@@ -191,9 +204,9 @@ def result(coordinateList, ratio, imageGray, imageRectangle, imageResult):
     
     _writeOutputImage("_result", imageResult)
 
-def tesseract():
+def execute():
     resultLanguage = ""
-    resultPsm = 6
+    resultPsm = 11#6
 
     if language == "en":
         resultLanguage = "eng"
@@ -203,6 +216,19 @@ def tesseract():
         resultLanguage = "Japanese_vert"
         resultPsm = 3
 
-    #os.system(
-    #    f"tesseract '/home/app/src/library/craft/output/{fileName}_result.png' '/home/app/src/library/craft/output/{fileName}' -l {resultLanguage} --oem 1 --psm {resultPsm} -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇' {output}"
-    #)
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+
+    os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/tesseract/language/"
+    
+    subprocess.run([
+        f"{PATH_ROOT}src/library/tesseract/executable",
+        f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_result{fileExtensionSplit}",
+        f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}",
+        f"-l", resultLanguage,
+        "--oem", "1",
+        "--psm", str(resultPsm),
+        "-c", "preserve_interword_spaces=1",
+        "-c", "page_separator=''",
+        "-c", "tessedit_char_blacklist='〇'",
+        output
+    ], check=True)

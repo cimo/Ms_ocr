@@ -66,7 +66,7 @@ WORKDIR ${PATH_ROOT}
 
 # Pip
 RUN python3 -m pip install pip --upgrade \
-    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/craft/requirements.txt \
     # Npm
     && rm -rf node_modules package-lock.json \
     && npm install \

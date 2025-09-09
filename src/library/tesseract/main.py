@@ -1,5 +1,3 @@
-import subprocess
-
 # Source
 import helper
 
@@ -23,16 +21,7 @@ def FontDown(image, unit):
 '''
 
 def Main():
-    subprocess.run([
-        "python3",
-        f"{helper.PATH_ROOT}src/library/craft/main.py",
-        helper.PATH_ROOT,
-        helper.PATH_FILE_INPUT,
-        helper.PATH_FILE_OUTPUT,
-        helper.fileName,
-        helper.isCuda,
-        helper.isDebug
-    ], check=True)
+    helper.executeCraft()
 
     imageGray, imageRectangle, imageResult, ratio = helper.preprocess()
 
@@ -40,10 +29,13 @@ def Main():
 
     helper.result(coordinateList, ratio, imageGray, imageRectangle, imageResult)
 
-    helper.tesseract()
+    helper.execute()
 
 Main()
 
 # TO DO - Integrate dewarp
 
-#python3 main.py "test_1.jpg" "en" "" False True
+#python3 main.py "test_1.jpg" "en" "pdf" False True
+
+#export TESSDATA_PREFIX=/home/app/src/library/tesseract/language/
+#./executable /home/app/file/output/tesseract/test_1_result.jpg  /home/app/file/output/tesseract/test_1 -l eng --oem 1 --psm 6 -c preserve_interword_spaces=1 -c page_separator='' -c tessedit_char_blacklist='〇' pdf
