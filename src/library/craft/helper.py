@@ -13,6 +13,7 @@ pathRoot = sys.argv[1]
 pathInput = sys.argv[2]
 pathOutput = sys.argv[3]
 fileName = sys.argv[4]
+
 pathWeightMain = os.path.join(os.path.dirname(__file__), "craft_mlt_25k.pth")
 pathWeightRefine = os.path.join(os.path.dirname(__file__), "craft_refiner_CTW1500.pth")
 sizeMax = 2048
@@ -169,6 +170,24 @@ def _removeDataParallel(stateDict):
 
     return stateDictNew
 
+def _loadImage():
+    print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
+
+    os.makedirs(f"{pathRoot}{pathOutput}", exist_ok=True)
+
+    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
+
+    if len(imageLoad.shape) == 2:
+        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
+
+    if imageLoad.shape[2] == 4:
+        imageLoad = imageLoad[:, :, :3]
+    
+    return imageLoad
+
+def checkCuda():
+    print(f"On your machine CUDA are: {'available' if torch.cuda.is_available() else 'NOT available'}.")
+
 def craftEval(craft):
     print(f"Loading weight: {pathWeightMain}")
 
@@ -206,15 +225,7 @@ def refineNetEval(refineNet):
         return None
 
 def preprocess():
-    os.makedirs(f"{pathRoot}{pathOutput}", exist_ok=True)
-
-    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
-
-    if len(imageLoad.shape) == 2:
-        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
-
-    if imageLoad.shape[2] == 4:
-        imageLoad = imageLoad[:, :, :3]
+    imageLoad = _loadImage()
 
     imageGray = cv2.cvtColor(imageLoad, cv2.COLOR_BGR2GRAY)
 

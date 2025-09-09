@@ -4,15 +4,13 @@ from craft import Craft
 from refine_net import RefineNet
 
 def Main():
-    print(f"On your machine CUDA are: {'available' if helper.torch.cuda.is_available() else 'NOT available'}.")
+    helper.checkCuda()
 
     craft = Craft(False, False)
     craft = helper.craftEval(craft)
 
     refineNet = RefineNet()
     refineNet = helper.refineNetEval(refineNet)
-
-    print(f"Load file: {helper.pathRoot}{helper.pathInput}{helper.fileName}\r")
 
     image, imageResize, ratioWidth, ratioHeight = helper.preprocess()
 
