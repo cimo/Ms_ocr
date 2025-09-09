@@ -44,7 +44,7 @@ ratioMultiplier = 4.0
 
 def _writeOutputImage(label, image):
     fileNameSpit, fileExtensionSplit = os.path.splitext(fileName)
-    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}", f"{fileNameSpit}{label}{fileExtensionSplit}")
+    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", f"{fileNameSpit}{label}{fileExtensionSplit}")
     
     imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
 
@@ -67,6 +67,9 @@ def _imageResize(image):
 
     return imageResult, ratio
 
+def _addBorder(image, color, unit):
+    return cv2.rectangle(image, (0, image.shape[0]), (image.shape[1], 0), color, unit)
+
 def _backgroundCheck(image):
     imageBgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     imageHsv = cv2.cvtColor(imageBgr, cv2.COLOR_BGR2HSV)
@@ -79,9 +82,6 @@ def _backgroundCheck(image):
     dilatation = cv2.dilate(mask, kernel, iterations=5)
 
     return 255 - cv2.bitwise_and(dilatation, mask)
-
-def _addBorder(image, color, unit):
-    return cv2.rectangle(image, (0, image.shape[0]), (image.shape[1], 0), color, unit)
 
 def _binarization(isInverted, image, blur, unitThresholdA, unitThresholdB):
     thresholdBinary = cv2.THRESH_BINARY
@@ -107,6 +107,11 @@ def _noiseRemove(image, unit):
     return cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
 
 def _cropFix(image):
+    if image is None or image.size == 0:
+        print("Error: Crop not generated!")
+
+        return None
+        
     imageBorder = _addBorder(image, (255, 255, 255), 2)
 
     backgroundCheckResult = _backgroundCheck(image)
@@ -124,6 +129,8 @@ def _cropFix(image):
 
 def _loadImage():
     print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
+
+    os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", exist_ok=True)
 
     imageLoad = cv2.imread(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
 
@@ -153,7 +160,7 @@ def readBoxCoordinatesFromFile():
 
     fileNameSpit, _ = os.path.splitext(fileName)
 
-    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}{fileNameSpit}.txt", "r") as file:
+    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSpit}.txt", "r") as file:
         lineList = file.readlines()
 
     for line in lineList:
@@ -174,12 +181,13 @@ def result(coordinateList, ratio, imageGray, imageRectangle, imageResult):
         imageCrop = imageGray[left:right, top:bottom]
         imageCropFix = _cropFix(imageCrop)
 
-        if isDebug:
-            cv2.rectangle(imageRectangle, (top, left), (bottom, right), (0, 0, 0), 1)
+        if imageCropFix is not None:
+            if isDebug:
+                cv2.rectangle(imageRectangle, (top, left), (bottom, right), (0, 0, 0), 1)
 
-            _writeOutputImage("_box", imageRectangle)
+                _writeOutputImage("_box", imageRectangle)
 
-        imageResult[left:right, top:bottom] = imageCropFix
+            imageResult[left:right, top:bottom] = imageCropFix
     
     _writeOutputImage("_result", imageResult)
 

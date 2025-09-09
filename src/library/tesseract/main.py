@@ -25,7 +25,7 @@ def FontDown(image, unit):
 def Main():
     subprocess.run([
         "python3",
-        "../craft/main.py",
+        f"{helper.PATH_ROOT}src/library/craft/main.py",
         helper.PATH_ROOT,
         helper.PATH_FILE_INPUT,
         helper.PATH_FILE_OUTPUT,

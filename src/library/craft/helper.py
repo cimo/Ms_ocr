@@ -6,7 +6,7 @@ import numpy
 import math
 import torch
 import torch.backends.cudnn as torchBackendCudnn
-from torch.autograd import Variable as torchAutograd
+from torch.autograd import Variable as torchAutogradVariable
 from collections import OrderedDict as collectionOrderDict
 
 pathRoot = sys.argv[1]
@@ -14,8 +14,8 @@ pathInput = sys.argv[2]
 pathOutput = sys.argv[3]
 fileName = sys.argv[4]
 
-pathWeightMain = os.path.join(os.path.dirname(__file__), "craft_mlt_25k.pth")
-pathWeightRefine = os.path.join(os.path.dirname(__file__), "craft_refiner_CTW1500.pth")
+pathWeightMain = os.path.join(os.path.dirname(__file__), "mlt_25k.pth")
+pathWeightRefine = os.path.join(os.path.dirname(__file__), "refiner_CTW1500.pth")
 sizeMax = 2048
 ratioMultiplier = 4.0
 lowText = 0.2
@@ -27,7 +27,7 @@ isDebug=sys.argv[6].lower() == "true"
 
 def _writeOutputImage(label, image):
     fileNameSpit, fileExtensionSplit = os.path.splitext(fileName)
-    path = os.path.join(f"{pathRoot}{pathOutput}", f"{fileNameSpit}{label}{fileExtensionSplit}")
+    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSpit}{label}{fileExtensionSplit}")
     
     if not isinstance(image, tuple):
         imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
@@ -48,8 +48,6 @@ def _imageResize(image):
         size = sizeMax
 
     ratio = size / max(height, width)
-    ratioWidth = 1 / ratio
-    ratioHeight = 1 / ratio
 
     targetWidth = int(width * ratio)
     targetHeight = int(height * ratio)
@@ -68,7 +66,7 @@ def _imageResize(image):
     imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
     imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
 
-    return imageResult, ratioWidth, ratioHeight
+    return imageResult, ratio
 
 def _normalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
     imageResult = image.copy().astype(numpy.float32)
@@ -84,7 +82,7 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
     return imageResult
 
-def _boxDetection(scoreTextValue, scoreLinkValue, ratioWidth, ratioHeight):
+def _boxDetection(scoreTextValue, scoreLinkValue, ratio):
     if isDebug:
         _writeOutputImage("_heatmap", (scoreTextValue, scoreLinkValue))
 
@@ -151,7 +149,7 @@ def _boxDetection(scoreTextValue, scoreLinkValue, ratioWidth, ratioHeight):
 
     for index in range(len(boxList)):
         if boxList[index] is not None:
-            boxList[index] *= (ratioWidth * 2, ratioHeight * 2)
+            boxList[index] *= ((1 / ratio) * 2, (1 / ratio) * 2)
 
     return boxList
 
@@ -173,7 +171,7 @@ def _removeDataParallel(stateDict):
 def _loadImage():
     print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
 
-    os.makedirs(f"{pathRoot}{pathOutput}", exist_ok=True)
+    os.makedirs(f"{pathRoot}{pathOutput}craft/", exist_ok=True)
 
     imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
 
@@ -188,22 +186,21 @@ def _loadImage():
 def checkCuda():
     print(f"On your machine CUDA are: {'available' if torch.cuda.is_available() else 'NOT available'}.")
 
-def craftEval(craft):
+def detectorEval(detector):
     print(f"Loading weight: {pathWeightMain}")
 
     if isCuda:
-        print(isCuda)
-        craft.load_state_dict(_removeDataParallel(torch.load(pathWeightMain)))
+        detector.load_state_dict(_removeDataParallel(torch.load(pathWeightMain)))
 
-        craft = torch.nn.DataParallel(craft.cuda())
+        detector = torch.nn.DataParallel(detector.cuda())
         
         torchBackendCudnn.benchmark = False
     else:
-        craft.load_state_dict(_removeDataParallel(torch.load(pathWeightMain, map_location="cpu")))
+        detector.load_state_dict(_removeDataParallel(torch.load(pathWeightMain, map_location="cpu")))
 
-    craft.eval()
+    detector.eval()
 
-    return craft
+    return detector
 
 def refineNetEval(refineNet):
     if isRefine:
@@ -243,26 +240,26 @@ def preprocess():
 
     imageColor = cv2.cvtColor(invertBA, cv2.COLOR_GRAY2BGR)
 
-    imageResize, ratioWidth, ratioHeight = _imageResize(imageColor)
+    imageResize, ratio = _imageResize(imageColor)
 
     if isDebug:
         _writeOutputImage("_preprocess", imageResize)
 
-    return imageColor, imageResize, ratioWidth, ratioHeight
+    return imageColor, imageResize, ratio
 
-def inference(imageValue, craft, refineNet):
+def inference(imageValue, detector, refineNet):
     timeStart = time.time()
 
     image = numpy.array(imageValue)
     imageNormalize  = _normalize(image)
     imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
-    modelInput = torchAutograd(imageTensor.unsqueeze(0))
+    modelInput = torchAutogradVariable(imageTensor.unsqueeze(0))
     
     if isCuda:
         modelInput = modelInput.cuda()
 
     with torch.no_grad():
-        scoreMap, feature = craft(modelInput)
+        scoreMap, feature = detector(modelInput)
 
     scoreTextTensor = scoreMap[0, :, :, 0]
     scoreLinkTensor = scoreMap[0, :, :, 1]
@@ -281,12 +278,12 @@ def inference(imageValue, craft, refineNet):
 
     return scoreText, scoreLink
 
-def result(scoreText, scoreLink, ratioWidth, ratioHeight, image):
-    boxList = _boxDetection(scoreText, scoreLink, ratioWidth, ratioHeight)
+def result(scoreText, scoreLink, ratio, image):
+    boxList = _boxDetection(scoreText, scoreLink, ratio)
 
     fileNameSpit, _ = os.path.splitext(fileName)
 
-    with open(f"{pathRoot}{pathOutput}{fileNameSpit}.txt", "w") as file:
+    with open(f"{pathRoot}{pathOutput}craft/{fileNameSpit}.txt", "w") as file:
         for _, box in enumerate(boxList):
             shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
 

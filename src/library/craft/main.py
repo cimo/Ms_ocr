@@ -1,21 +1,21 @@
 # Source
 import helper
-from craft import Craft
+from detector import Detector
 from refine_net import RefineNet
 
 def Main():
     helper.checkCuda()
 
-    craft = Craft(False, False)
-    craft = helper.craftEval(craft)
+    detector = Detector(False, False)
+    detector = helper.detectorEval(detector)
 
     refineNet = RefineNet()
     refineNet = helper.refineNetEval(refineNet)
 
-    image, imageResize, ratioWidth, ratioHeight = helper.preprocess()
+    image, imageResize, ratio = helper.preprocess()
 
-    scoreText, scoreLink = helper.inference(imageResize, craft, refineNet)
+    scoreText, scoreLink = helper.inference(imageResize, detector, refineNet)
 
-    helper.result(scoreText, scoreLink, ratioWidth, ratioHeight, image)
+    helper.result(scoreText, scoreLink, ratio, image)
 
 Main()

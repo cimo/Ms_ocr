@@ -22,14 +22,14 @@ class _DoubleConvolution(torchNN.Module):
     def forward(self, x):
         return self.conv(x)
 
-class Craft(torchNN.Module):
+class Detector(torchNN.Module):
     def _upsampleAndConcatenate(self, scoreMap, basenet):
         scoreMap = torchNNfunctional.interpolate(scoreMap, size=basenet.size()[2:], mode="bilinear", align_corners=False)
 
         return torch.cat([scoreMap, basenet], dim=1)
 
     def __init__(self, pretrained, freeze):
-        super(Craft, self).__init__()
+        super(Detector, self).__init__()
 
         self.basenet = Vgg16Bn(pretrained, freeze)
 
