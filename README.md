@@ -72,10 +72,10 @@ form-data
 
 key             value
 ---             ---
-fileName        test
 file            "upload field"
-language        jp
-result          pdf
+language        en
+isCuda          false
+isDebug         true
 ```
 
 4. Logout

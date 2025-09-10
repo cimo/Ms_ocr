@@ -42,23 +42,31 @@ isDebug = sys.argv[4]
 sizeMax = 2048
 ratioMultiplier = 4.0
 
-def _writeOutputImage(label, image):
-    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
-    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", f"{fileNameSplit}{label}{fileExtensionSplit}")
-    
-    imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
+def _loadImage():
+    print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
 
-    cv2.imwrite(pathJoin, imageResult)
+    os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", exist_ok=True)
+
+    imageLoad = cv2.imread(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
+
+    if len(imageLoad.shape) == 2:
+        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
+
+    if imageLoad.shape[2] == 4:
+        imageLoad = imageLoad[:, :, :3]
+    
+    return imageLoad
 
 def _imageResize(image):
     height, width, _ = image.shape
 
-    size = ratioMultiplier * max(height, width)
+    sideMin = min(height, width)
+    sideMax = max(height, width)
 
-    if size > sizeMax:
-        size = sizeMax
-
-    ratio = size / max(height, width)
+    if sideMin < sizeMax:
+        ratio = sizeMax / sideMin
+    else:
+        ratio = ratioMultiplier * sideMax / sideMax
 
     targetWidth = int(width * ratio)
     targetHeight = int(height * ratio)
@@ -78,10 +86,10 @@ def _backgroundCheck(image):
     colorMax = numpy.array([179, 255, 146])
     mask = cv2.inRange(imageHsv, colorMin, colorMax)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
-    dilatation = cv2.dilate(mask, kernel, iterations=5)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    dilate = cv2.dilate(mask, kernel, iterations=5)
 
-    return 255 - cv2.bitwise_and(dilatation, mask)
+    return 255 - cv2.bitwise_and(dilate, mask)
 
 def _binarization(isInverted, image, blur, unitThresholdA, unitThresholdB):
     thresholdBinary = cv2.THRESH_BINARY
@@ -102,7 +110,7 @@ def _binarization(isInverted, image, blur, unitThresholdA, unitThresholdB):
     )
 
 def _noiseRemove(image, unit):
-    kernel = numpy.ones((unit, unit), numpy.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (unit, unit))
 
     return cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
 
@@ -125,22 +133,15 @@ def _cropFix(image):
     else:
         imageResult = _binarization(False, imageBorder, 91, 255, 5)
 
-    return _noiseRemove(imageResult, 1)
+    return _noiseRemove(imageResult, 2)
 
-def _loadImage():
-    print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
-
-    os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", exist_ok=True)
-
-    imageLoad = cv2.imread(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
-
-    if len(imageLoad.shape) == 2:
-        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
-
-    if imageLoad.shape[2] == 4:
-        imageLoad = imageLoad[:, :, :3]
+def _writeOutputImage(label, image):
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+    pathJoin = os.path.join(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", f"{fileNameSplit}{label}{fileExtensionSplit}")
     
-    return imageLoad
+    imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
+
+    cv2.imwrite(pathJoin, imageResult)
 
 def executeCraft():
     subprocess.run([
@@ -167,7 +168,7 @@ def preprocess():
 
     return imageGray, imageRectangle, imageResult, ratio
 
-def readBoxCoordinatesFromFile():
+def readBoxCoordinateFromFile():
     resultList = []
 
     fileNameSplit, _ = os.path.splitext(fileName)

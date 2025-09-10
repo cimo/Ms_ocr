@@ -13,41 +13,58 @@ pathRoot = sys.argv[1]
 pathInput = sys.argv[2]
 pathOutput = sys.argv[3]
 fileName = sys.argv[4]
+isCuda = sys.argv[5].lower() == "true"
+isDebug = sys.argv[6].lower() == "true"
 
 pathWeightMain = os.path.join(os.path.dirname(__file__), "mlt_25k.pth")
 pathWeightRefine = os.path.join(os.path.dirname(__file__), "refiner_CTW1500.pth")
 sizeMax = 2048
 ratioMultiplier = 4.0
-lowText = 0.2
-thresholdText = 0.2
-thresholdLink = 0.6
-isCuda=sys.argv[5].lower() == "true"
-isRefine=True
-isDebug=sys.argv[6].lower() == "true"
+lowText = 0.4
+thresholdText = 0.6
+thresholdLink = 0.3
+isRefine = True
 
-def _writeOutputImage(label, image):
-    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
-    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSplit}{label}{fileExtensionSplit}")
-    
-    if not isinstance(image, tuple):
-        imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
+def _removeDataParallel(stateDict):
+    if list(stateDict.keys())[0].startswith("module"):
+        indexStart = 1
     else:
-        scoreTextValue, scoreLinkValue = image
-        imageHstack = numpy.hstack((scoreTextValue, scoreLinkValue))
-        imageWrite = (numpy.clip(imageHstack, 0, 1) * 255).astype(numpy.uint8)
-        imageResult = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
+        indexStart = 0
 
-    cv2.imwrite(path, imageResult)
+    stateDictNew = collectionOrderDict()
+
+    for key, value in stateDict.items():
+        name = ".".join(key.split(".")[indexStart:])
+
+        stateDictNew[name] = value
+
+    return stateDictNew
+
+def _loadImage():
+    print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
+
+    os.makedirs(f"{pathRoot}{pathOutput}craft/", exist_ok=True)
+
+    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
+
+    if len(imageLoad.shape) == 2:
+        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
+
+    if imageLoad.shape[2] == 4:
+        imageLoad = imageLoad[:, :, :3]
+    
+    return imageLoad
 
 def _imageResize(image):
     height, width, channel = image.shape
 
-    size = ratioMultiplier * max(height, width)
+    sideMin = min(height, width)
+    sideMax = max(height, width)
 
-    if size > sizeMax:
-        size = sizeMax
-
-    ratio = size / max(height, width)
+    if sideMin < sizeMax:
+        ratio = sizeMax / sideMin
+    else:
+        ratio = ratioMultiplier * sideMax / sideMax
 
     targetWidth = int(width * ratio)
     targetHeight = int(height * ratio)
@@ -153,35 +170,19 @@ def _boxDetection(scoreTextValue, scoreLinkValue, ratio):
 
     return boxList
 
-def _removeDataParallel(stateDict):
-    if list(stateDict.keys())[0].startswith("module"):
-        indexStart = 1
-    else:
-        indexStart = 0
-
-    stateDictNew = collectionOrderDict()
-
-    for key, value in stateDict.items():
-        name = ".".join(key.split(".")[indexStart:])
-
-        stateDictNew[name] = value
-
-    return stateDictNew
-
-def _loadImage():
-    print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
-
-    os.makedirs(f"{pathRoot}{pathOutput}craft/", exist_ok=True)
-
-    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
-
-    if len(imageLoad.shape) == 2:
-        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
-
-    if imageLoad.shape[2] == 4:
-        imageLoad = imageLoad[:, :, :3]
+def _writeOutputImage(label, image):
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSplit}{label}{fileExtensionSplit}")
     
-    return imageLoad
+    if not isinstance(image, tuple):
+        imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
+    else:
+        scoreTextValue, scoreLinkValue = image
+        imageHstack = numpy.hstack((scoreTextValue, scoreLinkValue))
+        imageWrite = (numpy.clip(imageHstack, 0, 1) * 255).astype(numpy.uint8)
+        imageResult = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
+
+    cv2.imwrite(path, imageResult)
 
 def checkCuda():
     print(f"On your machine CUDA are: {'available' if torch.cuda.is_available() else 'NOT available'}.")
@@ -226,17 +227,17 @@ def preprocess():
 
     imageGray = cv2.cvtColor(imageLoad, cv2.COLOR_BGR2GRAY)
 
-    denoise = cv2.medianBlur(imageGray, 1)
+    blur = cv2.medianBlur(imageGray, 1)
 
-    threshold = cv2.adaptiveThreshold(denoise, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 10)
+    threshold = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 10)
 
     invertAB = cv2.bitwise_not(threshold)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
 
-    clean = cv2.morphologyEx(invertAB, cv2.MORPH_OPEN, kernel, iterations=0)
+    morphologyEx = cv2.morphologyEx(invertAB, cv2.MORPH_CLOSE, kernel)
 
-    invertBA = cv2.bitwise_not(clean)
+    invertBA = cv2.bitwise_not(morphologyEx)
 
     imageColor = cv2.cvtColor(invertBA, cv2.COLOR_GRAY2BGR)
 

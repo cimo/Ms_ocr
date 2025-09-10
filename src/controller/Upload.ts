@@ -77,9 +77,7 @@ export default class Upload {
             }
         }
 
-        if (!parameterList.includes("fileName")) {
-            result += "Parameter 'fileName' is missing.";
-        } else if (!parameterList.includes("file")) {
+        if (!parameterList.includes("file")) {
             result += "Parameter 'file' is missing.";
         }
 

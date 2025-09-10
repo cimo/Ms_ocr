@@ -6,7 +6,7 @@ def Main():
 
     imageGray, imageRectangle, imageResult, ratio = helper.preprocess()
 
-    coordinateList = helper.readBoxCoordinatesFromFile()
+    coordinateList = helper.readBoxCoordinateFromFile()
 
     helper.result(coordinateList, ratio, imageGray, imageRectangle, imageResult)
 
@@ -15,4 +15,3 @@ def Main():
 Main()
 
 # TO DO - Integrate dewarp
-#python3 main.py "test_1.jpg" "en" False True
