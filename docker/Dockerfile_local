@@ -53,6 +53,8 @@ RUN cd ~ \
     libleptonica-dev \
     libtiff-dev \
     libgl1 \
+    imagemagick \
+    bc \
     # Clean
     && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \

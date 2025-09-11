@@ -20,9 +20,9 @@ pathWeightMain = os.path.join(os.path.dirname(__file__), "mlt_25k.pth")
 pathWeightRefine = os.path.join(os.path.dirname(__file__), "refiner_CTW1500.pth")
 sizeMax = 2048
 ratioMultiplier = 4.0
-lowText = 0.4
-thresholdText = 0.6
-thresholdLink = 0.3
+lowText = 0.2
+thresholdText = 0.3
+thresholdLink = 0.4
 isRefine = True
 
 def _removeDataParallel(stateDict):
@@ -99,7 +99,7 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
     return imageResult
 
-def _boxDetection(scoreTextValue, scoreLinkValue, ratio):
+def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
     if isDebug:
         _writeOutputImage("_heatmap", (scoreTextValue, scoreLinkValue))
 
@@ -159,16 +159,11 @@ def _boxDetection(scoreTextValue, scoreLinkValue, ratio):
         box = numpy.roll(box, 4 - indexStart, 0)
 
         box /= scaleFactor
+        box *= ((1 / ratio) * 2, (1 / ratio) * 2)
 
         boxList.append(box)
-    
-    boxList = numpy.array(boxList)
 
-    for index in range(len(boxList)):
-        if boxList[index] is not None:
-            boxList[index] *= ((1 / ratio) * 2, (1 / ratio) * 2)
-
-    return boxList
+    return numpy.array(boxList)
 
 def _writeOutputImage(label, image):
     fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
@@ -280,7 +275,7 @@ def inference(imageValue, detector, refineNet):
     return scoreText, scoreLink
 
 def result(scoreText, scoreLink, ratio, image):
-    boxList = _boxDetection(scoreText, scoreLink, ratio)
+    boxList = _boxCreation(scoreText, scoreLink, ratio)
 
     fileNameSplit, _ = os.path.splitext(fileName)
 

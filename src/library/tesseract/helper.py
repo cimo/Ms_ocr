@@ -211,9 +211,9 @@ def execute():
     if language == "en":
         resultLanguage = "eng"
     elif language == "jp":
-        resultLanguage = "Japanese"
+        resultLanguage = "jpn"
     elif language == "jp_vert":
-        resultLanguage = "Japanese_vert"
+        resultLanguage = "jpn_vert"
         resultPsm = 3
 
     fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
@@ -229,7 +229,7 @@ def execute():
         "--psm", str(resultPsm),
         "-c", "preserve_interword_spaces=1",
         "-c", "page_separator=''",
-        "-c", "tessedit_char_blacklist=''",
+        "-c", "tessedit_char_blacklist='〇'",
         "-c", "tessedit_create_txt=1",
         "-c", "tessedit_create_hocr=1",
         "-c", "tessedit_create_alto=1",
