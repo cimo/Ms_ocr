@@ -161,6 +161,7 @@ def preprocess():
     imageResize, ratio = _imageResize(imageLoad)
         
     imageGray = cv2.cvtColor(imageResize, cv2.COLOR_BGR2GRAY)
+    
     imageRectangle = imageGray.copy()
 
     imageResult = imageGray.copy()
@@ -214,7 +215,7 @@ def execute():
         resultLanguage = "jpn"
     elif language == "jp_vert":
         resultLanguage = "jpn_vert"
-        resultPsm = 3
+        resultPsm = 5
 
     fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
 
@@ -229,7 +230,7 @@ def execute():
         "--psm", str(resultPsm),
         "-c", "preserve_interword_spaces=1",
         "-c", "page_separator=''",
-        "-c", "tessedit_char_blacklist='〇'",
+        "-c", "tessedit_char_blacklist=''",
         "-c", "tessedit_create_txt=1",
         "-c", "tessedit_create_hocr=1",
         "-c", "tessedit_create_alto=1",
@@ -240,3 +241,80 @@ def execute():
         "-c", "tessedit_create_pdf=1",
         "-c", "tessedit_create_boxfile=1"
     ], check=True)
+
+def test():
+    # Coordinate
+    resultList = []
+
+    fileNameSplit, _ = os.path.splitext(fileName)
+
+    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSplit}.txt", "r") as file:
+        lineList = file.readlines()
+
+    for line in lineList:
+        coordinateList = list(map(int, line.strip().split(",")))
+        boxList = numpy.array(coordinateList).reshape((-1, 2))
+        
+        resultList.append([boxList])
+
+    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
+
+    # Load
+    print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
+
+    os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/", exist_ok=True)
+
+    imageLoad = cv2.imread(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
+
+    if len(imageLoad.shape) == 2:
+        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
+
+    if imageLoad.shape[2] == 4:
+        imageLoad = imageLoad[:, :, :3]
+
+    # Resize
+    height, width, _ = imageLoad.shape
+
+    sideMin = min(height, width)
+    sideMax = max(height, width)
+
+    if sideMin < sizeMax:
+        ratio = sizeMax / sideMin
+    else:
+        ratio = ratioMultiplier * sideMax / sideMax
+
+    print(ratio)
+
+    targetWidth = int(width * ratio)
+    targetHeight = int(height * ratio)
+
+    imageResult = cv2.resize(imageLoad, (targetWidth, targetHeight), interpolation=cv2.INTER_LINEAR)
+
+    # Crop
+    for a in range(len(resultList)):
+        box  = resultList[a]
+
+        top = int(box[0][0][0] * ratio)
+        left = int(box[0][0][1] * ratio)
+        bottom = int(box[0][2][0] * ratio)
+        right = int(box[0][2][1] * ratio)
+
+        imageCrop = imageResult[left:right, top:bottom]
+
+        cropPath = f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_box_{a}{fileExtensionSplit}"
+        cv2.imwrite(cropPath, imageCrop)
+
+        os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/tesseract/language/"
+
+        subprocess.run([
+            f"{PATH_ROOT}src/library/tesseract/executable",
+            cropPath,
+            f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_box_{a}",
+            "-l", "jpn",
+            "--oem", "1",
+            "--psm", "6",
+            "-c", "preserve_interword_spaces=1",
+            "-c", "page_separator=''",
+            "-c", "tessedit_char_blacklist=''",
+            "-c", "tessedit_create_txt=1"
+        ], check=True)
