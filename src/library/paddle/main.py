@@ -1,35 +1,17 @@
 from paddleocr import PaddleOCR
-import cv2
 
-def _loadImage(imagePath: str):
-    return cv2.imread(imagePath)
+ocr = PaddleOCR(
+    device="cpu",
+    lang="japan",
+    text_detection_model_dir="/home/app/src/library/paddle/PP-OCRv5_server_det/",
+    text_recognition_model_dir="/home/app/src/library/paddle/PP-OCRv5_server_rec/",
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False)
 
-def _initializeOcr():
-    return PaddleOCR(
-        use_angle_cls=True, lang='japan',
-        det_model_dir='modelli/ch_PP-OCRv3_det_infer',
-        rec_model_dir='modelli/japan_PP-OCRv3_rec_infer',
-        cls_model_dir='modelli/cls_infer'
-    )
+ocrResultList = ocr.predict("/home/app/file/input/1_jp.jpg")
 
-def _extractText(ocrModel, image):
-    results = ocrModel.ocr(image, cls=True)
-    extractedText = []
-
-    for a in results:
-        for b in a:
-            extractedText.append(b[1][0])
-
-    return extractedText
-
-def runOcr(imagePath: str):
-    image = _loadImage(imagePath)
-    ocrModel = _initializeOcr()
-    textList = _extractText(ocrModel, image)
-
-    for a in textList:
-        print(a)
-
-# Esempio di utilizzo
-if __name__ == "__main__":
-    runOcr("/home/app/file/input/test_1_en.jpg")
+for ocrResult in ocrResultList:  
+    ocrResult.print()  
+    ocrResult.save_to_img("/home/app/file/output/paddle/")  
+    ocrResult.save_to_json("/home/app/file/output/paddle/") 

@@ -2,7 +2,7 @@
 import helper
 
 def Main():
-    #helper.executeCraft()
+    helper.executeCraft()
 
     #imageGray, imageRectangle, imageResult, ratio = helper.preprocess()
 
