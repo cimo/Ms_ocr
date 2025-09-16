@@ -9,6 +9,11 @@ import torch.backends.cudnn as torchBackendCudnn
 from torch.autograd import Variable as torchAutogradVariable
 from collections import OrderedDict as collectionOrderDict
 
+# Source
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from preprocessor import helper as preprocessorHelper
+
 pathRoot = sys.argv[1]
 pathInput = sys.argv[2]
 pathOutput = sys.argv[3]
@@ -40,37 +45,7 @@ def _removeDataParallel(stateDict):
 
     return stateDictNew
 
-def _loadImage():
-    print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
-
-    os.makedirs(f"{pathRoot}{pathOutput}craft/", exist_ok=True)
-
-    imageLoad = cv2.imread(f"{pathRoot}{pathInput}{fileName}")
-
-    if len(imageLoad.shape) == 2:
-        imageLoad = cv2.cvtColor(imageLoad, cv2.COLOR_GRAY2BGR)
-
-    if imageLoad.shape[2] == 4:
-        imageLoad = imageLoad[:, :, :3]
-    
-    return imageLoad
-
-def _imageResize(image):
-    height, width, channel = image.shape
-
-    sideMin = min(height, width)
-    sideMax = max(height, width)
-
-    if sideMin < sizeMax:
-        ratio = sizeMax / sideMin
-    else:
-        ratio = ratioMultiplier * sideMax / sideMax
-
-    targetWidth = int(width * ratio)
-    targetHeight = int(height * ratio)
-
-    imageResize = cv2.resize(image, (targetWidth, targetHeight), interpolation=cv2.INTER_LINEAR)
-
+def _resizeCnn(targetWidth, targetHeight, channel, imageResize):
     target32Width = targetWidth
     target32Height = targetHeight
     
@@ -83,7 +58,7 @@ def _imageResize(image):
     imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
     imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
 
-    return imageResult, ratio
+    return imageResult
 
 def _normalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
     imageResult = image.copy().astype(numpy.float32)
@@ -101,11 +76,13 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
 def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
     if isDebug:
-        _writeOutputImage("_heatmap", (scoreTextValue, scoreLinkValue))
+        imageHeatmap = preprocessorHelper.heatmap(scoreTextValue, scoreLinkValue)
+
+        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap", imageHeatmap)
 
     imageHeight, imageWidth = scoreTextValue.shape
 
-    scaleFactor = max(4096 / max(imageHeight, imageWidth), 1.0)
+    scaleFactor = max(sizeMax / max(imageHeight, imageWidth), 1.0)
     width = int(imageWidth * scaleFactor)
     height = int(imageHeight * scaleFactor)
 
@@ -165,20 +142,6 @@ def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
 
     return numpy.array(boxList)
 
-def _writeOutputImage(label, image):
-    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
-    path = os.path.join(f"{pathRoot}{pathOutput}craft/", f"{fileNameSplit}{label}{fileExtensionSplit}")
-    
-    if not isinstance(image, tuple):
-        imageResult = numpy.clip(image, 0, 255).astype(numpy.uint8)
-    else:
-        scoreTextValue, scoreLinkValue = image
-        imageHstack = numpy.hstack((scoreTextValue, scoreLinkValue))
-        imageWrite = (numpy.clip(imageHstack, 0, 1) * 255).astype(numpy.uint8)
-        imageResult = cv2.applyColorMap(imageWrite, cv2.COLORMAP_JET)
-
-    cv2.imwrite(path, imageResult)
-
 def checkCuda():
     print(f"On your machine CUDA are: {'available' if torch.cuda.is_available() else 'NOT available'}.")
 
@@ -218,36 +181,29 @@ def refineNetEval(refineNet):
         return None
 
 def preprocess():
-    imageLoad = _loadImage()
+    print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
 
-    imageGray = cv2.cvtColor(imageLoad, cv2.COLOR_BGR2GRAY)
+    imageRead = preprocessorHelper.read(f"{pathRoot}{pathInput}{fileName}")
 
-    blur = cv2.medianBlur(imageGray, 1)
+    targetWidth, targetHeight, ratio, imageResize, channel = preprocessorHelper.resize(imageRead, sizeMax)
 
-    threshold = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 10)
+    imageGray = preprocessorHelper.gray(imageResize)
 
-    invertAB = cv2.bitwise_not(threshold)
+    imageNoiseRemove = preprocessorHelper.noiseRemove(imageGray)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+    imageColor = preprocessorHelper.color(imageNoiseRemove)
 
-    morphologyEx = cv2.morphologyEx(invertAB, cv2.MORPH_CLOSE, kernel)
-
-    invertBA = cv2.bitwise_not(morphologyEx)
-
-    imageColor = cv2.cvtColor(invertBA, cv2.COLOR_GRAY2BGR)
-
-    imageResize, ratio = _imageResize(imageColor)
+    imageResizeCnn = _resizeCnn(targetWidth, targetHeight, channel, imageColor)
 
     if isDebug:
-        _writeOutputImage("_preprocess", imageResize)
+        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_preprocess", imageColor)
 
-    return imageColor, imageResize, ratio
+    return ratio, imageResizeCnn, imageRead
 
-def inference(imageValue, detector, refineNet):
+def inference(imageResizeCnn, detector, refineNet):
     timeStart = time.time()
 
-    image = numpy.array(imageValue)
-    imageNormalize  = _normalize(image)
+    imageNormalize  = _normalize(imageResizeCnn)
     imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
     modelInput = torchAutogradVariable(imageTensor.unsqueeze(0))
     
@@ -274,17 +230,18 @@ def inference(imageValue, detector, refineNet):
 
     return scoreText, scoreLink
 
-def result(scoreText, scoreLink, ratio, image):
+def result(scoreText, scoreLink, ratio, imageRead):
     boxList = _boxCreation(scoreText, scoreLink, ratio)
 
     fileNameSplit, _ = os.path.splitext(fileName)
 
-    with open(f"{pathRoot}{pathOutput}craft/{fileNameSplit}.txt", "w") as file:
+    with open(f"{pathRoot}{pathOutput}{fileNameSplit}.txt", "w") as file:
         for _, box in enumerate(boxList):
             shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
 
             file.write(",".join([str(shape) for shape in shapeList]) + "\r\n")
 
-            cv2.polylines(image, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
+            cv2.polylines(imageRead, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
 
-    _writeOutputImage("", image)
+    if isDebug:
+        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_result", imageRead)

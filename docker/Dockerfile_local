@@ -53,8 +53,7 @@ RUN cd ~ \
     libleptonica-dev \
     libtiff-dev \
     libgl1 \
-    imagemagick \
-    bc \
+    ccache \
     # Clean
     && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \
@@ -70,7 +69,7 @@ WORKDIR ${PATH_ROOT}
 CMD cp -r ${PATH_ROOT}.ms_cronjob-volume/certificate/* ${PATH_ROOT}certificate/ \
     # Pip
     && python3 -m pip install pip --upgrade \
-    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/craft/requirements.txt \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Tesseract
     && ${PATH_ROOT}src/library/tesseract/executable --version \
     && ${PATH_ROOT}src/library/tesseract/executable --list-langs \

@@ -12,10 +12,10 @@ def Main():
     refineNet = RefineNet()
     refineNet = helper.refineNetEval(refineNet)
 
-    image, imageResize, ratio = helper.preprocess()
+    ratio, imageResizeCnn, imageRead = helper.preprocess()
 
-    scoreText, scoreLink = helper.inference(imageResize, detector, refineNet)
+    scoreText, scoreLink = helper.inference(imageResizeCnn, detector, refineNet)
 
-    helper.result(scoreText, scoreLink, ratio, image)
+    helper.result(scoreText, scoreLink, ratio, imageRead)
 
 Main()
