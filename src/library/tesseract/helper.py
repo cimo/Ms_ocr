@@ -5,6 +5,7 @@ import logging
 import ast
 import numpy
 import cv2
+import json
 
 # Source
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -126,21 +127,52 @@ def _subprocess(fileNameSplit):
         f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_crop.png",
         f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}",
         f"-l", resultLanguage,
-        "--oem", "1",
         "--psm", str(resultPsm),
-        "-c", "preserve_interword_spaces=1",
-        #"-c", "page_separator=''",
-        #"-c", "tessedit_char_blacklist=''",
-        #"-c", "tessedit_create_txt=1",
-        #"-c", "tessedit_create_hocr=1",
-        #"-c", "tessedit_create_alto=1",
-        #"-c", "tessedit_create_page_xml=1",
-        #"-c", "tessedit_create_lstmbox=1",
-        #"-c", "tessedit_create_tsv=1",
-        #"-c", "tessedit_create_wordstrbox=1",
-        #"-c", "tessedit_create_pdf=1",
-        #"-c", "tessedit_create_boxfile=1"
+        "--oem", "1",
+        "-c", "preserve_interword_spaces=0",
+        "-c", "textord_tabfind_vertical_text=0",
+        "-c", "textord_min_xheight=10",
+        "-c", "classify_enable_learning=1",
+        "-c", "classify_enable_adaptive_matcher=1",
+        "-c", "classify_use_pre_adapted_templates=0",
+        "-c", "enable_noise_removal=1",
+        "-c", "noise_maxperword=6",
+        "-c", "noise_maxperblob=6",
+        "-c", "tessedit_create_txt=1",
+        "-c", "tessedit_create_hocr=0",
+        "-c", "tessedit_create_alto=0",
+        "-c", "tessedit_create_page_xml=0",
+        "-c", "tessedit_create_lstmbox=0",
+        "-c", "tessedit_create_tsv=0",
+        "-c", "tessedit_create_wordstrbox=0",
+        "-c", "tessedit_create_pdf=0",
+        "-c", "tessedit_create_boxfile=0"
     ], check=True)
+
+def jsonCreate(pathJson, left, top, right, bottom, pathText):
+    if os.path.exists(pathJson):
+        with open(pathJson, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    else:
+        data = []
+
+    box = {
+        "left": left,
+        "top": top,
+        "right": right,
+        "bottom": bottom
+    }
+    
+    with open(pathText, "r", encoding="utf-8") as file:
+        text = file.read().strip()
+
+    data.append({
+        "box": box,
+        "text": text
+    })
+
+    with open(pathJson, "w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
 
 def executeCraft():
     subprocess.run([
@@ -159,90 +191,23 @@ def preprocess():
 
     imageRead = preprocessorHelper.read(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
 
-    _, _, ratio, imageResize, _ = preprocessorHelper.resize(imageRead, sizeMax)
-
-    imageGray = preprocessorHelper.gray(imageResize)
-
-    imageResult = imageGray.copy()
-    imageResult.fill(255)
-
-    return ratio, imageGray, imageResult
-
-def result(ratio, imageGray, imageResult):
-    fileNameSplit, fileExtensionSplit = os.path.splitext(fileName)
-
-    with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSplit}.txt", "r") as file:
-        lineList = file.readlines()
-
-    for line in lineList:
-        coordinateList = list(map(int, line.strip().split(",")))
-        boxList = numpy.array(coordinateList).reshape((-1, 2))
-
-        left = int(boxList[0][0] * ratio)
-        top = int(boxList[0][1] * ratio)
-        right = int(boxList[2][0] * ratio)
-        bottom = int(boxList[2][1] * ratio)
-
-        imageCrop = imageGray[top:bottom, left:right]
-        imageCropFix = _cropFix(imageCrop)
-
-        if imageCropFix is not None:
-            if isDebug:
-                cv2.rectangle(imageGray, (left, top), (right, bottom), (0, 0, 0), 1)
-
-                preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_box", imageGray)
-
-            imageResult[top:bottom, left:right] = imageCropFix
-    
-    preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_result", imageResult)
-
-    resultLanguage = ""
-    resultPsm = 6
-
-    if language == "en":
-        resultLanguage = "eng"
-    elif language == "jp":
-        resultLanguage = "jpn"
-    elif language == "jp_vert":
-        resultLanguage = "jpn_vert"
-        resultPsm = 5
-
-    os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/tesseract/language/"
-    
-    subprocess.run([
-        f"{PATH_ROOT}src/library/tesseract/executable",
-        f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_result{fileExtensionSplit}",
-        f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}",
-        f"-l", resultLanguage,
-        "--oem", "1",
-        "--psm", str(resultPsm),
-        "-c", "preserve_interword_spaces=1",
-        "-c", "page_separator=''",
-        "-c", "tessedit_char_blacklist=''",
-        "-c", "tessedit_create_txt=1",
-        "-c", "tessedit_create_hocr=1",
-        "-c", "tessedit_create_alto=1",
-        "-c", "tessedit_create_page_xml=1",
-        "-c", "tessedit_create_lstmbox=1",
-        "-c", "tessedit_create_tsv=1",
-        "-c", "tessedit_create_wordstrbox=1",
-        "-c", "tessedit_create_pdf=1",
-        "-c", "tessedit_create_boxfile=1"
-    ], check=True)
-
-def test():
-    print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
-
-    imageRead = preprocessorHelper.read(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
-
     imageGray = preprocessorHelper.gray(imageRead)
-    
+
     imageBox = imageGray.copy()
 
     imageResult = imageGray.copy()
     imageResult.fill(255)
 
+    return imageGray, imageBox, imageResult
+
+def result(imageGray, imageBox, imageResult):
     fileNameSplit, _ = os.path.splitext(fileName)
+
+    pathJson = f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.json"
+    pathText = f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.txt"
+
+    if os.path.exists(pathJson):
+        os.remove(pathJson)
 
     with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSplit}.txt", "r") as file:
         lineList = file.readlines()
@@ -259,16 +224,23 @@ def test():
         imageCrop = imageGray[top:bottom, left:right]
         #imageCropFix = _cropFix(imageCrop)
 
-        if imageCrop is not None:
-            if isDebug:
-                cv2.rectangle(imageBox, (left, top), (right, bottom), (0, 0, 0), 1)
+        if isDebug:
+            cv2.rectangle(imageBox, (left, top), (right, bottom), (0, 0, 0), 1)
 
-                preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_box", imageBox)
+            preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_box", imageBox)
 
-            imageResult[top:bottom, left:right] = imageCrop
+        imageResult[top:bottom, left:right] = imageCrop
 
-            preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.png", "_crop", imageCrop)
+        _, imageCropResize = preprocessorHelper.resizeLineHeight(imageCrop)
 
-            _subprocess(fileNameSplit)
+        preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.png", "_crop", imageCropResize)
+
+        _subprocess(fileNameSplit)
+
+        jsonCreate(pathJson, left, top, right, bottom, pathText)
     
-    preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_result", imageResult)
+    if os.path.exists(pathText):
+        os.remove(pathText)
+    
+    if isDebug:
+        preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_result", imageResult)

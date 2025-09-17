@@ -10,8 +10,14 @@ def Main():
     _, _, _, imageResize, _ = helper.resize(image, 1024)
     helper.write(pathOutput, "_resize", imageResize)
 
+    _, imageResizeLineHeight = helper.resizeLineHeight(image)
+    helper.write(pathOutput, "_resizeLineHeight", imageResizeLineHeight)
+
     imageGray = helper.gray(imageResize)
     helper.write(pathOutput, "_gray", imageGray)
+
+    imageColor = helper.color(imageGray)
+    helper.write(pathOutput, "_color", imageColor)
 
     imageBinarization = helper.binarization(imageGray)
     helper.write(pathOutput, "_binarization", imageBinarization)

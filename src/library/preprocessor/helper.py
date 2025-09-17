@@ -54,6 +54,35 @@ def resize(image, sizeLimit):
 
     return targetWidth, targetHeight, ratio, imageResult, channel
 
+def resizeLineHeight(image, heightTarget=30):
+    imageGray = gray(image)
+
+    _, imageThreshold = cv2.threshold(imageGray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    contourList, _ = cv2.findContours(imageThreshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    heightList = []
+
+    for contour in contourList:
+        _, _, _, height = cv2.boundingRect(contour)
+        
+        if 8 <= height <= 100:
+            heightList.append(height)
+
+    if heightList:
+        heightCurrent = int(numpy.median(heightList))
+    else:
+        heightCurrent = 10
+
+    scale = heightTarget / heightCurrent
+
+    widthNew = int(image.shape[1] * scale)
+    heightNew = int(image.shape[0] * scale)
+
+    imageResult = cv2.resize(image, (widthNew, heightNew), interpolation=cv2.INTER_CUBIC)
+
+    return scale, imageResult
+
 def gray(image):
     imageArray = _imageArray(image)
 

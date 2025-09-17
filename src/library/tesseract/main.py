@@ -4,10 +4,9 @@ import helper
 def Main():
     #helper.executeCraft()
 
-    #ratio, imageGray, imageResult = helper.preprocess()
+    imageGray, imageBox, imageResult = helper.preprocess()
 
-    #helper.result(ratio, imageGray, imageResult)
-    helper.test()
+    helper.result(imageGray, imageBox, imageResult)
 
 Main()
 
