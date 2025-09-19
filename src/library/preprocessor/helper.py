@@ -50,7 +50,10 @@ def resize(image, sizeLimit):
 
     imageResult = cv2.resize(imageArray, (targetWidth, targetHeight), interpolation=interpolation)
 
-    _, _, channel = imageResult.shape
+    if imageResult.ndim == 2:
+        channel = 1
+    else:
+        channel = imageResult.shape[2]
 
     return targetWidth, targetHeight, ratio, imageResult, channel
 
@@ -74,14 +77,22 @@ def resizeLineHeight(image, heightTarget=30):
     else:
         heightCurrent = 10
 
-    scale = heightTarget / heightCurrent
+    ratio = heightTarget / heightCurrent
 
-    widthNew = int(image.shape[1] * scale)
-    heightNew = int(image.shape[0] * scale)
+    targetWidth = int(image.shape[1] * ratio)
+    targetHeight = int(image.shape[0] * ratio)
 
-    imageResult = cv2.resize(image, (widthNew, heightNew), interpolation=cv2.INTER_CUBIC)
+    imageResult = cv2.resize(image, (targetWidth, targetHeight), interpolation=cv2.INTER_CUBIC)
 
-    return scale, imageResult
+    if imageResult.ndim == 2:
+        imageResult = numpy.expand_dims(imageResult, axis=-1)
+
+    if imageResult.shape[2] == 1:
+        imageResult = numpy.repeat(imageResult, 3, axis=-1)
+
+    _, _, channel = imageResult.shape
+
+    return targetWidth, targetHeight, ratio, imageResult, channel
 
 def gray(image):
     imageArray = _imageArray(image)
@@ -98,33 +109,44 @@ def color(image):
 
     if imageArray.ndim == 2:
         imageArray = cv2.cvtColor(imageArray, cv2.COLOR_GRAY2BGR)
-    elif imageArray.ndim == 3 and imageArray.shape[2] == 4:
+    if imageArray.ndim == 3 and imageArray.shape[2] == 1:
+        imageArray = cv2.cvtColor(imageArray.squeeze(-1), cv2.COLOR_GRAY2BGR)
+    if imageArray.ndim == 3 and imageArray.shape[2] == 4:
         imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGBA2BGR)
     
     return imageArray
 
-def binarization(image, blur=5, block=15, isInverted=False, threshold=10):
+def medianBlur(image, value=5):
+    imageArray = _imageArray(image)
+
+    return cv2.medianBlur(imageArray, value)
+
+def binarization(image, blur=7, threshold=11, block=2, isInverted=False):
     imageArray = _imageArray(image, True)
 
-    if blur % 2 == 0:
-        blur += 1
-    
-    if block % 2 == 0:
-        block += 1
-
-    imageBlur = cv2.GaussianBlur(imageArray, (blur, blur), 0)
-    imageBlur[imageBlur == 0] = 1e-6
-
-    imageDivide = cv2.divide(imageArray, imageBlur, scale=255)
-
-    imageDivide = numpy.clip(imageDivide, 0, 255).astype(numpy.uint8)
+    imageBlur = medianBlur(imageArray)
 
     if isInverted:
         thresholdType = cv2.THRESH_BINARY_INV
     else:
         thresholdType = cv2.THRESH_BINARY
     
-    return cv2.adaptiveThreshold(imageDivide, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C, thresholdType=thresholdType, blockSize=block, C=threshold)
+    return cv2.adaptiveThreshold(imageBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType, threshold, block)
+
+def contour(image):
+    imageArray = _imageArray(image)
+
+    return cv2.findContours(imageArray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+def mask(image):
+    imageArray = _imageArray(image)
+
+    return numpy.zeros_like(imageArray)
+
+def maskApply(image, imageMask):
+    imageArray = _imageArray(image)
+
+    return cv2.bitwise_and(imageArray, imageArray, mask=imageMask)
 
 def gamma(image, gamma=2.2):
     imageArray = _imageArray(image)
@@ -187,14 +209,10 @@ def addOrRemoveBorder(image, unit=1, color=125):
 
         return imageArray[unitNegative:height-unitNegative, unitNegative:width-unitNegative]
 
-def heatmap(scoreTextValue, scoreLinkValue):
-    scoreTextNormalize = cv2.normalize(scoreTextValue, None, 0, 255, cv2.NORM_MINMAX).astype(numpy.uint8)
-    scoreLinkNormalize = cv2.normalize(scoreLinkValue, None, 0, 255, cv2.NORM_MINMAX).astype(numpy.uint8)
+def heatmap(scoreText):
+    scoreTextNormalize = cv2.normalize(scoreText, None, 0, 255, cv2.NORM_MINMAX).astype(numpy.uint8)
 
-    scoreTextColor = cv2.applyColorMap(scoreTextNormalize, cv2.COLORMAP_JET)
-    scoreLinkColor = cv2.applyColorMap(scoreLinkNormalize, cv2.COLORMAP_JET)
-
-    return numpy.hstack((scoreTextColor, scoreLinkColor))
+    return cv2.applyColorMap(scoreTextNormalize, cv2.COLORMAP_JET)
 
 def write(pathFull, label, image, dpi=(300, 300)):
     fileNameSplit, fileExtensionSplit = os.path.splitext(os.path.basename(pathFull))
@@ -212,17 +230,26 @@ def write(pathFull, label, image, dpi=(300, 300)):
         if image.ndim == 2:
             image = pillowImage.fromarray(image, mode="L")
         elif image.ndim == 3:
-            if image.shape[2] == 3:
+            if image.shape[2] == 1:
+                image = pillowImage.fromarray(image.squeeze(-1), mode="L")
+            elif image.shape[2] == 3:
                 image = pillowImage.fromarray(image, mode="RGB")
             elif image.shape[2] == 4:
                 image = pillowImage.fromarray(image, mode="RGBA")
+    
+    iccProfile = None
+    
+    if hasattr(image, "info"):
+        iccProfile = image.info.get("icc_profile")
 
     if fileExtensionSplit.lower() in [".jpg", ".jpeg"]:
-        image.save(pathJoin, quality=100, subsampling=0, icc_profile=image.info.get("icc_profile"), dpi=dpi)
+        image.save(pathJoin, quality=100, subsampling=0, icc_profile=iccProfile, dpi=dpi)
     else:
-        image.save(pathJoin, icc_profile=image.info.get("icc_profile"), dpi=dpi)
+        image.save(pathJoin, icc_profile=iccProfile, dpi=dpi)
 
-def writeMemory(image, format="png"):
+def writeMemory(image, fileName, dpi=(300, 300)):
+    fileNameSplit, _ = os.path.splitext(fileName)
+
     if isinstance(image, numpy.ndarray):
         if numpy.issubdtype(image.dtype, numpy.floating):
             image = numpy.clip(image, 0, 255).astype(numpy.uint8)
@@ -232,13 +259,25 @@ def writeMemory(image, format="png"):
         if image.ndim == 2:
             image = pillowImage.fromarray(image, mode="L")
         elif image.ndim == 3:
-            if image.shape[2] == 3:
+            if image.shape[2] == 1:
+                image = pillowImage.fromarray(image.squeeze(-1), mode="L")
+            elif image.shape[2] == 3:
                 image = pillowImage.fromarray(image, mode="RGB")
             elif image.shape[2] == 4:
                 image = pillowImage.fromarray(image, mode="RGBA")
     
     buffer = io.BytesIO()
-    image.save(buffer, format=format)
+
+    iccProfile = None
+    
+    if hasattr(image, "info"):
+        iccProfile = image.info.get("icc_profile")
+
+    if fileNameSplit.lower() in [".jpg", ".jpeg"]:
+        image.save(buffer, quality=100, subsampling=0, icc_profile=iccProfile, dpi=dpi)
+    else:
+        image.save(buffer, icc_profile=iccProfile, dpi=dpi)
+    
     buffer.seek(0)
     
     return buffer

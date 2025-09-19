@@ -23,11 +23,9 @@ isDebug = sys.argv[6].lower() == "true"
 
 pathWeightMain = os.path.join(os.path.dirname(__file__), "mlt_25k.pth")
 pathWeightRefine = os.path.join(os.path.dirname(__file__), "refiner_CTW1500.pth")
-sizeMax = 2048
-ratioMultiplier = 4.0
-lowText = 0.2
-thresholdText = 0.3
-thresholdLink = 0.4
+lowText = 0.4
+thresholdText = 0.7
+thresholdLink = 0.1
 isRefine = True
 
 def _removeDataParallel(stateDict):
@@ -76,15 +74,16 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
 def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
     if isDebug:
-        imageHeatmap = preprocessorHelper.heatmap(scoreTextValue, scoreLinkValue)
+        imageHeatmapScoreText = preprocessorHelper.heatmap(scoreTextValue)
+        imageHeatmapScoreLink = preprocessorHelper.heatmap(scoreLinkValue)
 
-        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap", imageHeatmap)
+        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_text", imageHeatmapScoreText)
+        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_link", imageHeatmapScoreLink)
 
     imageHeight, imageWidth = scoreTextValue.shape
 
-    scaleFactor = max(sizeMax / max(imageHeight, imageWidth), 1.0)
-    width = int(imageWidth * scaleFactor)
-    height = int(imageHeight * scaleFactor)
+    width = int(imageWidth * ratio)
+    height = int(imageHeight * ratio)
 
     scoreText = cv2.resize(scoreTextValue, (width, height), interpolation=cv2.INTER_LINEAR)
     scoreLink = cv2.resize(scoreLinkValue, (width, height), interpolation=cv2.INTER_LINEAR)
@@ -135,7 +134,7 @@ def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
         indexStart = box.sum(axis=1).argmin()
         box = numpy.roll(box, 4 - indexStart, 0)
 
-        box /= scaleFactor
+        box /= ratio
         box *= ((1 / ratio) * 2, (1 / ratio) * 2)
 
         boxList.append(box)
@@ -185,11 +184,13 @@ def preprocess():
 
     imageRead = preprocessorHelper.read(f"{pathRoot}{pathInput}{fileName}")
 
-    targetWidth, targetHeight, ratio, imageResize, channel = preprocessorHelper.resize(imageRead, sizeMax)
+    targetWidth, targetHeight, ratio, imageResize, channel = preprocessorHelper.resize(imageRead, 2048)
 
     imageGray = preprocessorHelper.gray(imageResize)
 
-    imageNoiseRemove = preprocessorHelper.noiseRemove(imageGray)
+    imageBinarize = preprocessorHelper.binarization(imageGray)
+
+    imageNoiseRemove = preprocessorHelper.noiseRemove(imageBinarize)
 
     imageColor = preprocessorHelper.color(imageNoiseRemove)
 
