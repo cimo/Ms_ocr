@@ -45,69 +45,6 @@ language = sys.argv[2]
 isCuda = sys.argv[3]
 isDebug = sys.argv[4]
 
-sizeMax = 2048
-ratioMultiplier = 4.0
-
-def _addBorder(image, color, unit):
-    return cv2.rectangle(image, (0, image.shape[0]), (image.shape[1], 0), color, unit)
-
-def _backgroundCheck(image):
-    imageBgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    imageHsv = cv2.cvtColor(imageBgr, cv2.COLOR_BGR2HSV)
-
-    colorMin = numpy.array([0, 0, 0])
-    colorMax = numpy.array([179, 255, 146])
-    mask = cv2.inRange(imageHsv, colorMin, colorMax)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    dilate = cv2.dilate(mask, kernel, iterations=5)
-
-    return 255 - cv2.bitwise_and(dilate, mask)
-
-def _binarization(isInverted, image, blur, unitThresholdA, unitThresholdB):
-    thresholdBinary = cv2.THRESH_BINARY
-
-    if isInverted:
-        thresholdBinary = cv2.THRESH_BINARY_INV
-
-    imageBlur = cv2.GaussianBlur(image, (blur, blur), 0)
-    imageDivide = cv2.divide(image, imageBlur, scale=255)
-
-    return cv2.adaptiveThreshold(
-        imageDivide,
-        255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        thresholdBinary,
-        unitThresholdA,
-        unitThresholdB,
-    )
-
-def _noiseRemove(image, unit):
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (unit, unit))
-
-    return cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
-
-def _cropFix(image):
-    if image is None or image.size == 0:
-        print("Error: Crop not generated!")
-
-        return None
-        
-    imageBorder = _addBorder(image, (255, 255, 255), 2)
-
-    backgroundCheckResult = _backgroundCheck(image)
-
-    pixelQuantity = round((backgroundCheckResult > 0).mean(), 1)
-
-    if pixelQuantity == 1.0 or pixelQuantity <= 0.4:
-        imageBinarization = _binarization(True, imageBorder, 91, 255, 0)
-
-        imageResult = _addBorder(imageBinarization, (255, 255, 255), 3)
-    else:
-        imageResult = _binarization(False, imageBorder, 91, 255, 5)
-
-    return _noiseRemove(imageResult, 2)
-
 def _subprocess(fileNameSplit):
     resultLanguage = ""
     resultPsm = 6
@@ -135,9 +72,10 @@ def _subprocess(fileNameSplit):
         "-c", "classify_enable_learning=1",
         "-c", "classify_enable_adaptive_matcher=1",
         "-c", "classify_use_pre_adapted_templates=0",
+        "-c", "classify_bln_numeric_mode=1",
         "-c", "enable_noise_removal=1",
-        "-c", "noise_maxperword=6",
-        "-c", "noise_maxperblob=6",
+        "-c", "noise_maxperword=16",
+        "-c", "noise_maxperblob=16",
         "-c", "tessedit_create_txt=1",
         "-c", "tessedit_create_hocr=0",
         "-c", "tessedit_create_alto=0",
@@ -149,7 +87,7 @@ def _subprocess(fileNameSplit):
         "-c", "tessedit_create_boxfile=0"
     ], check=True)
 
-def jsonCreate(pathJson, left, top, right, bottom, pathText):
+def _jsonCreate(pathJson, left, top, right, bottom, pathText):
     if os.path.exists(pathJson):
         with open(pathJson, "r", encoding="utf-8") as file:
             data = json.load(file)
@@ -212,7 +150,7 @@ def result(imageGray, imageBox, imageResult):
     with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{fileNameSplit}.txt", "r") as file:
         lineList = file.readlines()
 
-    for line in lineList:
+    for _, line in enumerate(lineList):
         coordinateList = list(map(int, line.strip().split(",")))
         boxList = numpy.array(coordinateList).reshape((-1, 2))
 
@@ -231,13 +169,13 @@ def result(imageGray, imageBox, imageResult):
 
         imageResult[top:bottom, left:right] = imageCrop
 
-        _, imageCropResize = preprocessorHelper.resizeLineHeight(imageCrop)
+        _, _, _, imageCropResize, _ = preprocessorHelper.resizeLineHeight(imageCrop)
 
         preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.png", "_crop", imageCropResize)
 
         _subprocess(fileNameSplit)
 
-        jsonCreate(pathJson, left, top, right, bottom, pathText)
+        _jsonCreate(pathJson, left, top, right, bottom, pathText)
     
     if os.path.exists(pathText):
         os.remove(pathText)
