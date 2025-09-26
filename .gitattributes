@@ -16,3 +16,4 @@
 # cimo +
 *.sh text eol=lf
 *.py text eol=lf
+*.pdiparams filter=lfs diff=lfs merge=lfs -text
