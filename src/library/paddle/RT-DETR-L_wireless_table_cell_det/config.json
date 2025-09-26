@@ -1,0 +1,208 @@
+{
+    "mode": "paddle",
+    "draw_threshold": 0.5,
+    "metric": "COCO",
+    "use_dynamic_shape": false,
+    "Global": {
+        "model_name": "RT-DETR-L_wireless_table_cell_det"
+    },
+    "arch": "DETR",
+    "min_subgraph_size": 3,
+    "Preprocess": [
+        {
+            "interp": 2,
+            "keep_ratio": false,
+            "target_size": [
+                640,
+                640
+            ],
+            "type": "Resize"
+        },
+        {
+            "mean": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "norm_type": "none",
+            "std": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "type": "NormalizeImage"
+        },
+        {
+            "type": "Permute"
+        }
+    ],
+    "label_list": [
+        "cell"
+    ],
+    "Hpi": {
+        "backend_configs": {
+            "paddle_infer": {
+                "trt_dynamic_shapes": {
+                    "im_shape": [
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            8,
+                            2
+                        ]
+                    ],
+                    "image": [
+                        [
+                            1,
+                            3,
+                            640,
+                            640
+                        ],
+                        [
+                            1,
+                            3,
+                            640,
+                            640
+                        ],
+                        [
+                            8,
+                            3,
+                            640,
+                            640
+                        ]
+                    ],
+                    "scale_factor": [
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            8,
+                            2
+                        ]
+                    ]
+                },
+                "trt_dynamic_shape_input_data": {
+                    "im_shape": [
+                        [
+                            640,
+                            640
+                        ],
+                        [
+                            640,
+                            640
+                        ],
+                        [
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640,
+                            640
+                        ]
+                    ],
+                    "scale_factor": [
+                        [
+                            2,
+                            2
+                        ],
+                        [
+                            1,
+                            1
+                        ],
+                        [
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67,
+                            0.67
+                        ]
+                    ]
+                }
+            },
+            "tensorrt": {
+                "dynamic_shapes": {
+                    "im_shape": [
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            8,
+                            2
+                        ]
+                    ],
+                    "image": [
+                        [
+                            1,
+                            3,
+                            640,
+                            640
+                        ],
+                        [
+                            1,
+                            3,
+                            640,
+                            640
+                        ],
+                        [
+                            8,
+                            3,
+                            640,
+                            640
+                        ]
+                    ],
+                    "scale_factor": [
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            1,
+                            2
+                        ],
+                        [
+                            8,
+                            2
+                        ]
+                    ]
+                }
+            }
+        }
+    }
+}
