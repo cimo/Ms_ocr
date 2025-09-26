@@ -4,7 +4,7 @@ from paddleocr import LayoutDetection
 os.makedirs("/home/app/file/output/paddle/", exist_ok=True)
 
 pathModelBlockLayout = "/home/app/src/library/paddle/PP-DocBlockLayout/"
-pathImage = "/home/app/file/input/1_en.jpg"
+pathImage = "/home/app/file/input/1_jp.jpg"
 
 modelBlockLayout = LayoutDetection(model_dir=pathModelBlockLayout, model_name="PP-DocBlockLayout")
 outputBlockLayoutList = modelBlockLayout.predict(pathImage, batch_size=1)
