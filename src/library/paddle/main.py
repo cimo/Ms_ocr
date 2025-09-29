@@ -1,6 +1,6 @@
 import os
 import json
-from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection
+from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 from PIL import Image as pillowImage
 
 os.makedirs("/home/app/file/output/paddle/layout/", exist_ok=True)
@@ -15,10 +15,13 @@ pathModelTableClassification = "/home/app/src/library/paddle/PP-LCNet_x1_0_table
 pathModelTableWired = "/home/app/src/library/paddle/RT-DETR-L_wired_table_cell_det/"
 pathModelTableWireless = "/home/app/src/library/paddle/RT-DETR-L_wireless_table_cell_det/"
 pathModelTextDetection = "/home/app/src/library/paddle/PP-OCRv5_server_det/"
+pathModelTextRecognition = "/home/app/src/library/paddle/PP-OCRv5_server_rec/"
 pathImageInput = "/home/app/file/input/1_jp.jpg"
 pathLayout = "/home/app/file/output/paddle/layout/"
 pathTable = "/home/app/file/output/paddle/table/"
 pathExport = "/home/app/file/output/paddle/export/"
+
+isClassification = True
 
 def _inferenceTableClassification(path):
     modelTableClassification = TableClassification(model_dir=pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls")
@@ -60,6 +63,16 @@ def _inferenceTextDetection(path):
         outputTextDetection.save_to_img(save_path=f"{pathExport}{fileNameSplit}.jpg")
         outputTextDetection.save_to_json(save_path=f"{pathExport}{fileNameSplit}.json")
 
+def _inferenceTextRecognition(path):
+    modelTextRecognition = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec")
+    outputTextRecognitionList = modelTextRecognition.predict(input=path, batch_size=1)
+
+    fileNameSplit, _ = os.path.splitext(os.path.basename(path))
+
+    for outputTextRecognition in outputTextRecognitionList:
+        outputTextRecognition.save_to_img(save_path=f"{pathExport}{fileNameSplit}.jpg")
+        outputTextRecognition.save_to_json(save_path=f"{pathExport}{fileNameSplit}.json")
+
 def process():
     imageInput = pillowImage.open(pathImageInput)
 
@@ -73,7 +86,7 @@ def inferenceLayout():
         outputBlockLayout.save_to_img(save_path=f"{pathLayout}result.jpg")
         outputBlockLayout.save_to_json(save_path=f"{pathLayout}result.json")
 
-def readLabelTable(imageInput):
+def readLabelTable(imageInput, isClassification=False):
     with open(f"{pathLayout}result.json", "r", encoding="utf-8") as file:
         data = json.load(file)
 
@@ -92,7 +105,8 @@ def readLabelTable(imageInput):
         imageCrop = imageInput.crop((x1, y1, x2, y2))
         imageCrop.save(f"{pathTable}crop/{count}.jpg", quality=100)
 
-        _inferenceTableClassification(f"{pathTable}crop/{count}.jpg")
+        if isClassification:
+            _inferenceTableClassification(f"{pathTable}crop/{count}.jpg")
                                     
         count += 1
 
@@ -122,16 +136,23 @@ def readLabelTableCell():
             elif (resultLabel == "wireless_table"):
                 _inferenceTableWireless(inputPath)
 
-def exportText():
+def textDetection():
     for file in os.listdir(f"{pathTable}crop/"):
         _inferenceTextDetection(f"{pathTable}crop/{file}")
+
+def textRecognition():
+    for file in os.listdir(f"{pathTable}crop/"):
+        _inferenceTextRecognition(f"{pathTable}crop/{file}")
 
 imageInput = process()
 
 inferenceLayout()
 
-readLabelTable(imageInput)
+readLabelTable(imageInput, isClassification)
 
-readLabelTableCell()
+if isClassification:
+    readLabelTableCell()
 
-exportText()
+#textDetection()
+
+textRecognition()
