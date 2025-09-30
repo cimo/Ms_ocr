@@ -19,7 +19,7 @@ pathModelTextDetection = "/home/app/src/library/paddle/PP-OCRv5_server_det/"
 pathModelTextRecognition = "/home/app/src/library/paddle/PP-OCRv5_server_rec/"
 pathModelChart = "/home/app/src/library/paddle/PP-Chart2Table/"
 
-pathImageInput = "/home/app/file/input/Chart.png"
+pathImageInput = "/home/app/file/input/Chart.jpg"
 pathLayout = "/home/app/file/output/paddle/layout/"
 pathTable = "/home/app/file/output/paddle/table/"
 pathExport = "/home/app/file/output/paddle/export/"
