@@ -2,7 +2,7 @@ import torch
 import torch.nn as torchNN
 
 # Source
-from vgg16bn import Vgg16Bn
+from vgg16_bn import Vgg16Bn
 
 class RefineNet(torchNN.Module):
     def __init__(self):

@@ -3,7 +3,7 @@ import torch.nn as torchNN
 import torch.nn.functional as torchNNfunctional
 
 # Source
-from vgg16bn import Vgg16Bn
+from vgg16_bn import Vgg16Bn
 
 class _DoubleConvolution(torchNN.Module):
     def __init__(self, channelIn, channelMid, channelOut):
