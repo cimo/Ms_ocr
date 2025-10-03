@@ -1,30 +1,26 @@
 import os
+import shutil
 import json
 import numpy
 import cv2
-import openpyxl
-from openpyxl.utils import get_column_letter
+from openpyxl import Workbook
 from openpyxl.styles import Alignment
-from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, PaddleOCR
-from PIL import Image as pillowImage
+from openpyxl.utils import get_column_letter
+from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition, PaddleOCR
+from PIL import Image, ImageDraw, ImageFont
 
-os.makedirs("/home/app/file/output/paddle/layout/", exist_ok=True)
-os.makedirs("/home/app/file/output/paddle/table/classification/", exist_ok=True)
-os.makedirs("/home/app/file/output/paddle/table/wired/", exist_ok=True)
-os.makedirs("/home/app/file/output/paddle/table/wireless/", exist_ok=True)
-os.makedirs("/home/app/file/output/paddle/export/", exist_ok=True)
+PATH_PADDLE_SYSTEM = "/home/app/.paddlex/"
+PATH_PADDLE_FILE_OUTPUT = "/home/app/file/output/paddle/"
+PATH_PADDLE_LIBRARY = "/home/app/src/library/paddle/"
 
-pathModelLayout = "/home/app/src/library/paddle/PP-DocLayout_plus-L/"
-pathModelTableClassification = "/home/app/src/library/paddle/PP-LCNet_x1_0_table_cls/"
-pathModelTableWired = "/home/app/src/library/paddle/RT-DETR-L_wired_table_cell_det/"
-pathModelTableWireless = "/home/app/src/library/paddle/RT-DETR-L_wireless_table_cell_det/"
-pathModelTextDetection = "/home/app/src/library/paddle/PP-OCRv5_server_det/"
-pathModelTextRecognition = "/home/app/src/library/paddle/PP-OCRv5_server_rec/"
-pathModelChart = "/home/app/src/library/paddle/PP-Chart2Table/"
+pathFont = f"{PATH_PADDLE_SYSTEM}fonts/PingFang-SC-Regular.ttf"
 
-pathLayout = "/home/app/file/output/paddle/layout/"
-pathTable = "/home/app/file/output/paddle/table/"
-pathExport = "/home/app/file/output/paddle/export/"
+pathModelLayout = f"{PATH_PADDLE_LIBRARY}PP-DocLayout_plus-L/"
+pathModelTableClassification = f"{PATH_PADDLE_LIBRARY}PP-LCNet_x1_0_table_cls/"
+pathModelTableWired = f"{PATH_PADDLE_LIBRARY}RT-DETR-L_wired_table_cell_det/"
+pathModelTableWireless = f"{PATH_PADDLE_LIBRARY}RT-DETR-L_wireless_table_cell_det/"
+pathModelTextDetection = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_server_det/"
+pathModelTextRecognition = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_server_rec/"
 
 isDebug = True
 device = "cpu"
@@ -40,162 +36,342 @@ ocr = PaddleOCR(
     device=device
 )
 
-def _inferenceTableClassification(input, count):
-    modelTableClassification = TableClassification(model_dir=pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=device)
-    outputTableClassificationList = modelTableClassification.predict(input=input, batch_size=1)
+def _inferenceTextDetection(input):
+    model = TextDetection(model_dir=pathModelTextDetection, model_name="PP-OCRv5_server_det")
+    outputList = model.predict(input=input, batch_size=1)
 
-    for outputTableClassification in outputTableClassificationList:
+    for output in outputList:
         if isDebug:
-            outputTableClassification.save_to_img(save_path=f"{pathTable}classification/{count}_debug.jpg")
+            output.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.jpg")
+            output.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.json")
+
+def _inferenceTextRecognition(input):
+    model = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec")
+    outputList = model.predict(input=input, batch_size=1)
+
+    for output in outputList:
+        if isDebug:
+            output.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
+            output.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
+
+def _filterOverlapBox(boxList):
+    resultBoxFilterList = []
+
+    for box in boxList:
+        x1, y1, x2, y2 = map(float, box["coordinate"])
         
-        outputTableClassification.save_to_json(save_path=f"{pathTable}classification/{count}.json")
+        isIgnore = False
+        
+        for boxFilter in resultBoxFilterList:
+            xf1, yf1, xf2, yf2 = map(float, boxFilter["coordinate"])
 
-def _inferenceTableWired(input, count):
-    modelTableWired = TableCellsDetection(model_dir=pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=device)
-    outputTableWiredList = modelTableWired.predict(input=input, batch_size=1)
+            overlapX = max(0, min(x2, xf2) - max(x1, xf1))
+            overlapY = max(0, min(y2, yf2) - max(y1, yf1))
 
-    for outputTableWired in outputTableWiredList:
-        if isDebug:
-            outputTableWired.save_to_img(save_path=f"{pathTable}wired/{count}_debug.jpg")
+            minWidth = min(x2 - x1, xf2 - xf1)
+            minHeight = min(y2 - y1, yf2 - yf1)
 
-        #outputTableWired.save_to_json(save_path=f"{pathTable}wired/{count}.json")
-        print("cimo", outputTableWired)
+            if overlapX / minWidth > 0.9 and overlapY / minHeight > 0.9:
+                isIgnore = True
+
+                break
+
+        if isIgnore:
+            continue
+
+        resultBoxFilterList.append(box)
+    
+    return resultBoxFilterList
+'''
+def _jsonToExcel(data, fontSize, pathExcel):
+    workbook = Workbook()
+    sheet = workbook.active
+
+    dataSortList = sorted(data, key=lambda x: (x["coordinate"][1], x["coordinate"][0]))
+
+    rowEdgeList = set()
+
+    for item in dataSortList:
+        _, y1, _, y2 = item["coordinate"]
+
+        rowEdgeList.add(round(y1, 1))
+        rowEdgeList.add(round(y2, 1))
+
+    rowEdgeList = sorted(rowEdgeList)
+
+    rowObject = {}
+
+    for a in range(len(rowEdgeList) - 1):
+        rowObject[(rowEdgeList[a], rowEdgeList[a + 1])] = a + 1
+
+    columnPositionList = []
+
+    for dataSort in dataSortList:
+        x1, _, _, _ = dataSort["coordinate"]
+
+        if not any(abs(x1 - a) < 5 for a in columnPositionList):
+            columnPositionList.append(x1)
+    
+    columnPositionList = sorted(columnPositionList)
+
+    for dataSort in dataSortList:
+        x1, y1, x2, y2 = dataSort["coordinate"]
+        textList = dataSort["rec_texts"]
+
+        columnIndex = None
+
+        for key, value in enumerate(columnPositionList):
+            if abs(x1 - value) < 5:
+                columnIndex = key + 1
+
+                break
+
+        rowStart = None
+        rowEnd = None
+
+        for (ya, yb), rowNumber in rowObject.items():
+            if abs(ya - y1) < 5:
+                rowStart = rowNumber
+
+            if abs(yb - y2) < 5:
+                rowEnd = rowNumber
+
+        if rowStart is None:
+            for (ya, yb), rowNumber in rowObject.items():
+                if ya <= y1 < yb:
+                    rowStart = rowNumber
+
+                    break
+
+        if rowEnd is None:
+            for (ya, yb), rowNumber in rowObject.items():
+                if ya < y2 <= yb:
+                    rowEnd = rowNumber
+
+                    break
+
+        if rowEnd is None:
+            rowEnd = rowStart
+
+        if rowEnd > rowStart:
+            sheet.merge_cells(start_row=rowStart, start_column=columnIndex, end_row=rowEnd, end_column=columnIndex)
+
+            if len(textList) > 1:
+                totalLineList = rowEnd - rowStart + 1
+                baseLineList = len(textList)
+
+                if baseLineList < totalLineList:
+                    extraSlot = totalLineList - baseLineList
+
+                    lineList = []
+
+                    for key, value in enumerate(textList):
+                        lineList.append(value)
+
+                        if key < baseLineList - 1:
+                            lineList.append("\n")
+
+                            if extraSlot > 0:
+                                lineList.append("\n")
+
+                                extraSlot -= 1
+
+                    value = "".join(lineList)
+                else:
+                    value = "\n".join(textList)
+            else:
+                value = textList[0] if textList else ""
+        else:
+            value = textList[0] if len(textList) == 1 else "\n".join(textList)
+
+        cell = sheet.cell(row=rowStart, column=columnIndex)
+        cell.value = value
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        #columnLetter = get_column_letter(columnIndex)
+        #sheet.column_dimensions[columnLetter].width = (x2 - x1) / 7
+        #sheet.row_dimensions[rowStart].height = (y2 - y1) * 0.75
+
+    workbook.save(pathExcel)
+'''
+def _jsonToExcel(data, fontSize, pathExcel):
+    workbook = Workbook()
+    sheet = workbook.active
+
+    # Ordina i dati
+    dataSortList = sorted(data, key=lambda x: (x["coordinate"][1], x["coordinate"][0]))
+
+    # Calcola bordi righe unici
+    rowEdgeList = set()
+    for item in dataSortList:
+        _, y1, _, y2 = item["coordinate"]
+        rowEdgeList.add(round(y1, 1))
+        rowEdgeList.add(round(y2, 1))
+    rowEdgeList = sorted(rowEdgeList)
+
+    # Mappa coppie di bordi a numero riga
+    rowObject = {}
+    for a in range(len(rowEdgeList) - 1):
+        rowObject[(rowEdgeList[a], rowEdgeList[a + 1])] = a + 1
+
+    # Calcola posizioni colonne
+    columnPositionList = []
+    for item in dataSortList:
+        x1, _, _, _ = item["coordinate"]
+        if not any(abs(x1 - a) < 5 for a in columnPositionList):
+            columnPositionList.append(x1)
+    columnPositionList = sorted(columnPositionList)
+
+    # Inserisci dati cella per cella
+    for item in dataSortList:
+        x1, y1, _, _ = item["coordinate"]
+        textList = item["rec_texts"]
+
+        # Trova colonna
+        columnIndex = None
+        for idx, value in enumerate(columnPositionList):
+            if abs(x1 - value) < 5:
+                columnIndex = idx + 1
+                break
+
+        # Trova riga
+        rowStart = None
+        for (ya, yb), rowNum in rowObject.items():
+            if ya <= y1 < yb:
+                rowStart = rowNum
+                break
+        if rowStart is None:
+            rowStart = 1  # default se non trovato
+
+        # Inserisci testo (tutte le righe separate da \n)
+        value = "\n".join(textList) if textList else ""
+        cell = sheet.cell(row=rowStart, column=columnIndex)
+        cell.value = value
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        # Imposta altezza riga proporzionale al fontSize
+        sheet.row_dimensions[rowStart].height = fontSize * 1.2
+
+    workbook.save(pathExcel)
+
+def _processTable(mode, data, input, count):
+    if isDebug:
+        inputHeight, inputWidth = input.shape[:2]
+        resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+        imageDraw = ImageDraw.Draw(resultImage)
+        resultMergeList = []
+
+    boxList = data.get("boxes", [])
+
+    boxFilterList = _filterOverlapBox(boxList)
+
+    for box in boxFilterList:
+        coordinateList = box.get("coordinate", [])
+        x1, y1, x2, y2 = map(int, coordinateList)
+
+        imageCrop = input[y1:y2, x1:x2, :]
+
+        resultList = ocr.predict(input=imageCrop)
+
+        for result in resultList:
+            coordinateList = [float(a) for a in coordinateList]
+            textList = result.get("rec_texts", []) or [""]
+
+            if isDebug:
+                lineNumber = max(1, len(textList))
+                cellHeight = y2 - y1
+                fontSize = max(8, int(cellHeight * 0.6 / lineNumber))
+                font = ImageFont.truetype(pathFont, fontSize)
+
+                bboxeList = [imageDraw.textbbox((0, 0), value, font=font) for value in textList]
+                textHeightList = [bbox[3] - bbox[1] for bbox in bboxeList]
+                textWidthList = [bbox[2] - bbox[0] for bbox in bboxeList]
+
+                totalTextHeight = sum(textHeightList)
+
+                if lineNumber > 1:
+                    extraSpace = (cellHeight - totalTextHeight) / (lineNumber + 1)
+                else:
+                    extraSpace = (cellHeight - totalTextHeight) / 2
+
+                currentY = y1 + extraSpace
+
+                for key, value in enumerate(textList):
+                    textWidth = textWidthList[key]
+                    textHeight = textHeightList[key]
+                    textPositionX = x1 + (x2 - x1 - textWidth) // 2
+                    textPositionY = int(currentY)
+
+                    imageDraw.text((textPositionX, textPositionY), value, font=font, fill=(0, 0, 0))
+
+                    currentY += textHeight + extraSpace
+
+                resultMergeList.append({
+                    "coordinate": coordinateList,
+                    "rec_texts": textList
+                })
+
+    if isDebug:
+        resultImage.save(f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.jpg", format="JPEG")
+
+        with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
+            json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
+
+    _jsonToExcel(resultMergeList, fontSize, f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.xlsx")
 
 def _inferenceTableWireless(input, count):
-    modelTableWireless = TableCellsDetection(model_dir=pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=device)
-    outputTableWirelessList = modelTableWireless.predict(input=input, batch_size=1)
+    model = TableCellsDetection(model_dir=pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=device)
+    dataList = model.predict(input=input, batch_size=1)
 
-    for outputTableWireless in outputTableWirelessList:
+    for data in dataList:
         if isDebug:
-            outputTableWireless.save_to_img(save_path=f"{pathTable}wireless/{count}_debug.jpg")
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/{count}.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/{count}.json")
 
-        outputTableWireless.save_to_json(save_path=f"{pathTable}wireless/{count}.json")
+        _processTable("wireless", data, input, count)
 
-def _extractTableCell(pathJson, imageCrop, count):
-    with open(pathJson, "r", encoding="utf-8") as file:
-        data = json.load(file)
-    
+def _inferenceTableWired(input, count):
+    model = TableCellsDetection(model_dir=pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=device)
+    dataList = model.predict(input=input, batch_size=1)
+
+    for data in dataList:
+        if isDebug:
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/wired/{count}.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/wired/{count}.json")
+
+        _processTable("wired", data, input, count)
+
+def _extractTableCell(data, input, count):
     labelNameList = data.get("label_names", [])
     scoreList = data.get("scores", [])
 
     if len(labelNameList) == len(scoreList):
-        resultIndex = scoreList.index(max(scoreList))
+        resultIndex = int(numpy.argmax(scoreList))
         resultLabel = labelNameList[resultIndex]
 
         if (resultLabel == "wired_table"):
-            cv2.imwrite(f"{pathTable}wired/{count}.jpg", imageCrop)
+            if isDebug:
+                cv2.imwrite(f"{PATH_PADDLE_FILE_OUTPUT}table/wired/{count}_crop.jpg", input)
 
-            _inferenceTableWired(imageCrop, count)
+            _inferenceTableWired(input, count)
         elif (resultLabel == "wireless_table"):
-            cv2.imwrite(f"{pathTable}wireless/{count}.jpg", imageCrop)
+            if isDebug:
+                cv2.imwrite(f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/{count}_crop.jpg", input)
 
-            _inferenceTableWireless(imageCrop, count)
+            _inferenceTableWireless(input, count)
 
-def _jsonToExcel(pathJson, pathExcel):
-    with open(pathJson, "r", encoding="utf-8") as file:
-        data = json.load(file)
+def _inferenceTableClassification(input, count):
+    model = TableClassification(model_dir=pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=device)
+    dataList = model.predict(input=input, batch_size=1)
 
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
-
-    cells = []
-    for item in data:
-        recTexts = item.get("rec_texts", [])
-        recPolys = item.get("rec_polys", [])
-        for a in range(len(recTexts)):
-            poly = recPolys[a]
-            minX = min([point[0] for point in poly])
-            minY = min([point[1] for point in poly])
-            maxX = max([point[0] for point in poly])
-            maxY = max([point[1] for point in poly])
-            centerX = (minX + maxX) / 2
-            centerY = (minY + maxY) / 2
-            cells.append({
-                "text": recTexts[a],
-                "centerX": centerX,
-                "centerY": centerY
-            })
-
-    # Ordina per posizione fisica
-    cells.sort(key=lambda x: (x["centerY"], x["centerX"]))
-
-    # Mappa logica: assegna riga e colonna
-    rowCenters = []
-    rowIndexMap = {}
-    colIndexMap = {}
-    layoutMap = []
-    rowCounter = 1
-
-    for cell in cells:
-        y = cell["centerY"]
-        x = cell["centerX"]
-
-        # Assegna riga
-        matchedRow = None
-        for ry in rowCenters:
-            if abs(ry - y) < 1e-3:
-                matchedRow = rowIndexMap[ry]
-                break
-        if matchedRow is None:
-            rowCenters.append(y)
-            rowIndexMap[y] = rowCounter
-            matchedRow = rowCounter
-            rowCounter += 1
-            colIndexMap[matchedRow] = []
-
-        # Assegna colonna
-        matchedCol = None
-        for col in colIndexMap[matchedRow]:
-            if abs(col["x"] - x) < 1e-3:
-                matchedCol = col["index"]
-                break
-        if matchedCol is None:
-            matchedCol = len(colIndexMap[matchedRow]) + 1
-            colIndexMap[matchedRow].append({"x": x, "index": matchedCol})
-
-        layoutMap.append({
-            "row": matchedRow,
-            "col": matchedCol,
-            "text": cell["text"]
-        })
-
-    # Scrivi in Excel
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
-    for cell in layoutMap:
-        sheet.cell(row=cell["row"], column=cell["col"]).value = cell["text"]
-
-    workbook.save(pathExcel)
-
-def process(pathImage):
-    imageInput = pillowImage.open(pathImage)
-    imageInput = numpy.array(imageInput)
-
-    height, width = imageInput.shape[:2]
-    maxSide = max(height, width)
-
-    if maxSide > 960:
-        scale = 960 / maxSide
-        newWidth = int(width * scale)
-        newHeight = int(height * scale)
-        imageInput = cv2.resize(imageInput, (newWidth, newHeight))
-
-    return imageInput
-
-def inferenceLayout(input):
-    modelLayout = LayoutDetection(model_dir=pathModelLayout, model_name="PP-DocLayout_plus-L", device=device)
-    outputBlockLayoutList = modelLayout.predict(input=input, batch_size=1)
-
-    for outputBlockLayout in outputBlockLayoutList:
+    for data in dataList:
         if isDebug:
-            outputBlockLayout.save_to_img(save_path=f"{pathLayout}result_debug.jpg")
-        
-        outputBlockLayout.save_to_json(save_path=f"{pathLayout}result.json")
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/classification/{count}.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}table/classification/{count}.json")
 
-def extractTable(imageInput, isClassification=False):
-    with open(f"{pathLayout}result.json", "r", encoding="utf-8") as file:
-        data = json.load(file)
+    _extractTableCell(data, input, count)
 
+def _extractTable(data, input):
     boxList = data.get("boxes", [])
 
     count = 0
@@ -207,61 +383,65 @@ def extractTable(imageInput, isClassification=False):
         coordinateList = box.get("coordinate", [])
         x1, y1, x2, y2 = map(int, coordinateList)
 
-        imageCrop = imageInput[y1:y2, x1:x2, :]
+        inputCrop = input[y1:y2, x1:x2, :]
 
-        if isClassification:
-            _inferenceTableClassification(imageCrop, count)
-            _extractTableCell(f"{pathTable}classification/{count}.json", imageCrop, count)
-                                    
+        _inferenceTableClassification(inputCrop, count)
+
         count += 1
 
-def processTable(pathJson, imageInput):
-    resultMergeList = []
+def removeOutputDir():
+    if os.path.exists(f"{PATH_PADDLE_FILE_OUTPUT}layout/"):
+        shutil.rmtree(f"{PATH_PADDLE_FILE_OUTPUT}layout/")
 
-    with open(pathJson, "r", encoding="utf-8") as file:
-        data = json.load(file)
+    if os.path.exists(f"{PATH_PADDLE_FILE_OUTPUT}table/"):
+        shutil.rmtree(f"{PATH_PADDLE_FILE_OUTPUT}table/")
 
-    boxList = data.get("boxes", [])
+    if os.path.exists(f"{PATH_PADDLE_FILE_OUTPUT}export/"):
+        shutil.rmtree(f"{PATH_PADDLE_FILE_OUTPUT}export/")
 
-    for box in boxList:
-        coordinateList = box.get("coordinate", [])
-        x1, y1, x2, y2 = map(int, coordinateList)
+def createOutputDir():
+    os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}layout/", exist_ok=True)
+    os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}table/classification/", exist_ok=True)
+    os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}table/wired/", exist_ok=True)
+    os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/", exist_ok=True)
+    os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}export/", exist_ok=True)
 
-        imageCrop = imageInput[y1:y2, x1:x2, :]
+def preprocess(pathImage, sizeLimit=2048):
+    imageInput = Image.open(pathImage)
+    imageInput = numpy.array(imageInput)
 
-        resultList = ocr.predict(input=imageCrop)
+    height, width = imageInput.shape[:2]
+    maxSide = max(height, width)
 
-        for result in resultList:
-            recPolyList = result.get("rec_polys", [])
-            
-            if isinstance(recPolyList, numpy.ndarray):
-                recPolyList = recPolyList.tolist()
-            else:
-                for a in range(len(recPolyList)):
-                    if isinstance(recPolyList[a], numpy.ndarray):
-                        recPolyList[a] = recPolyList[a].tolist()
+    if maxSide > sizeLimit:
+        scale = sizeLimit / maxSide
+        newWidth = int(width * scale)
+        newHeight = int(height * scale)
+        imageInput = cv2.resize(imageInput, (newWidth, newHeight))
 
-            resultMergeList.append({
-                "rec_texts": result.get("rec_texts", []),
-                "rec_scores": result.get("rec_scores", []),
-                "rec_polys": recPolyList
-            })
-    
-    with open(f"{pathExport}result.json", "w", encoding="utf-8") as file:
-        json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
+    return imageInput
 
-    _jsonToExcel(f"{pathExport}result.json", f"{pathExport}result.xlsx")
+def inferenceLayout(input):
+    model = LayoutDetection(model_dir=pathModelLayout, model_name="PP-DocLayout_plus-L", device=device)
+    dataList = model.predict(input=input, batch_size=1)
 
-imageInput = process("/home/app/file/input/1_jp.jpg")
+    for data in dataList:
+        if isDebug:
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}layout/result.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}layout/result.json")
 
-inferenceLayout(imageInput)
+        _extractTable(data, input)
 
-extractTable(imageInput, True)
+# Execution
+#removeOutputDir()
 
-#inferenceOcr(imageInput)
+#createOutputDir()
 
-#imageInput = process(f"{pathTable}wired/0.jpg")
+#imageInput = preprocess("/home/app/file/input/1_jp.jpg")
 
-#processTable(f"{pathTable}wired/0.json", imageInput)
+#inferenceLayout(imageInput)
 
-#_jsonToExcel(f"{pathTable}wired/0.json", f"{pathExport}result.xlsx")
+with open(f"{PATH_PADDLE_FILE_OUTPUT}table/wired/1_result.json", "r", encoding="utf-8") as file:
+    data = json.load(file)
+
+_jsonToExcel(data, 14, f"{PATH_PADDLE_FILE_OUTPUT}table/wired/1_result.xlsx")

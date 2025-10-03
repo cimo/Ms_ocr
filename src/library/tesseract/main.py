@@ -139,7 +139,6 @@ def pageLayout():
 
     return thresh, mergedBoxes
 
-
 def Main():
     helper.executeCraft()
 

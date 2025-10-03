@@ -90,9 +90,9 @@ def _subprocess(fileNameSplit):
 def _jsonCreate(pathJson, left, top, right, bottom, pathText):
     if os.path.exists(pathJson):
         with open(pathJson, "r", encoding="utf-8") as file:
-            data = json.load(file)
+            dataList = json.load(file)
     else:
-        data = []
+        dataList = []
 
     box = {
         "left": left,
@@ -104,13 +104,13 @@ def _jsonCreate(pathJson, left, top, right, bottom, pathText):
     with open(pathText, "r", encoding="utf-8") as file:
         text = file.read().strip()
 
-    data.append({
+    dataList.append({
         "box": box,
         "text": text
     })
 
     with open(pathJson, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+        json.dump(dataList, file, ensure_ascii=False, indent=2)
 
 def executeCraft():
     subprocess.run([
