@@ -3,11 +3,12 @@ import shutil
 import json
 import numpy
 import cv2
-from openpyxl import Workbook
-from openpyxl.styles import Alignment
-from openpyxl.utils import get_column_letter
+import pandas
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition, PaddleOCR
 from PIL import Image, ImageDraw, ImageFont
+from typing import List, Dict, Tuple
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
 
 PATH_PADDLE_SYSTEM = "/home/app/.paddlex/"
 PATH_PADDLE_FILE_OUTPUT = "/home/app/file/output/paddle/"
@@ -194,66 +195,6 @@ def _jsonToExcel(data, fontSize, pathExcel):
 
     workbook.save(pathExcel)
 '''
-def _jsonToExcel(data, fontSize, pathExcel):
-    workbook = Workbook()
-    sheet = workbook.active
-
-    # Ordina i dati
-    dataSortList = sorted(data, key=lambda x: (x["coordinate"][1], x["coordinate"][0]))
-
-    # Calcola bordi righe unici
-    rowEdgeList = set()
-    for item in dataSortList:
-        _, y1, _, y2 = item["coordinate"]
-        rowEdgeList.add(round(y1, 1))
-        rowEdgeList.add(round(y2, 1))
-    rowEdgeList = sorted(rowEdgeList)
-
-    # Mappa coppie di bordi a numero riga
-    rowObject = {}
-    for a in range(len(rowEdgeList) - 1):
-        rowObject[(rowEdgeList[a], rowEdgeList[a + 1])] = a + 1
-
-    # Calcola posizioni colonne
-    columnPositionList = []
-    for item in dataSortList:
-        x1, _, _, _ = item["coordinate"]
-        if not any(abs(x1 - a) < 5 for a in columnPositionList):
-            columnPositionList.append(x1)
-    columnPositionList = sorted(columnPositionList)
-
-    # Inserisci dati cella per cella
-    for item in dataSortList:
-        x1, y1, _, _ = item["coordinate"]
-        textList = item["rec_texts"]
-
-        # Trova colonna
-        columnIndex = None
-        for idx, value in enumerate(columnPositionList):
-            if abs(x1 - value) < 5:
-                columnIndex = idx + 1
-                break
-
-        # Trova riga
-        rowStart = None
-        for (ya, yb), rowNum in rowObject.items():
-            if ya <= y1 < yb:
-                rowStart = rowNum
-                break
-        if rowStart is None:
-            rowStart = 1  # default se non trovato
-
-        # Inserisci testo (tutte le righe separate da \n)
-        value = "\n".join(textList) if textList else ""
-        cell = sheet.cell(row=rowStart, column=columnIndex)
-        cell.value = value
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-        # Imposta altezza riga proporzionale al fontSize
-        sheet.row_dimensions[rowStart].height = fontSize * 1.2
-
-    workbook.save(pathExcel)
-
 def _processTable(mode, data, input, count):
     if isDebug:
         inputHeight, inputWidth = input.shape[:2]
@@ -317,7 +258,7 @@ def _processTable(mode, data, input, count):
         with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
             json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-    _jsonToExcel(resultMergeList, fontSize, f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.xlsx")
+    #_jsonToExcel(resultMergeList, fontSize, f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.xlsx")
 
 def _inferenceTableWireless(input, count):
     model = TableCellsDetection(model_dir=pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=device)
@@ -441,7 +382,337 @@ def inferenceLayout(input):
 
 #inferenceLayout(imageInput)
 
-with open(f"{PATH_PADDLE_FILE_OUTPUT}table/wired/1_result.json", "r", encoding="utf-8") as file:
+with open(f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/0_result.json", "r", encoding="utf-8") as file:
     data = json.load(file)
 
-_jsonToExcel(data, 14, f"{PATH_PADDLE_FILE_OUTPUT}table/wired/1_result.xlsx")
+#_jsonToExcel(data, 14, f"{PATH_PADDLE_FILE_OUTPUT}table/wired/1_result.xlsx")
+
+class DynamicTableExtractor:
+    """
+    Estrae automaticamente tabelle da JSON PaddleOCR senza conoscere la struttura.
+    Gestisce automaticamente celle mergiate in base alle coordinate.
+    """
+    
+    def __init__(self, tolerance_y: float = 10, tolerance_x: float = 10):
+        """
+        Args:
+            tolerance_y: Tolleranza in pixel per raggruppare righe
+            tolerance_x: Tolleranza in pixel per raggruppare colonne
+        """
+        self.tolerance_y = tolerance_y
+        self.tolerance_x = tolerance_x
+        self.merge_info = []  # Lista di celle da mergiare (row, col_start, col_end)
+    
+    def extract_cells(self, json_data: List[Dict]) -> List[Dict]:
+        """
+        Estrae informazioni dalle celle.
+        
+        Returns:
+            Lista di dict con x1, y1, x2, y2, center_x, center_y, text
+        """
+        cells = []
+        for item in json_data:
+            coord = item.get('coordinate', [])
+            texts = item.get('rec_texts', [''])
+            
+            if len(coord) >= 4:
+                x1, y1, x2, y2 = coord[:4]
+                text = '\n'.join([t.strip() for t in texts if t.strip()])
+                
+                cells.append({
+                    'x1': x1,
+                    'y1': y1,
+                    'x2': x2,
+                    'y2': y2,
+                    'center_x': (x1 + x2) / 2,
+                    'center_y': (y1 + y2) / 2,
+                    'text': text.strip(),
+                    'width': x2 - x1,
+                    'height': y2 - y1
+                })
+        
+        return cells
+    
+    def cluster_values(self, values: List[float], tolerance: float) -> List[int]:
+        """
+        Raggruppa valori simili in cluster.
+        
+        Returns:
+            Lista di indici cluster per ogni valore
+        """
+        if not values:
+            return []
+        
+        sorted_indices = numpy.argsort(values)
+        sorted_values = numpy.array(values)[sorted_indices]
+        
+        clusters = []
+        current_cluster = 0
+        cluster_assignment = [0] * len(values)
+        
+        cluster_assignment[sorted_indices[0]] = 0
+        
+        for i in range(1, len(sorted_values)):
+            if sorted_values[i] - sorted_values[i-1] > tolerance:
+                current_cluster += 1
+            cluster_assignment[sorted_indices[i]] = current_cluster
+        
+        return cluster_assignment
+    
+    def detect_grid(self, cells: List[Dict]) -> Tuple[List[int], List[int], List[float], List[float]]:
+        """
+        Rileva automaticamente la griglia (righe e colonne).
+        Usa i bordi sinistri (x1) invece dei centri per identificare le colonne.
+        
+        Returns:
+            (row_indices, col_indices, row_positions, col_positions)
+        """
+        if not cells:
+            return [], [], [], []
+        
+        # Estrai coordinate
+        y_centers = [cell['center_y'] for cell in cells]
+        x_lefts = [cell['x1'] for cell in cells]  # Usa bordo sinistro invece del centro
+        
+        # Cluster per righe (Y) - usa centro
+        row_indices = self.cluster_values(y_centers, self.tolerance_y)
+        
+        # Cluster per colonne (X) - usa bordo sinistro
+        col_indices = self.cluster_values(x_lefts, self.tolerance_x)
+        
+        # Calcola posizioni medie dei cluster
+        num_rows = max(row_indices) + 1
+        num_cols = max(col_indices) + 1
+        
+        row_positions = []
+        for i in range(num_rows):
+            row_y_values = [y_centers[j] for j in range(len(y_centers)) if row_indices[j] == i]
+            row_positions.append(numpy.mean(row_y_values) if row_y_values else 0)
+        
+        col_positions = []
+        for i in range(num_cols):
+            col_x_values = [x_lefts[j] for j in range(len(x_lefts)) if col_indices[j] == i]
+            col_positions.append(numpy.mean(col_x_values) if col_x_values else 0)
+        
+        return row_indices, col_indices, row_positions, col_positions
+    
+    def detect_merged_cells(self, cells: List[Dict], row_indices: List[int], 
+                           col_indices: List[int], col_positions: List[float]) -> List[Dict]:
+        """
+        Rileva celle che dovrebbero essere mergiate in base alla loro larghezza.
+        Usa x2 della cella per determinare quante colonne copre realmente.
+        
+        Returns:
+            Lista di dict con informazioni sulle celle da mergiare
+        """
+        if not col_positions or len(col_positions) < 2:
+            return []
+        
+        merged_cells = []
+        
+        for idx, cell in enumerate(cells):
+            row_idx = row_indices[idx]
+            col_idx = col_indices[idx]
+            cell_x2 = cell['x2']
+            
+            # Trova quante colonne questa cella attraversa
+            # controllando quali col_positions sono coperte dalla cella
+            col_end = col_idx
+            for i in range(col_idx + 1, len(col_positions)):
+                # Se la posizione della prossima colonna è prima della fine della cella
+                if col_positions[i] < cell_x2 - self.tolerance_x:
+                    col_end = i
+                else:
+                    break
+            
+            # Se copre più di una colonna, è una merge
+            if col_end > col_idx:
+                merged_cells.append({
+                    'cell_idx': idx,
+                    'row': row_idx,
+                    'col_start': col_idx,
+                    'col_end': col_end,
+                    'text': cell['text']
+                })
+        
+        return merged_cells
+    
+    def build_table_matrix(self, cells: List[Dict], row_indices: List[int], 
+                          col_indices: List[int], merged_cells: List[Dict]) -> pandas.DataFrame:
+        """
+        Costruisce la matrice della tabella gestendo le celle mergiate.
+        
+        Returns:
+            DataFrame con la tabella ricostruita
+        """
+        if not cells:
+            return pandas.DataFrame()
+        
+        # Determina dimensioni
+        num_rows = max(row_indices) + 1
+        num_cols = max(col_indices) + 1
+        
+        # Crea matrice vuota
+        matrix = [['' for _ in range(num_cols)] for _ in range(num_rows)]
+        
+        # Crea set di celle mergiate per riferimento rapido
+        merged_cells_set = {}
+        for merge in merged_cells:
+            key = (merge['row'], merge['col_start'])
+            merged_cells_set[key] = merge
+        
+        # Riempi matrice
+        for idx, cell in enumerate(cells):
+            row_idx = row_indices[idx]
+            col_idx = col_indices[idx]
+            text = cell['text']
+            
+            # Controlla se questa cella è mergiata
+            merge_key = (row_idx, col_idx)
+            if merge_key in merged_cells_set:
+                merge_info = merged_cells_set[merge_key]
+                # Inserisci il testo solo nella prima colonna del merge
+                matrix[row_idx][col_idx] = text
+                # Salva info per mergiare in Excel
+                self.merge_info.append({
+                    'row': row_idx,
+                    'col_start': col_idx,
+                    'col_end': merge_info['col_end']
+                })
+            else:
+                # Cella normale
+                if matrix[row_idx][col_idx]:
+                    matrix[row_idx][col_idx] += ' ' + text
+                else:
+                    matrix[row_idx][col_idx] = text
+        
+        # Crea DataFrame
+        df = pandas.DataFrame(matrix)
+        
+        # Rimuovi righe completamente vuote
+        df = df.replace('', pandas.NA)
+        df = df.dropna(how='all')
+        df = df.fillna('')
+        
+        # Rimuovi colonne completamente vuote
+        df = df.loc[:, (df != '').any(axis=0)]
+        
+        # Reset index
+        df = df.reset_index(drop=True)
+        
+        return df
+    
+    def extract_table(self, json_data: List[Dict]) -> pandas.DataFrame:
+        """
+        Estrae la tabella completa dal JSON.
+        
+        Args:
+            json_data: Output JSON di PaddleOCR
+        
+        Returns:
+            DataFrame con la tabella ricostruita
+        """
+        # Reset merge info
+        self.merge_info = []
+        
+        # Estrai celle
+        cells = self.extract_cells(json_data)
+        
+        if not cells:
+            return pandas.DataFrame()
+        
+        # Rileva griglia usando bordi sinistri
+        row_indices, col_indices, row_positions, col_positions = self.detect_grid(cells)
+        
+        # Rileva celle mergiate
+        merged_cells = self.detect_merged_cells(cells, row_indices, col_indices, col_positions)
+        
+        # Costruisci tabella
+        df = self.build_table_matrix(cells, row_indices, col_indices, merged_cells)
+        
+        return df
+    
+    def apply_merges_to_excel(self, worksheet, header_offset: int = 1):
+        """
+        Applica i merge alle celle in Excel e allinea tutto center/middle.
+        
+        Args:
+            worksheet: Foglio Excel openpyxl
+            header_offset: Offset per l'header (1 se c'è header, 0 altrimenti)
+        """
+        # Allinea tutte le celle center/middle
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        
+        # Applica merge
+        for merge in self.merge_info:
+            row = merge['row'] + header_offset + 1  # +1 per Excel (1-based)
+            col_start = merge['col_start'] + 1
+            col_end = merge['col_end'] + 1
+            
+            if col_start < col_end:
+                # Merge range
+                start_cell = f"{get_column_letter(col_start)}{row}"
+                end_cell = f"{get_column_letter(col_end)}{row}"
+                merge_range = f"{start_cell}:{end_cell}"
+                
+                try:
+                    worksheet.merge_cells(merge_range)
+                    # Assicura allineamento center anche per celle mergiate
+                    worksheet[start_cell].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                except Exception as e:
+                    print(f"⚠️  Impossibile mergiare {merge_range}: {e}")
+    
+    def to_excel(self, json_data: List[Dict], output_file: str, sheet_name: str = 'Sheet1') -> pandas.DataFrame:
+        """
+        Estrae la tabella e salva in Excel con celle mergiate.
+        
+        Args:
+            json_data: Output JSON di PaddleOCR
+            output_file: Nome file Excel di output
+            sheet_name: Nome del foglio
+        
+        Returns:
+            DataFrame estratto
+        """
+        df = self.extract_table(json_data)
+        
+        if df.empty:
+            print("⚠️  Nessuna tabella trovata nel JSON")
+            return df
+
+        # Salva in Excel
+        with pandas.ExcelWriter(output_file, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, header=False, sheet_name=sheet_name)
+            
+            worksheet = writer.sheets[sheet_name]
+            
+            # Applica merge (nessun offset header)
+            self.apply_merges_to_excel(worksheet, header_offset=0)
+            
+            # Auto-dimensiona colonne
+            for idx, column in enumerate(worksheet.columns, 1):
+                max_length = 0
+                column_letter = worksheet.cell(row=1, column=idx).column_letter
+                
+                for cell in column:
+                    try:
+                        cell_length = len(str(cell.value))
+                        if cell_length > max_length:
+                            max_length = cell_length
+                    except:
+                        pass
+                
+                adjusted_width = min(max_length + 3, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        print(f"✓ Tabella estratta: {len(df)} righe x {len(df.columns)} colonne")
+        if self.merge_info:
+            print(f"✓ Celle mergiate: {len(self.merge_info)}")
+        print(f"✓ File salvato: {output_file}")
+        
+        return df
+    
+extractor = DynamicTableExtractor(tolerance_y=10, tolerance_x=15)
+extractor.to_excel(data, f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/0_result.xlsx")
