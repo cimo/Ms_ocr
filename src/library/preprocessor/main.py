@@ -5,9 +5,9 @@ def Main():
     pathInput = "/home/app/file/input/1_jp.jpg"
     pathOutput = "/home/app/file/output/preprocessor/1_jp.jpg"
 
-    image = helper.read(pathInput)
+    image = helper.open(pathInput)
 
-    _, _, _, imageResize, _ = helper.resize(image, 1024)
+    _, _, _, imageResize, _ = helper.resize(image, 2048)
     helper.write(pathOutput, "_resize", imageResize)
 
     _, _, _, imageResizeLineHeight, _ = helper.resizeLineHeight(image)

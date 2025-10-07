@@ -127,7 +127,7 @@ def executeCraft():
 def preprocess():
     print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
 
-    imageRead = preprocessorHelper.read(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
+    imageRead = preprocessorHelper.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
 
     imageGray = preprocessorHelper.gray(imageRead)
 

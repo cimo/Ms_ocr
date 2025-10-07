@@ -182,7 +182,7 @@ def refineNetEval(refineNet):
 def preprocess():
     print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
 
-    imageRead = preprocessorHelper.read(f"{pathRoot}{pathInput}{fileName}")
+    imageRead = preprocessorHelper.open(f"{pathRoot}{pathInput}{fileName}")
 
     targetWidth, targetHeight, ratio, imageResize, channel = preprocessorHelper.resize(imageRead, 2048)
 

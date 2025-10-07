@@ -25,7 +25,7 @@ def _imageArray(image, isRequestedFloat=False):
 
     return result
 
-def read(pathFull):
+def open(pathFull):
     result = pillowImage.open(pathFull)
     result.info['icc_profile'] = result.info.get('icc_profile')
 
@@ -36,12 +36,14 @@ def resize(image, sizeLimit):
 
     height, width = imageArray.shape[:2]
 
-    maxSide = max(height, width)
-
-    ratio = sizeLimit / maxSide
-
-    targetWidth = int(width * ratio)
-    targetHeight = int(height * ratio)
+    if height >= width:
+        ratio = sizeLimit / height
+        targetHeight = sizeLimit
+        targetWidth = int(width * ratio)
+    else:
+        ratio = sizeLimit / width
+        targetWidth = sizeLimit
+        targetHeight = int(height * ratio)
 
     if ratio < 1:  
         interpolation = cv2.INTER_AREA
