@@ -132,13 +132,13 @@ def _processTable(mode, data, input, count):
 
                 currentY = y1 + extraSpace
 
-                for key, value in enumerate(textList):
-                    textWidth = textWidthList[key]
-                    textHeight = textHeightList[key]
+                for index, text in enumerate(textList):
+                    textWidth = textWidthList[index]
+                    textHeight = textHeightList[index]
                     textPositionX = x1 + (x2 - x1 - textWidth) // 2
                     textPositionY = int(currentY)
 
-                    imageDraw.text((textPositionX, textPositionY), value, font=font, fill=(0, 0, 0))
+                    imageDraw.text((textPositionX, textPositionY), text, font=font, fill=(0, 0, 0))
 
                     currentY += textHeight + extraSpace
 
@@ -255,13 +255,13 @@ def inferenceLayout(input):
 
 class JsonToExcel:
     def _clusterPosition(self, positionList, tolerance):
-        indexSortList = numpy.argsort(positionList)
-        valueSortList = numpy.array(positionList)[indexSortList]
-
         resultList = [0] * len(positionList)
         
+        indexSortList = numpy.argsort(positionList)
+        valueSortList = numpy.array(positionList)[indexSortList]
+        
         resultList[indexSortList[0]] = 0
-
+        
         count = 0
         
         for a in range(1, len(valueSortList)):
@@ -269,7 +269,7 @@ class JsonToExcel:
                 count += 1
 
             resultList[indexSortList[a]] = count
-        
+
         return resultList
 
     def _clusterPositionAverage(self, positionList, indexList, count):
@@ -277,13 +277,13 @@ class JsonToExcel:
 
         for a in range(count):
             clusterValues = [positionList[b] for b in range(len(positionList)) if indexList[b] == a]
-            
+
             resultList.append(numpy.mean(clusterValues) if clusterValues else 0)
-            
+        
         return resultList
 
     def _detectGrid(self, cellList):
-        centerYlist = [cell["center_y"] for cell in cellList]
+        centerYlist = [cell["y1"] for cell in cellList]
         leftXlist = [cell["x1"] for cell in cellList]
 
         resultRowIndexList = self._clusterPosition(centerYlist, self.toleranceY)
@@ -291,88 +291,84 @@ class JsonToExcel:
 
         countRow = max(resultRowIndexList) + 1
         countColumn = max(resultColumnIndexList) + 1
-        
+
         resultRowPositionList = self._clusterPositionAverage(centerYlist, resultRowIndexList, countRow)
         resultColumnPositionList = self._clusterPositionAverage(leftXlist, resultColumnIndexList, countColumn)
-        
+
         return resultRowIndexList, resultColumnIndexList, resultRowPositionList, resultColumnPositionList
-    
-    def _detectMergedCell(self, cellList, rowIndexList, columnIndexList, columnPositionList):
+
+    def _detectCellMerge(self, cellList, rowIndexList, columnIndexList, rowPositionList, columnPositionList):
         resultList = []
         
-        if len(columnPositionList) < 2:
-            return resultList
-        
         for index, cell in enumerate(cellList):
-            indexRow = rowIndexList[index]
-            indexColumnStart = columnIndexList[index]
-            indexColumnEnd = indexColumnStart
+            rowStart = rowIndexList[index]
+            columnStart = columnIndexList[index]
 
-            for a in range(indexColumnStart + 1, len(columnPositionList)):
-                if columnPositionList[a] < cell["x2"] - self.toleranceX:
-                    indexColumnEnd = a
+            rowEnd = rowStart
+
+            for a in range(rowStart + 1, len(rowPositionList)):
+                if cell["y2"] > rowPositionList[a] + self.toleranceY:
+                    rowEnd = a
                 else:
                     break
 
-            if indexColumnEnd == indexColumnStart:
-                continue
+            columnEnd = columnStart
 
-            resultList.append({
-                "row": indexRow,
-                "column_start": indexColumnStart,
-                "column_end": indexColumnEnd,
-                "text": cell["text"]
-            })
+            for a in range(columnStart + 1, len(columnPositionList)):
+                if cell["x2"] > columnPositionList[a] + self.toleranceX:
+                    columnEnd = a
+                else:
+                    break
 
+            if rowEnd > rowStart or columnEnd > columnStart:
+                resultList.append({
+                    "row_start": rowStart,
+                    "column_start": columnStart,
+                    "row_end": rowEnd,
+                    "column_end": columnEnd,
+                    "text": cell["text"]
+                })
+        
         return resultList
     
-    def _buildTableMatrix(self, cellList, rowIndexList, columnIndexList, cellMergedList):
+    def _buildTableMatrix(self, cellList, rowIndexList, columnIndexList, mergeList):
         countRow = max(rowIndexList) + 1
         countColumn = max(columnIndexList) + 1
 
         matrix = [["" for _ in range(countColumn)] for _ in range(countRow)]
+        
+        cellMergeList = []
 
-        cellMergeDict = {}
-
-        for cellMerged in cellMergedList:
-            key = (cellMerged["row"], cellMerged["column_start"])
-            cellMergeDict[key] = cellMerged
+        for merge in mergeList:
+            for a in range(merge["row_start"], merge["row_end"] + 1):
+                for b in range(merge["column_start"], merge["column_end"] + 1):
+                    if a != merge["row_start"] or b != merge["column_start"]:
+                        cellMergeList.append((a, b))
 
         for index, cell in enumerate(cellList):
             indexRow = rowIndexList[index]
             indexColumn = columnIndexList[index]
-            keyMerge = (indexRow, indexColumn)
 
-            if keyMerge in cellMergeDict:
-                cellMergeStatusList = cellMergeDict[keyMerge]
+            if (indexRow, indexColumn) in cellMergeList:
+                continue
 
-                matrix[indexRow][indexColumn] = cell["text"]
-                
-                self.cellMergeStatusList.append({
-                    "row": indexRow,
-                    "column_start": indexColumn,
-                    "column_end": cellMergeStatusList["column_end"]
-                })
+            if matrix[indexRow][indexColumn]:
+                matrix[indexRow][indexColumn] += " " + cell["text"]
             else:
-                if matrix[indexRow][indexColumn]:
-                    matrix[indexRow][indexColumn] += " " + cell["text"]
-                else:
-                    matrix[indexRow][indexColumn] = cell["text"]
+                matrix[indexRow][indexColumn] = cell["text"]
 
         dataFrame = pandas.DataFrame(matrix)
-
         dataFrame = dataFrame.replace("", pandas.NA)
         dataFrame = dataFrame.dropna(how="all")
         dataFrame = dataFrame.fillna("")
         dataFrame = dataFrame.loc[:, (dataFrame != "").any(axis=0)]
         dataFrame = dataFrame.reset_index(drop=True)
-        
+
         return dataFrame
 
     def __init__(self, isDebug, dataList, outputPath):
-        self.toleranceX = 10
-        self.toleranceY = 15
-        self.cellMergeStatusList = []
+        self.toleranceX = 15
+        self.toleranceY = 10
 
         sheetName = "Sheet1"
         cellList = []
@@ -391,43 +387,35 @@ class JsonToExcel:
                     "x2": x2,
                     "y2": y2,
                     "text": text.strip(),
-                    "center_x": (x1 + x2) / 2,
-                    "center_y": (y1 + y2) / 2,
                     "width": x2 - x1,
                     "height": y2 - y1
                 })
 
         rowIndexList, columnIndexList, rowPositionList, columnPositionList = self._detectGrid(cellList)
-
-        cellMergedList = self._detectMergedCell(cellList, rowIndexList, columnIndexList, columnPositionList)
-        
-        dataFrame = self._buildTableMatrix(cellList, rowIndexList, columnIndexList, cellMergedList)
+        mergeList = self._detectCellMerge(cellList, rowIndexList, columnIndexList, rowPositionList, columnPositionList)
+        dataFrame = self._buildTableMatrix(cellList, rowIndexList, columnIndexList, mergeList)
 
         with pandas.ExcelWriter(outputPath, engine="openpyxl") as writer:
             dataFrame.to_excel(writer, index=False, header=False, sheet_name=sheetName)
-            
             worksheet = writer.sheets[sheetName]
+
+            for merge in mergeList:
+                rowStart = merge["row_start"] + 1
+                columnStart = merge["column_start"] + 1
+                rowEnd = merge["row_end"] + 1
+                columnEnd = merge["column_end"] + 1
+                
+                if rowStart != rowEnd or columnStart != columnEnd:
+                    worksheet.merge_cells(start_row=rowStart, start_column=columnStart, end_row=rowEnd, end_column=columnEnd)
 
             for rowList in worksheet.iter_rows():
                 for cell in rowList:
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-            for cellmergeStatus in self.cellMergeStatusList:
-                row = cellmergeStatus["row"] + 1
-                columnStart = cellmergeStatus["column_start"] + 1
-                columnEnd = cellmergeStatus["column_end"] + 1
-
-                cellStart = f"{get_column_letter(columnStart)}{row}"
-                cellEnd = f"{get_column_letter(columnEnd)}{row}"
-
-                worksheet.merge_cells(f"{cellStart}:{cellEnd}")
-                worksheet[cellStart].alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
             for index, columnList in enumerate(worksheet.columns, 1):
                 maxLength = 0
+                columnLetter = get_column_letter(index)
 
-                columnLetter = worksheet.cell(row=1, column=index).column_letter
-                
                 for cell in columnList:
                     cellLength = len(str(cell.value))
 
@@ -435,12 +423,10 @@ class JsonToExcel:
                         maxLength = cellLength
 
                 worksheet.column_dimensions[columnLetter].width = min(maxLength + 3, 50)
-        
+
         if isDebug:
             print(f"✓ Table: {len(dataFrame)} row - {len(dataFrame.columns)} column.")
-
-            if self.cellMergeStatusList:
-                print(f"✓ Merged cell: {len(self.cellMergeStatusList)}.")
+            print(f"✓ Cell merge: {len(mergeList)}.")
 
 def Main():
     # Execution
@@ -453,9 +439,11 @@ def Main():
 
     #inferenceLayout(imageResize)
 
-    with open(f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/0_result.json", "r", encoding="utf-8") as file:
+    path = "wireless/0_result"
+
+    with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.json", "r", encoding="utf-8") as file:
         dataList = json.load(file)
 
-    JsonToExcel(isDebug, dataList, f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/0_result.xlsx")
+    JsonToExcel(isDebug, dataList, f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.xlsx")
 
 Main()
