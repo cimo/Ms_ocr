@@ -22,17 +22,17 @@ pathModelLayout = f"{PATH_PADDLE_LIBRARY}PP-DocLayout_plus-L/"
 pathModelTableClassification = f"{PATH_PADDLE_LIBRARY}PP-LCNet_x1_0_table_cls/"
 pathModelTableWired = f"{PATH_PADDLE_LIBRARY}RT-DETR-L_wired_table_cell_det/"
 pathModelTableWireless = f"{PATH_PADDLE_LIBRARY}RT-DETR-L_wireless_table_cell_det/"
-pathModelTextDetection = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_server_det/"
-pathModelTextRecognition = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_server_rec/"
+pathModelTextDetection = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_mobile_det/"
+pathModelTextRecognition = f"{PATH_PADDLE_LIBRARY}PP-OCRv5_mobile_rec/"
 
 isDebug = True
 device = "cpu"
 
 ocr = PaddleOCR(
     text_detection_model_dir=pathModelTextDetection,
-    text_detection_model_name="PP-OCRv5_server_det",
+    text_detection_model_name="PP-OCRv5_mobile_det",
     text_recognition_model_dir=pathModelTextRecognition,
-    text_recognition_model_name="PP-OCRv5_server_rec",
+    text_recognition_model_name="PP-OCRv5_mobile_rec",
     use_doc_orientation_classify=False,
     use_doc_unwarping=False,
     use_textline_orientation=False,
@@ -242,15 +242,15 @@ def inferenceLayout(input):
         _extractTable(data, input)
 
 def Main():
-    #removeOutputDir()
+    removeOutputDir()
 
-    #createOutputDir()
+    createOutputDir()
 
     image = preprocessor.open("/home/app/file/input/1_jp.jpg")
-    _, _, _, imageResize, _ = preprocessor.resize(image, 2048)
+    #_, _, _, imageResize, _ = preprocessor.resize(image, 2048)
 
-    #inferenceLayout(image)
+    inferenceLayout(image)
     
-    inferenceText(imageResize)
+    inferenceText(image)
 
 Main()
