@@ -12,7 +12,7 @@ from collections import OrderedDict as collectionOrderDict
 # Source
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from preprocessor import helper as preprocessorHelper
+from preprocessor import main as preprocessor
 
 pathRoot = sys.argv[1]
 pathInput = sys.argv[2]
@@ -74,11 +74,11 @@ def _denormalize(image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.22
 
 def _boxCreation(scoreTextValue, scoreLinkValue, ratio):
     if isDebug:
-        imageHeatmapScoreText = preprocessorHelper.heatmap(scoreTextValue)
-        imageHeatmapScoreLink = preprocessorHelper.heatmap(scoreLinkValue)
+        imageHeatmapScoreText = preprocessor.heatmap(scoreTextValue)
+        imageHeatmapScoreLink = preprocessor.heatmap(scoreLinkValue)
 
-        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_text", imageHeatmapScoreText)
-        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_link", imageHeatmapScoreLink)
+        preprocessor.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_text", imageHeatmapScoreText)
+        preprocessor.write(f"{pathRoot}{pathOutput}{fileName}", "_heatmap_link", imageHeatmapScoreLink)
 
     imageHeight, imageWidth = scoreTextValue.shape
 
@@ -182,22 +182,22 @@ def refineNetEval(refineNet):
 def preprocess():
     print(f"Load file: {pathRoot}{pathInput}{fileName}\r")
 
-    imageRead = preprocessorHelper.open(f"{pathRoot}{pathInput}{fileName}")
+    imageRead = preprocessor.open(f"{pathRoot}{pathInput}{fileName}")
 
-    targetWidth, targetHeight, ratio, imageResize, channel = preprocessorHelper.resize(imageRead, 2048)
+    targetWidth, targetHeight, ratio, imageResize, channel = preprocessor.resize(imageRead, 2048)
 
-    imageGray = preprocessorHelper.gray(imageResize)
+    imageGray = preprocessor.gray(imageResize)
 
-    imageBinarize = preprocessorHelper.binarization(imageGray)
+    imageBinarize = preprocessor.binarization(imageGray)
 
-    imageNoiseRemove = preprocessorHelper.noiseRemove(imageBinarize)
+    imageNoiseRemove = preprocessor.noiseRemove(imageBinarize)
 
-    imageColor = preprocessorHelper.color(imageNoiseRemove)
+    imageColor = preprocessor.color(imageNoiseRemove)
 
     imageResizeCnn = _resizeCnn(targetWidth, targetHeight, channel, imageColor)
 
     if isDebug:
-        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_preprocess", imageColor)
+        preprocessor.write(f"{pathRoot}{pathOutput}{fileName}", "_preprocess", imageColor)
 
     return ratio, imageResizeCnn, imageRead
 
@@ -245,4 +245,4 @@ def result(scoreText, scoreLink, ratio, imageRead):
             cv2.polylines(imageRead, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
 
     if isDebug:
-        preprocessorHelper.write(f"{pathRoot}{pathOutput}{fileName}", "_result", imageRead)
+        preprocessor.write(f"{pathRoot}{pathOutput}{fileName}", "_result", imageRead)

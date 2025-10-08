@@ -2,19 +2,15 @@ import sys
 import os
 import shutil
 import json
-import numpy
 import cv2
-import pandas
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition, PaddleOCR
 from PIL import Image, ImageDraw, ImageFont
-from typing import List, Dict, Tuple
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment
 
 # Source
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from preprocessor import helper as preprocessorHelper
+from json_to_excel.main import JsonToExcel
+from preprocessor import main as preprocessor
 
 PATH_PADDLE_SYSTEM = "/home/app/.paddlex/"
 PATH_PADDLE_FILE_OUTPUT = "/home/app/file/output/paddle/"
@@ -43,34 +39,16 @@ ocr = PaddleOCR(
     device=device
 )
 
-def _inferenceTextDetection(input):
-    model = TextDetection(model_dir=pathModelTextDetection, model_name="PP-OCRv5_server_det")
-    outputList = model.predict(input=input, batch_size=1)
-
-    for output in outputList:
-        if isDebug:
-            output.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.jpg")
-            output.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.json")
-
-def _inferenceTextRecognition(input):
-    model = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec")
-    outputList = model.predict(input=input, batch_size=1)
-
-    for output in outputList:
-        if isDebug:
-            output.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
-            output.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
-
 def _filterOverlapBox(boxList):
-    resultBoxFilterList = []
+    resultList = []
 
     for box in boxList:
         x1, y1, x2, y2 = map(float, box["coordinate"])
         
         isIgnore = False
         
-        for boxFilter in resultBoxFilterList:
-            xf1, yf1, xf2, yf2 = map(float, boxFilter["coordinate"])
+        for result in resultList:
+            xf1, yf1, xf2, yf2 = map(float, result["coordinate"])
 
             overlapX = max(0, min(x2, xf2) - max(x1, xf1))
             overlapY = max(0, min(y2, yf2) - max(y1, yf1))
@@ -86,29 +64,50 @@ def _filterOverlapBox(boxList):
         if isIgnore:
             continue
 
-        resultBoxFilterList.append(box)
+        resultList.append(box)
     
-    return resultBoxFilterList
+    return resultList
+
+def _inferenceTextRecognition(input):
+    model = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec")
+    datList = model.predict(input=input, batch_size=1)
+
+    for data in datList:
+        if isDebug:
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
+
+def _inferenceTextDetection(input):
+    model = TextDetection(model_dir=pathModelTextDetection, model_name="PP-OCRv5_server_det")
+    datList = model.predict(input=input, batch_size=1)
+
+    for data in datList:
+        if isDebug:
+            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.jpg")
+            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.json")
+
+        #_inferenceTextRecognition(input)
 
 def _processTable(mode, data, input, count):
     if isDebug:
         inputHeight, inputWidth = input.shape[:2]
         resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
         imageDraw = ImageDraw.Draw(resultImage)
-        resultMergeList = []
+    
+    resultMergeList = []
 
     boxList = data.get("boxes", [])
-
     boxFilterList = _filterOverlapBox(boxList)
 
     for box in boxFilterList:
         coordinateList = box.get("coordinate", [])
         x1, y1, x2, y2 = map(int, coordinateList)
 
-        imageCrop = input[y1:y2, x1:x2, :]
+        inputCrop = input[y1:y2, x1:x2, :]
+        #_, _, _, inputCropResize, _ = preprocessor.resize(inputCrop, 960)
 
-        resultList = ocr.predict(input=imageCrop)
-
+        resultList = ocr.predict(input=inputCrop)
+        
         for result in resultList:
             coordinateList = [float(a) for a in coordinateList]
             textList = result.get("rec_texts", []) or [""]
@@ -142,10 +141,10 @@ def _processTable(mode, data, input, count):
 
                     currentY += textHeight + extraSpace
 
-                resultMergeList.append({
-                    "coordinate": coordinateList,
-                    "rec_texts": textList
-                })
+            resultMergeList.append({
+                "bbox": coordinateList,
+                "text": textList
+            })
 
     if isDebug:
         resultImage.save(f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.jpg", format="JPEG")
@@ -153,7 +152,7 @@ def _processTable(mode, data, input, count):
         with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
             json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-    #DynamicTableExtractor
+    JsonToExcel(isDebug, resultMergeList, f"{PATH_PADDLE_FILE_OUTPUT}table/{mode}/{count}.xlsx")
 
 def _inferenceTableWireless(input, count):
     model = TableCellsDetection(model_dir=pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=device)
@@ -182,7 +181,7 @@ def _extractTableCell(data, input, count):
     scoreList = data.get("scores", [])
 
     if len(labelNameList) == len(scoreList):
-        resultIndex = int(numpy.argmax(scoreList))
+        resultIndex = max(range(len(scoreList)), key=lambda a: scoreList[a])
         resultLabel = labelNameList[resultIndex]
 
         if (resultLabel == "wired_table"):
@@ -209,10 +208,11 @@ def _inferenceTableClassification(input, count):
 
 def _extractTable(data, input):
     boxList = data.get("boxes", [])
+    boxFilterList = _filterOverlapBox(boxList)
 
     count = 0
 
-    for box in boxList:
+    for box in boxFilterList:
         if str(box.get("label", "")).lower() != "table":
             continue
 
@@ -220,6 +220,7 @@ def _extractTable(data, input):
         x1, y1, x2, y2 = map(int, coordinateList)
 
         inputCrop = input[y1:y2, x1:x2, :]
+        #_, _, _, inputCropResize, _ = preprocessor.resize(inputCrop, 960)
 
         _inferenceTableClassification(inputCrop, count)
 
@@ -253,197 +254,22 @@ def inferenceLayout(input):
 
         _extractTable(data, input)
 
-class JsonToExcel:
-    def _clusterPosition(self, positionList, tolerance):
-        resultList = [0] * len(positionList)
-        
-        indexSortList = numpy.argsort(positionList)
-        valueSortList = numpy.array(positionList)[indexSortList]
-        
-        resultList[indexSortList[0]] = 0
-        
-        count = 0
-        
-        for a in range(1, len(valueSortList)):
-            if valueSortList[a] - valueSortList[a - 1] > tolerance:
-                count += 1
-
-            resultList[indexSortList[a]] = count
-
-        return resultList
-
-    def _clusterPositionAverage(self, positionList, indexList, count):
-        resultList = []
-
-        for a in range(count):
-            clusterValues = [positionList[b] for b in range(len(positionList)) if indexList[b] == a]
-
-            resultList.append(numpy.mean(clusterValues) if clusterValues else 0)
-        
-        return resultList
-
-    def _detectGrid(self, cellList):
-        centerYlist = [cell["y1"] for cell in cellList]
-        leftXlist = [cell["x1"] for cell in cellList]
-
-        resultRowIndexList = self._clusterPosition(centerYlist, self.toleranceY)
-        resultColumnIndexList = self._clusterPosition(leftXlist, self.toleranceX)
-
-        countRow = max(resultRowIndexList) + 1
-        countColumn = max(resultColumnIndexList) + 1
-
-        resultRowPositionList = self._clusterPositionAverage(centerYlist, resultRowIndexList, countRow)
-        resultColumnPositionList = self._clusterPositionAverage(leftXlist, resultColumnIndexList, countColumn)
-
-        return resultRowIndexList, resultColumnIndexList, resultRowPositionList, resultColumnPositionList
-
-    def _detectCellMerge(self, cellList, rowIndexList, columnIndexList, rowPositionList, columnPositionList):
-        resultList = []
-        
-        for index, cell in enumerate(cellList):
-            rowStart = rowIndexList[index]
-            columnStart = columnIndexList[index]
-
-            rowEnd = rowStart
-
-            for a in range(rowStart + 1, len(rowPositionList)):
-                if cell["y2"] > rowPositionList[a] + self.toleranceY:
-                    rowEnd = a
-                else:
-                    break
-
-            columnEnd = columnStart
-
-            for a in range(columnStart + 1, len(columnPositionList)):
-                if cell["x2"] > columnPositionList[a] + self.toleranceX:
-                    columnEnd = a
-                else:
-                    break
-
-            if rowEnd > rowStart or columnEnd > columnStart:
-                resultList.append({
-                    "row_start": rowStart,
-                    "column_start": columnStart,
-                    "row_end": rowEnd,
-                    "column_end": columnEnd,
-                    "text": cell["text"]
-                })
-        
-        return resultList
-    
-    def _buildTableMatrix(self, cellList, rowIndexList, columnIndexList, mergeList):
-        countRow = max(rowIndexList) + 1
-        countColumn = max(columnIndexList) + 1
-
-        matrix = [["" for _ in range(countColumn)] for _ in range(countRow)]
-        
-        cellMergeList = []
-
-        for merge in mergeList:
-            for a in range(merge["row_start"], merge["row_end"] + 1):
-                for b in range(merge["column_start"], merge["column_end"] + 1):
-                    if a != merge["row_start"] or b != merge["column_start"]:
-                        cellMergeList.append((a, b))
-
-        for index, cell in enumerate(cellList):
-            indexRow = rowIndexList[index]
-            indexColumn = columnIndexList[index]
-
-            if (indexRow, indexColumn) in cellMergeList:
-                continue
-
-            if matrix[indexRow][indexColumn]:
-                matrix[indexRow][indexColumn] += " " + cell["text"]
-            else:
-                matrix[indexRow][indexColumn] = cell["text"]
-
-        dataFrame = pandas.DataFrame(matrix)
-        dataFrame = dataFrame.replace("", pandas.NA)
-        dataFrame = dataFrame.dropna(how="all")
-        dataFrame = dataFrame.fillna("")
-        dataFrame = dataFrame.loc[:, (dataFrame != "").any(axis=0)]
-        dataFrame = dataFrame.reset_index(drop=True)
-
-        return dataFrame
-
-    def __init__(self, isDebug, dataList, outputPath):
-        self.toleranceX = 15
-        self.toleranceY = 10
-
-        sheetName = "Sheet1"
-        cellList = []
-
-        for data in dataList:
-            coorinateList = data.get("coordinate", [])
-            textList = data.get("rec_texts", [])
-
-            if len(coorinateList) >= 4:
-                x1, y1, x2, y2 = coorinateList[:4]
-                text = "\n".join([text.strip() for text in textList if text.strip()])
-
-                cellList.append({
-                    "x1": x1,
-                    "y1": y1,
-                    "x2": x2,
-                    "y2": y2,
-                    "text": text.strip(),
-                    "width": x2 - x1,
-                    "height": y2 - y1
-                })
-
-        rowIndexList, columnIndexList, rowPositionList, columnPositionList = self._detectGrid(cellList)
-        mergeList = self._detectCellMerge(cellList, rowIndexList, columnIndexList, rowPositionList, columnPositionList)
-        dataFrame = self._buildTableMatrix(cellList, rowIndexList, columnIndexList, mergeList)
-
-        with pandas.ExcelWriter(outputPath, engine="openpyxl") as writer:
-            dataFrame.to_excel(writer, index=False, header=False, sheet_name=sheetName)
-            worksheet = writer.sheets[sheetName]
-
-            for merge in mergeList:
-                rowStart = merge["row_start"] + 1
-                columnStart = merge["column_start"] + 1
-                rowEnd = merge["row_end"] + 1
-                columnEnd = merge["column_end"] + 1
-                
-                if rowStart != rowEnd or columnStart != columnEnd:
-                    worksheet.merge_cells(start_row=rowStart, start_column=columnStart, end_row=rowEnd, end_column=columnEnd)
-
-            for rowList in worksheet.iter_rows():
-                for cell in rowList:
-                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-            for index, columnList in enumerate(worksheet.columns, 1):
-                maxLength = 0
-                columnLetter = get_column_letter(index)
-
-                for cell in columnList:
-                    cellLength = len(str(cell.value))
-
-                    if cellLength > maxLength:
-                        maxLength = cellLength
-
-                worksheet.column_dimensions[columnLetter].width = min(maxLength + 3, 50)
-
-        if isDebug:
-            print(f"✓ Table: {len(dataFrame)} row - {len(dataFrame.columns)} column.")
-            print(f"✓ Cell merge: {len(mergeList)}.")
-
 def Main():
     # Execution
-    #removeOutputDir()
+    removeOutputDir()
 
-    #createOutputDir()
+    createOutputDir()
 
-    #image = preprocessorHelper.open("/home/app/file/input/1_jp.jpg")
-    #_, _, _, imageResize, _ = preprocessorHelper.resize(image, 2048)
+    image = preprocessor.open("/home/app/file/input/1_jp.jpg")
+    #_, _, _, imageResize, _ = preprocessor.resize(image, 2048)
 
-    #inferenceLayout(imageResize)
-
-    path = "wireless/0_result"
+    inferenceLayout(image)
+    '''
+    path = "wired/1_result"
 
     with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.json", "r", encoding="utf-8") as file:
         dataList = json.load(file)
 
     JsonToExcel(isDebug, dataList, f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.xlsx")
-
+    '''
 Main()

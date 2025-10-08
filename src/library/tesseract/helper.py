@@ -10,7 +10,7 @@ import json
 # Source
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from preprocessor import helper as preprocessorHelper
+from preprocessor import main as preprocessor
 
 def checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -127,9 +127,9 @@ def executeCraft():
 def preprocess():
     print(f"Load file: {PATH_ROOT}{PATH_FILE_INPUT}{fileName}\r")
 
-    imageRead = preprocessorHelper.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
+    imageRead = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{fileName}")
 
-    imageGray = preprocessorHelper.gray(imageRead)
+    imageGray = preprocessor.gray(imageRead)
 
     imageBox = imageGray.copy()
 
