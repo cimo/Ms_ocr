@@ -3,7 +3,7 @@ import os
 import shutil
 import json
 import cv2
-from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition, PaddleOCR
+from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, PaddleOCR
 from PIL import Image, ImageDraw, ImageFont
 
 # Source
@@ -39,7 +39,7 @@ ocr = PaddleOCR(
     device=device
 )
 
-def _filterOverlapBox(boxList):
+def _filterOverlapBbox(boxList):
     resultList = []
 
     for box in boxList:
@@ -68,26 +68,6 @@ def _filterOverlapBox(boxList):
     
     return resultList
 
-def _inferenceTextRecognition(input):
-    model = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec")
-    datList = model.predict(input=input, batch_size=1)
-
-    for data in datList:
-        if isDebug:
-            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
-            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
-
-def _inferenceTextDetection(input):
-    model = TextDetection(model_dir=pathModelTextDetection, model_name="PP-OCRv5_server_det")
-    datList = model.predict(input=input, batch_size=1)
-
-    for data in datList:
-        if isDebug:
-            data.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.jpg")
-            data.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_detection.json")
-
-        #_inferenceTextRecognition(input)
-
 def _processTable(mode, data, input, count):
     if isDebug:
         inputHeight, inputWidth = input.shape[:2]
@@ -97,14 +77,13 @@ def _processTable(mode, data, input, count):
     resultMergeList = []
 
     boxList = data.get("boxes", [])
-    boxFilterList = _filterOverlapBox(boxList)
+    boxFilterList = _filterOverlapBbox(boxList)
 
     for box in boxFilterList:
         coordinateList = box.get("coordinate", [])
         x1, y1, x2, y2 = map(int, coordinateList)
 
         inputCrop = input[y1:y2, x1:x2, :]
-        #_, _, _, inputCropResize, _ = preprocessor.resize(inputCrop, 960)
 
         resultList = ocr.predict(input=inputCrop)
         
@@ -114,20 +93,20 @@ def _processTable(mode, data, input, count):
 
             if isDebug:
                 lineNumber = max(1, len(textList))
-                cellHeight = y2 - y1
-                fontSize = max(8, int(cellHeight * 0.6 / lineNumber))
+                boxHeight = y2 - y1
+                fontSize = max(8, int(boxHeight * 0.6 / lineNumber))
                 font = ImageFont.truetype(pathFont, fontSize)
 
-                bboxeList = [imageDraw.textbbox((0, 0), value, font=font) for value in textList]
-                textHeightList = [bbox[3] - bbox[1] for bbox in bboxeList]
-                textWidthList = [bbox[2] - bbox[0] for bbox in bboxeList]
+                textBoxList = [imageDraw.textbbox((0, 0), text, font=font) for text in textList]
+                textHeightList = [bbox[3] - bbox[1] for bbox in textBoxList]
+                textWidthList = [bbox[2] - bbox[0] for bbox in textBoxList]
 
                 totalTextHeight = sum(textHeightList)
 
                 if lineNumber > 1:
-                    extraSpace = (cellHeight - totalTextHeight) / (lineNumber + 1)
+                    extraSpace = (boxHeight - totalTextHeight) / (lineNumber + 1)
                 else:
-                    extraSpace = (cellHeight - totalTextHeight) / 2
+                    extraSpace = (boxHeight - totalTextHeight) / 2
 
                 currentY = y1 + extraSpace
 
@@ -142,8 +121,8 @@ def _processTable(mode, data, input, count):
                     currentY += textHeight + extraSpace
 
             resultMergeList.append({
-                "bbox": coordinateList,
-                "text": textList
+                "bbox_list": coordinateList,
+                "text_list": textList
             })
 
     if isDebug:
@@ -208,23 +187,22 @@ def _inferenceTableClassification(input, count):
 
 def _extractTable(data, input):
     boxList = data.get("boxes", [])
-    boxFilterList = _filterOverlapBox(boxList)
+    boxFilterList = _filterOverlapBbox(boxList)
 
     count = 0
 
     for box in boxFilterList:
-        if str(box.get("label", "")).lower() != "table":
-            continue
+        label = str(box.get("label", "")).lower()
 
-        coordinateList = box.get("coordinate", [])
-        x1, y1, x2, y2 = map(int, coordinateList)
+        if label == "table":
+            coordinateList = box.get("coordinate", [])
+            x1, y1, x2, y2 = map(int, coordinateList)
 
-        inputCrop = input[y1:y2, x1:x2, :]
-        #_, _, _, inputCropResize, _ = preprocessor.resize(inputCrop, 960)
+            inputCrop = input[y1:y2, x1:x2, :]
 
-        _inferenceTableClassification(inputCrop, count)
+            _inferenceTableClassification(inputCrop, count)
 
-        count += 1
+            count += 1
 
 def removeOutputDir():
     if os.path.exists(f"{PATH_PADDLE_FILE_OUTPUT}layout/"):
@@ -243,6 +221,15 @@ def createOutputDir():
     os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}table/wireless/", exist_ok=True)
     os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}export/", exist_ok=True)
 
+def inferenceText(input):
+    resultList = ocr.predict(input=input)
+    
+    for result in resultList:
+        if isDebug:
+            result.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
+        
+        result.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
+
 def inferenceLayout(input):
     model = LayoutDetection(model_dir=pathModelLayout, model_name="PP-DocLayout_plus-L", device=device)
     dataList = model.predict(input=input, batch_size=1)
@@ -255,21 +242,15 @@ def inferenceLayout(input):
         _extractTable(data, input)
 
 def Main():
-    # Execution
-    removeOutputDir()
+    #removeOutputDir()
 
-    createOutputDir()
+    #createOutputDir()
 
     image = preprocessor.open("/home/app/file/input/1_jp.jpg")
-    #_, _, _, imageResize, _ = preprocessor.resize(image, 2048)
+    _, _, _, imageResize, _ = preprocessor.resize(image, 2048)
 
-    inferenceLayout(image)
-    '''
-    path = "wired/1_result"
+    #inferenceLayout(image)
+    
+    inferenceText(imageResize)
 
-    with open(f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.json", "r", encoding="utf-8") as file:
-        dataList = json.load(file)
-
-    JsonToExcel(isDebug, dataList, f"{PATH_PADDLE_FILE_OUTPUT}table/{path}.xlsx")
-    '''
 Main()

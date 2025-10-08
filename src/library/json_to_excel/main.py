@@ -124,8 +124,8 @@ class JsonToExcel:
         cellList = []
 
         for data in dataList:
-            bboxList = data.get("bbox", [])
-            textList = data.get("text", [])
+            bboxList = data.get("bbox_list", [])
+            textList = data.get("text_list", [])
 
             if len(bboxList) >= 4:
                 x1, y1, x2, y2 = bboxList[:4]
@@ -136,9 +136,9 @@ class JsonToExcel:
                     "y1": y1,
                     "x2": x2,
                     "y2": y2,
-                    "text": text.strip(),
                     "width": x2 - x1,
-                    "height": y2 - y1
+                    "height": y2 - y1,
+                    "text": text.strip()
                 })
 
         rowIndexList, columnIndexList, rowPositionList, columnPositionList = self._detectGrid(cellList)
