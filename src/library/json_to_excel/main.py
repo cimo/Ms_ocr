@@ -116,7 +116,7 @@ class JsonToExcel:
 
         return dataFrame
 
-    def __init__(self, isDebug, dataList, pathOutput):
+    def __init__(self, dataList, pathOutput):
         self.toleranceX = 15
         self.toleranceY = 10
 
@@ -180,8 +180,3 @@ class JsonToExcel:
                             lengthMax = max(lengthMax, lengthFixed)
 
                 worksheet.column_dimensions[columnLetter].width = lengthMax * 1.2
-
-        if isDebug:
-            print(f"Row: {len(dataFrame)} - Column: {len(dataFrame.columns)}")
-            print(f"Merge: {len(mergeList)}")
-            print(f"Path: {pathOutput}")

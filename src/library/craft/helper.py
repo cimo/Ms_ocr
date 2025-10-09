@@ -10,8 +10,6 @@ from torch.autograd import Variable as torchAutogradVariable
 from collections import OrderedDict as collectionOrderDict
 
 # Source
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from preprocessor import main as preprocessor
 
 pathRoot = sys.argv[1]

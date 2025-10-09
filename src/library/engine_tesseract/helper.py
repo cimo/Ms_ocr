@@ -1,49 +1,11 @@
-import sys
 import os
 import subprocess
-import logging
-import ast
 import numpy
 import cv2
 import json
 
 # Source
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from preprocessor import main as preprocessor
-
-def checkEnvVariable(varKey):
-    if os.environ.get(varKey) is None:
-        logging.exception("Environment variable %s do not exist", varKey)
-    else:
-        if os.environ.get(varKey).lower() == "true":
-            return True
-        if os.environ.get(varKey).lower() == "false":
-            return False
-        if os.environ.get(varKey).isnumeric():
-            return int(os.environ.get(varKey))
-        if os.environ.get(varKey).startswith("[") and os.environ.get(varKey).endswith("]"):
-            return ast.literal_eval(os.environ.get(varKey))
-
-    return os.environ.get(varKey)
-
-ENV_NAME = checkEnvVariable("ENV_NAME")
-PATH_ROOT = checkEnvVariable("PATH_ROOT")
-PATH_FILE_INPUT = checkEnvVariable("MS_O_PATH_FILE_INPUT")
-PATH_FILE_OUTPUT = checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
-
-def locationFromEnvName():
-    result = ENV_NAME.split("_")[-1]
-
-    if result == "local":
-        result = "jp"
-
-    return result
-
-fileName = sys.argv[1]
-language = sys.argv[2]
-isCuda = sys.argv[3]
-isDebug = sys.argv[4]
 
 def _subprocess(fileNameSplit):
     resultLanguage = ""
@@ -112,7 +74,7 @@ def _jsonCreate(pathJson, left, top, right, bottom, pathText):
     with open(pathJson, "w", encoding="utf-8") as file:
         json.dump(dataList, file, ensure_ascii=False, indent=2)
 
-def executeCraft():
+def executeCraft(PATH_ROOT, PATH_FILE_INPUT, PATH_FILE_OUTPUT, fileName, isCuda, isDebug):
     subprocess.run([
         "python3",
         f"{PATH_ROOT}src/library/craft/main.py",
@@ -165,13 +127,13 @@ def result(imageGray, imageBox, imageResult):
         if isDebug:
             cv2.rectangle(imageBox, (left, top), (right, bottom), (0, 0, 0), 1)
 
-            preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_box", imageBox)
+            preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_box", imageBox)
 
         imageResult[top:bottom, left:right] = imageCrop
 
-        _, _, _, imageCropResize, _ = preprocessorHelper.resizeLineHeight(imageCrop)
+        _, _, _, imageCropResize, _ = preprocessor.resizeLineHeight(imageCrop)
 
-        preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.png", "_crop", imageCropResize)
+        preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}.png", "_crop", imageCropResize)
 
         _subprocess(fileNameSplit)
 
@@ -181,4 +143,4 @@ def result(imageGray, imageBox, imageResult):
         os.remove(pathText)
     
     if isDebug:
-        preprocessorHelper.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_result", imageResult)
+        preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileName}", "_result", imageResult)

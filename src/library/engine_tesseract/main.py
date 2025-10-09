@@ -139,16 +139,14 @@ def pageLayout():
 
     return thresh, mergedBoxes
 
-def Main():
-    helper.executeCraft()
+def Main(PATH_ROOT, PATH_FILE_INPUT, PATH_FILE_OUTPUT, fileName, language, isCuda, isDebug):
+    helper.executeCraft(PATH_ROOT, PATH_FILE_INPUT, PATH_FILE_OUTPUT, fileName, isCuda, isDebug)
 
     #imageGray, imageBox, imageResult = helper.preprocess()
 
     #helper.result(imageGray, imageBox, imageResult)
 
     #thresh, boxList = pageLayout()
-
-Main()
 
 # TO DO - Integrate dewarp
 

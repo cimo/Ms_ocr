@@ -30,7 +30,17 @@ export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
 export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
 
-export const LOCALE = "jp";
+export const locationFromEnvName = (): string => {
+    let result = ENV_NAME.split("_").pop();
+
+    if (!result || result === "local") {
+        result = "jp";
+    }
+
+    return result;
+};
+
+export const LOCALE = locationFromEnvName();
 
 const localeConfiguration: Record<string, { locale: string; currency: string }> = {
     // Europe
@@ -136,11 +146,27 @@ export const fileReadStream = (filePath: string, callback: (result: NodeJS.Errno
 };
 
 export const fileRemove = (path: string, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
-    Fs.unlink(path, (error) => {
-        if (!error) {
-            callback(true);
+    Fs.stat(path, (error, stats) => {
+        if (error) {
+            return callback(error);
+        }
+
+        if (stats.isDirectory()) {
+            Fs.rm(path, { recursive: true, force: true }, (error) => {
+                if (error) {
+                    return callback(error);
+                }
+
+                callback(true);
+            });
         } else {
-            callback(error);
+            Fs.unlink(path, (error) => {
+                if (error) {
+                    return callback(error);
+                }
+
+                callback(true);
+            });
         }
     });
 };
@@ -193,16 +219,6 @@ export const removeAnsiEscape = (text: string): string => {
     return text.replace(regex, "");
 };
 
-export const locationFromEnvName = (): string | undefined => {
-    let result = ENV_NAME.split("_").pop();
-
-    if (result === "local") {
-        result = "jp";
-    }
-
-    return result;
-};
-
 export const localeFormat = (value: number | Date): string | undefined => {
     if (typeof value === "number") {
         const formatOptions: Intl.NumberFormatOptions = {
@@ -225,4 +241,11 @@ export const localeFormat = (value: number | Date): string | undefined => {
     }
 
     return undefined;
+};
+
+export const generateUniqueId = () => {
+    const timestamp = Date.now().toString(36);
+    const randomPart = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
+
+    return `${timestamp}-${randomPart}`;
 };
