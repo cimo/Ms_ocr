@@ -71,8 +71,8 @@ CMD cp -r ${PATH_ROOT}.ms_cronjob-volume/certificate/* ${PATH_ROOT}certificate/ 
     && python3 -m pip install pip --upgrade \
     && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Tesseract
-    && ${PATH_ROOT}src/library/tesseract/executable --version \
-    && ${PATH_ROOT}src/library/tesseract/executable --list-langs \
+    && ${PATH_ROOT}src/library/engine_tesseract/executable --version \
+    && ${PATH_ROOT}src/library/engine_tesseract/executable --list-langs \
     # Npm
     && rm -rf node_modules package-lock.json \
     && npm install \

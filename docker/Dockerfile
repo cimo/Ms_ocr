@@ -77,8 +77,8 @@ RUN python3 -m pip install pip --upgrade \
     && npm run build
 
 # Tesseract
-CMD ${PATH_ROOT}src/library/tesseract/executable --version \
-    && ${PATH_ROOT}src/library/tesseract/executable --list-langs \
+CMD ${PATH_ROOT}src/library/engine_tesseract/executable --version \
+    && ${PATH_ROOT}src/library/engine_tesseract/executable --list-langs \
     # Node
     && node ${PATH_ROOT}dist/src/controller/Server.js
 

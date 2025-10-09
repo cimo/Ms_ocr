@@ -19,10 +19,10 @@ def _subprocess(fileNameSplit):
         resultLanguage = "jpn_vert"
         resultPsm = 5
 
-    os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/tesseract/language/"
+    os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/engine_tesseract/language/"
     
     subprocess.run([
-        f"{PATH_ROOT}src/library/tesseract/executable",
+        f"{PATH_ROOT}src/library/engine_tesseract/executable",
         f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}_crop.png",
         f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{fileNameSplit}",
         f"-l", resultLanguage,
