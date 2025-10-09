@@ -39,16 +39,16 @@ ocr = PaddleOCR(
     device=device
 )
 
-def _filterOverlapBbox(boxList):
+def _filterOverlapBbox(bboxList):
     resultList = []
 
-    for box in boxList:
-        x1, y1, x2, y2 = map(float, box["coordinate"])
+    for bbox in bboxList:
+        x1, y1, x2, y2 = [float(bboxCoordinate) for bboxCoordinate in bbox["coordinate"]]
         
         isIgnore = False
         
         for result in resultList:
-            xf1, yf1, xf2, yf2 = map(float, result["coordinate"])
+            xf1, yf1, xf2, yf2 = [float(resultCoordinate) for resultCoordinate in result["coordinate"]]
 
             overlapX = max(0, min(x2, xf2) - max(x1, xf1))
             overlapY = max(0, min(y2, yf2) - max(y1, yf1))
@@ -64,7 +64,7 @@ def _filterOverlapBbox(boxList):
         if isIgnore:
             continue
 
-        resultList.append(box)
+        resultList.append(bbox)
     
     return resultList
 
@@ -73,33 +73,33 @@ def _processTable(mode, data, input, count):
         inputHeight, inputWidth = input.shape[:2]
         resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
         imageDraw = ImageDraw.Draw(resultImage)
+        font = ImageFont.truetype(pathFont, 14)
     
     resultMergeList = []
 
-    boxList = data.get("boxes", [])
-    boxFilterList = _filterOverlapBbox(boxList)
+    bboxList = data.get("boxes", [])
+    boxFilterList = _filterOverlapBbox(bboxList)
 
-    for box in boxFilterList:
-        coordinateList = box.get("coordinate", [])
-        x1, y1, x2, y2 = map(int, coordinateList)
+    for bbox in boxFilterList:
+        coordinateList = bbox.get("coordinate", [])
+        coordinateList = [float(coordinate) for coordinate in coordinateList]
+        
+        x1, y1, x2, y2 = coordinateList
 
         inputCrop = input[y1:y2, x1:x2, :]
 
-        resultList = ocr.predict(input=inputCrop)
+        predictDataList = ocr.predict(input=inputCrop)
         
-        for result in resultList:
-            coordinateList = [float(a) for a in coordinateList]
-            textList = result.get("rec_texts", []) or [""]
+        for predictData in predictDataList:
+            textList = predictData.get("rec_texts", []) or [""]
 
             if isDebug:
-                lineNumber = max(1, len(textList))
+                lineNumber = len(textList)
                 boxHeight = y2 - y1
-                fontSize = max(8, int(boxHeight * 0.6 / lineNumber))
-                font = ImageFont.truetype(pathFont, fontSize)
 
-                textBoxList = [imageDraw.textbbox((0, 0), text, font=font) for text in textList]
-                textHeightList = [bbox[3] - bbox[1] for bbox in textBoxList]
-                textWidthList = [bbox[2] - bbox[0] for bbox in textBoxList]
+                textBboxList = [imageDraw.textbbox((0, 0), text, font=font) for text in textList]
+                textWidthList = [textBox[2] - textBox[0] for textBox in textBboxList]
+                textHeightList = [textBox[3] - textBox[1] for textBox in textBboxList]
 
                 totalTextHeight = sum(textHeightList)
 
@@ -186,17 +186,18 @@ def _inferenceTableClassification(input, count):
     _extractTableCell(data, input, count)
 
 def _extractTable(data, input):
-    boxList = data.get("boxes", [])
-    boxFilterList = _filterOverlapBbox(boxList)
+    bboxList = data.get("boxes", [])
+    boxFilterList = _filterOverlapBbox(bboxList)
 
     count = 0
 
-    for box in boxFilterList:
-        label = str(box.get("label", "")).lower()
+    for bbox in boxFilterList:
+        label = str(bbox.get("label", "")).lower()
 
         if label == "table":
-            coordinateList = box.get("coordinate", [])
-            x1, y1, x2, y2 = map(int, coordinateList)
+            coordinateList = bbox.get("coordinate", [])
+
+            x1, y1, x2, y2 = [float(coordinate) for coordinate in coordinateList]
 
             inputCrop = input[y1:y2, x1:x2, :]
 
@@ -222,13 +223,36 @@ def createOutputDir():
     os.makedirs(f"{PATH_PADDLE_FILE_OUTPUT}export/", exist_ok=True)
 
 def inferenceText(input):
-    resultList = ocr.predict(input=input)
+    if isDebug:
+        inputHeight, inputWidth = input.shape[:2]
+        resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+        imageDraw = ImageDraw.Draw(resultImage)
+        font = ImageFont.truetype("NotoSansCJK-Regular.ttc", 14)
     
-    for result in resultList:
+    predictDataList = ocr.predict(input=input)
+    
+    for predictData in predictDataList:
+        bboxList = predictData.get("rec_boxes", [])
+        textList = predictData.get("rec_texts", []) or [""]
+
         if isDebug:
-            result.save_to_img(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg")
-        
-        result.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
+            assert len(bboxList) == len(textList), f"Mismatch tra box e testi: {len(bboxList)} vs {len(textList)}"
+
+            for index in range(len(bboxList)):
+                print(f"[DEBUG] Box {index}: {bboxList[index]}")
+                print(f"[DEBUG] Testo {index}: {textList[index]}")
+
+                assert len(bboxList[index]) == 4, f"Formato bbox non valido: {bboxList[index]}"
+                assert bboxList[index][2] > bboxList[index][0] and bboxList[index][3] > bboxList[index][1], f"Box malformato: {bboxList[index]}"
+
+                x1, y1, _, _ = [int(bbox) for bbox in bboxList[index]]
+
+                imageDraw.text((x1, y1), textList[index], font=font, fill=(0, 0, 0))
+
+        predictData.save_to_json(save_path=f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.json")
+    
+    if isDebug:
+        resultImage.save(f"{PATH_PADDLE_FILE_OUTPUT}export/result_recognition.jpg", format="JPEG")
 
 def inferenceLayout(input):
     model = LayoutDetection(model_dir=pathModelLayout, model_name="PP-DocLayout_plus-L", device=device)
@@ -242,14 +266,13 @@ def inferenceLayout(input):
         _extractTable(data, input)
 
 def Main():
-    removeOutputDir()
+    #removeOutputDir()
 
-    createOutputDir()
+    #createOutputDir()
 
     image = preprocessor.open("/home/app/file/input/1_jp.jpg")
-    #_, _, _, imageResize, _ = preprocessor.resize(image, 2048)
 
-    inferenceLayout(image)
+    #inferenceLayout(image)
     
     inferenceText(image)
 

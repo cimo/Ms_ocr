@@ -116,7 +116,7 @@ class JsonToExcel:
 
         return dataFrame
 
-    def __init__(self, isDebug, dataList, outputPath):
+    def __init__(self, isDebug, dataList, pathOutput):
         self.toleranceX = 15
         self.toleranceY = 10
 
@@ -145,7 +145,7 @@ class JsonToExcel:
         mergeList = self._detectCellMerge(cellList, rowIndexList, columnIndexList, rowPositionList, columnPositionList)
         dataFrame = self._buildTableMatrix(cellList, rowIndexList, columnIndexList, mergeList)
 
-        with pandas.ExcelWriter(outputPath, engine="openpyxl") as writer:
+        with pandas.ExcelWriter(pathOutput, engine="openpyxl") as writer:
             dataFrame.to_excel(writer, index=False, header=False, sheet_name=sheetName)
             worksheet = writer.sheets[sheetName]
 
@@ -182,5 +182,6 @@ class JsonToExcel:
                 worksheet.column_dimensions[columnLetter].width = lengthMax * 1.2
 
         if isDebug:
-            print(f"✓ Table: {len(dataFrame)} row - {len(dataFrame.columns)} column.")
-            print(f"✓ Cell merge: {len(mergeList)}.")
+            print(f"Row: {len(dataFrame)} - Column: {len(dataFrame.columns)}")
+            print(f"Merge: {len(mergeList)}")
+            print(f"Path: {pathOutput}")

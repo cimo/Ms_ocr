@@ -28,7 +28,6 @@ pnpm-debug.log*
 .npm
 .pki
 .paddlex/*
-!.paddlex/fonts/
 certificate/*
 !certificate/.gitkeep
 certificate/proxy/*
