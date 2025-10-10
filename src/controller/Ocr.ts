@@ -78,9 +78,26 @@ export default class ControllerOcr {
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
-                            helperSrc.fileReadStream(`${outputEngineResult}export/${fileNameParse}.pdf`, (resultFileReadStream) => {
+                            helperSrc.fileReadStream(`${outputEngineResult}export/${fileNameParse}.pdf`, async (resultFileReadStream) => {
                                 if (Buffer.isBuffer(resultFileReadStream)) {
-                                    helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
+                                    const dataList = await helperSrc.findFileInDirectoryRecursive(
+                                        `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}paddle/${uniqueId}/`,
+                                        ".xlsx"
+                                    );
+
+                                    const excelList: string[] = [];
+
+                                    for (const data of dataList) {
+                                        excelList.push(data.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}`, ""));
+                                    }
+
+                                    const responseJson = {
+                                        uniqueId,
+                                        pdf: resultFileReadStream.toString("base64"),
+                                        excelList
+                                    };
+
+                                    helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                                 } else {
                                     helperSrc.writeLog(
                                         "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream()",
@@ -90,50 +107,57 @@ export default class ControllerOcr {
                                     helperSrc.responseBody("", resultFileReadStream.toString(), response, 500);
                                 }
 
-                                Fs.readdir(outputCraftResult, (error) => {
-                                    if (error) {
-                                        helperSrc.writeLog(
-                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult)",
-                                            error.toString()
-                                        );
-
-                                        return;
-                                    }
-
-                                    helperSrc.fileRemove(outputCraftResult, (resultFileRemove) => {
-                                        if (typeof resultFileRemove !== "boolean") {
+                                if (engine !== "paddle") {
+                                    Fs.readdir(outputCraftResult, (error) => {
+                                        if (error) {
                                             helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult) - fileRemove(outputCraftResult)",
-                                                resultFileRemove.toString()
+                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult)",
+                                                error.toString()
                                             );
 
-                                            helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                            return;
                                         }
+
+                                        helperSrc.fileRemove(outputCraftResult, (resultFileRemove) => {
+                                            if (typeof resultFileRemove !== "boolean") {
+                                                helperSrc.writeLog(
+                                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult) - fileRemove(resultFileRemove)",
+                                                    resultFileRemove.toString()
+                                                );
+
+                                                helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                            }
+                                        });
                                     });
-                                });
+                                }
 
                                 /*
-                                Fs.readdir(outputEngineResult, (error) => {
-                                    if (error) {
-                                        helperSrc.writeLog(
-                                            "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputTesseractResult)",
-                                            error.toString()
-                                        );
+                                setTimeout(
+                                    () => {
+                                        Fs.readdir(outputEngineResult, (error) => {
+                                            if (error) {
+                                                helperSrc.writeLog(
+                                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputEngineResult)",
+                                                    error.toString()
+                                                );
 
-                                        return;
-                                    }
+                                                return;
+                                            }
 
-                                    helperSrc.fileRemove(outputEngineResult, (resultFileRemove) => {
-                                        if (typeof resultFileRemove !== "boolean") {
-                                            helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputTesseractResult) - fileRemove(outputTesseractResult)",
-                                                resultFileRemove.toString()
-                                            );
+                                            helperSrc.fileRemove(outputEngineResult, (resultFileRemove) => {
+                                                if (typeof resultFileRemove !== "boolean") {
+                                                    helperSrc.writeLog(
+                                                        "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputEngineResult) - fileRemove(resultFileRemove)",
+                                                        resultFileRemove.toString()
+                                                    );
 
-                                            helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
-                                        }
-                                    });
-                                });
+                                                    helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                                }
+                                            });
+                                        });
+                                    },
+                                    10 * 60 * 1000
+                                );
                                 */
                             });
                         } else {

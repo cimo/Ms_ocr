@@ -5,42 +5,7 @@ import { Ce } from "@cimo/environment/dist/src/Main";
 // Source
 import * as modelHelperSrc from "./model/HelperSrc";
 
-export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env.ENV_NAME as string);
-
-Ce.loadFile(`./env/${ENV_NAME}.env`);
-
-export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
-export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env.TIME_ZONE as string);
-export const LANG = Ce.checkVariable("LANG") || (process.env.LANG as string);
-export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
-export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
-export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
-export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
-export const DEBUG = Ce.checkVariable("MS_O_DEBUG") || (process.env.MS_O_DEBUG as string);
-export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
-export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
-export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
-export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
-export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
-export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
-export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
-export const PATH_FILE_INPUT = Ce.checkVariable("MS_O_PATH_FILE_INPUT");
-export const PATH_FILE_OUTPUT = Ce.checkVariable("MS_O_PATH_FILE_OUTPUT");
-export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
-export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
-export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
-
-export const locationFromEnvName = (): string => {
-    let result = ENV_NAME.split("_").pop();
-
-    if (!result || result === "local") {
-        result = "jp";
-    }
-
-    return result;
-};
-
-export const LOCALE = locationFromEnvName();
+let timeoutCron: NodeJS.Timeout | null = null;
 
 const localeConfiguration: Record<string, { locale: string; currency: string }> = {
     // Europe
@@ -74,6 +39,67 @@ const localeConfiguration: Record<string, { locale: string; currency: string }> 
     nz: { locale: "mi-NZ", currency: "NZD" }
 };
 
+export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env.ENV_NAME as string);
+
+Ce.loadFile(`./env/${ENV_NAME}.env`);
+
+export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
+export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env.TIME_ZONE as string);
+export const LANG = Ce.checkVariable("LANG") || (process.env.LANG as string);
+export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
+export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
+export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
+export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
+export const DEBUG = Ce.checkVariable("MS_O_DEBUG") || (process.env.MS_O_DEBUG as string);
+export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
+export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
+export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
+export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
+export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
+export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
+export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
+export const PATH_FILE_INPUT = Ce.checkVariable("MS_O_PATH_FILE_INPUT");
+export const PATH_FILE_OUTPUT = Ce.checkVariable("MS_O_PATH_FILE_OUTPUT");
+export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
+export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
+export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
+
+export const localeFromEnvName = (): string => {
+    let result = ENV_NAME.split("_").pop();
+
+    if (!result || result === "local") {
+        result = "jp";
+    }
+
+    return result;
+};
+
+export const LOCALE = localeFromEnvName();
+
+export const localeFormat = (value: number | Date): string | undefined => {
+    if (typeof value === "number") {
+        const formatOptions: Intl.NumberFormatOptions = {
+            style: "decimal",
+            currency: localeConfiguration[LOCALE].currency
+        };
+
+        return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+    } else if (value instanceof Date) {
+        const formatOptions: Intl.DateTimeFormatOptions = {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        };
+
+        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+    }
+
+    return undefined;
+};
+
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
     if (DEBUG === "true") {
         if (typeof process !== "undefined") {
@@ -86,28 +112,6 @@ export const writeLog = (tag: string, value: string | Record<string, unknown> | 
             console.log(`WriteLog => ${tag}: `, value);
         }
     }
-};
-
-export const serverTime = (): string => {
-    const currentDate = new Date();
-
-    const month = currentDate.getMonth() + 1;
-    const monthOut = month < 10 ? `0${month}` : `${month}`;
-
-    const day = currentDate.getDate();
-    const dayOut = day < 10 ? `0${day}` : `${day}`;
-
-    const date = `${currentDate.getFullYear()}/${monthOut}/${dayOut}`;
-
-    const minute = currentDate.getMinutes();
-    const minuteOut = minute < 10 ? `0${minute}` : `${minute}`;
-
-    const second = currentDate.getSeconds();
-    const secondOut = second < 10 ? `0${second}` : `${second}`;
-
-    const time = `${currentDate.getHours()}:${minuteOut}:${secondOut}`;
-
-    return `${date} ${time}`;
 };
 
 export const fileWriteStream = (filePath: string, buffer: Buffer, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
@@ -219,33 +223,71 @@ export const removeAnsiEscape = (text: string): string => {
     return text.replace(regex, "");
 };
 
-export const localeFormat = (value: number | Date): string | undefined => {
-    if (typeof value === "number") {
-        const formatOptions: Intl.NumberFormatOptions = {
-            style: "decimal",
-            currency: localeConfiguration[LOCALE].currency
-        };
-
-        return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
-    } else if (value instanceof Date) {
-        const formatOptions: Intl.DateTimeFormatOptions = {
-            year: "numeric",
-            month: "numeric",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        };
-
-        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
-    }
-
-    return undefined;
-};
-
-export const generateUniqueId = () => {
+export const generateUniqueId = (): string => {
     const timestamp = Date.now().toString(36);
     const randomPart = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
 
     return `${timestamp}-${randomPart}`;
+};
+
+export const findFileInDirectoryRecursive = async (path: string, extension: string): Promise<string[]> => {
+    const resultList: string[] = [];
+
+    const dataList = await Fs.promises.readdir(path);
+
+    for (let a = 0; a < dataList.length; a++) {
+        const data = `${path}${dataList[a]}`;
+        const dataStat = await Fs.promises.stat(data);
+
+        if (dataStat.isDirectory()) {
+            const dataSubList = await findFileInDirectoryRecursive(`${data}/`, extension);
+
+            for (let b = 0; b < dataSubList.length; b++) {
+                resultList.push(dataSubList[b]);
+            }
+        } else if (dataStat.isFile() && data.endsWith(extension)) {
+            resultList.push(data);
+        }
+    }
+
+    return resultList;
+};
+
+export const startCronJob = (): void => {
+    const runCronjob = (): void => {
+        if (timeoutCron !== null) {
+            clearTimeout(timeoutCron);
+        }
+
+        const path = `${PATH_ROOT}${PATH_FILE_OUTPUT}paddle/`;
+
+        Fs.readdir(path, (error, dataList) => {
+            if (error) {
+                writeLog("HelperSrc.ts - startCronJob() - runCronjob() - Fs.readdir(path)", error.toString());
+
+                return;
+            }
+
+            for (let a = 0; a < dataList.length; a++) {
+                const data = `${path}${dataList[a]}`;
+
+                Fs.stat(data, (errorDataStat, dataStat) => {
+                    if (errorDataStat) {
+                        writeLog("HelperSrc.ts - startCronJob() - runCronjob() - Fs.readdir(path) - Fs.stat(data)", errorDataStat.toString());
+
+                        return;
+                    }
+
+                    if (dataStat.isDirectory()) {
+                        // eslint-disable-next-line no-console
+                        console.log(`Folder: ${dataList[a]} - Last edit: ${localeFormat(dataStat.mtime)}`);
+                    }
+                });
+            }
+        });
+
+        timeoutCron = setTimeout(runCronjob, 1000);
+    };
+
+    timeoutCron = setTimeout(runCronjob, 1000);
 };
