@@ -6,6 +6,7 @@ import * as Http from "http";
 import * as Https from "https";
 import Fs from "fs";
 import { Ca } from "@cimo/authentication/dist/src/Main";
+import { Cc } from "@cimo/cronjob/dist/src/Main";
 
 // Source
 import * as helperSrc from "../HelperSrc";
@@ -134,5 +135,5 @@ const controllerServer = new Server();
 controllerServer.createSetting();
 controllerServer.createServer();
 
-helperSrc.startCronJob();
+Cc.startCronJob(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}paddle/`, helperSrc.LOCALE);
 helperSrc.keepProcess();

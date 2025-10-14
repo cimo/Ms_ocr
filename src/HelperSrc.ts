@@ -5,8 +5,6 @@ import { Ce } from "@cimo/environment/dist/src/Main";
 // Source
 import * as modelHelperSrc from "./model/HelperSrc";
 
-let timeoutCron: NodeJS.Timeout | null = null;
-
 const localeConfiguration: Record<string, { locale: string; currency: string }> = {
     // Europe
     it: { locale: "it-IT", currency: "EUR" },
@@ -78,14 +76,14 @@ export const LOCALE = localeFromEnvName();
 
 export const localeFormat = (value: number | Date): string | undefined => {
     if (typeof value === "number") {
-        const formatOptions: Intl.NumberFormatOptions = {
+        const formatOption: Intl.NumberFormatOptions = {
             style: "decimal",
             currency: localeConfiguration[LOCALE].currency
         };
 
-        return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+        return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOption).format(value);
     } else if (value instanceof Date) {
-        const formatOptions: Intl.DateTimeFormatOptions = {
+        const formatOption: Intl.DateTimeFormatOptions = {
             year: "numeric",
             month: "numeric",
             day: "numeric",
@@ -94,7 +92,7 @@ export const localeFormat = (value: number | Date): string | undefined => {
             second: "2-digit"
         };
 
-        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOptions).format(value);
+        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOption).format(value);
     }
 
     return undefined;
@@ -251,43 +249,4 @@ export const findFileInDirectoryRecursive = async (path: string, extension: stri
     }
 
     return resultList;
-};
-
-export const startCronJob = (): void => {
-    const runCronjob = (): void => {
-        if (timeoutCron !== null) {
-            clearTimeout(timeoutCron);
-        }
-
-        const path = `${PATH_ROOT}${PATH_FILE_OUTPUT}paddle/`;
-
-        Fs.readdir(path, (error, dataList) => {
-            if (error) {
-                writeLog("HelperSrc.ts - startCronJob() - runCronjob() - Fs.readdir(path)", error.toString());
-
-                return;
-            }
-
-            for (let a = 0; a < dataList.length; a++) {
-                const data = `${path}${dataList[a]}`;
-
-                Fs.stat(data, (errorDataStat, dataStat) => {
-                    if (errorDataStat) {
-                        writeLog("HelperSrc.ts - startCronJob() - runCronjob() - Fs.readdir(path) - Fs.stat(data)", errorDataStat.toString());
-
-                        return;
-                    }
-
-                    if (dataStat.isDirectory()) {
-                        // eslint-disable-next-line no-console
-                        console.log(`Folder: ${dataList[a]} - Last edit: ${localeFormat(dataStat.mtime)}`);
-                    }
-                });
-            }
-        });
-
-        timeoutCron = setTimeout(runCronjob, 1000);
-    };
-
-    timeoutCron = setTimeout(runCronjob, 1000);
 };

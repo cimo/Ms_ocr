@@ -130,35 +130,6 @@ export default class ControllerOcr {
                                         });
                                     });
                                 }
-
-                                /*
-                                setTimeout(
-                                    () => {
-                                        Fs.readdir(outputEngineResult, (error) => {
-                                            if (error) {
-                                                helperSrc.writeLog(
-                                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputEngineResult)",
-                                                    error.toString()
-                                                );
-
-                                                return;
-                                            }
-
-                                            helperSrc.fileRemove(outputEngineResult, (resultFileRemove) => {
-                                                if (typeof resultFileRemove !== "boolean") {
-                                                    helperSrc.writeLog(
-                                                        "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputEngineResult) - fileRemove(resultFileRemove)",
-                                                        resultFileRemove.toString()
-                                                    );
-
-                                                    helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
-                                                }
-                                            });
-                                        });
-                                    },
-                                    10 * 60 * 1000
-                                );
-                                */
                             });
                         } else {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
