@@ -1,6 +1,6 @@
 #!/bin/bash
 
-path="${PATH_ROOT}file/output/paddle/*"
+path=${PATH_ROOT}file/output/paddle/*/
 currentTime=$(date +%s)
 
 for data in ${path}; do
