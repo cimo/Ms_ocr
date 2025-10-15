@@ -1,0 +1,4 @@
+{
+    "schedule": "*/1 * * * *",
+    "command": "bash script/cronjob_paddle.sh"
+}
