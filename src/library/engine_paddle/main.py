@@ -7,7 +7,7 @@ from paddleocr import LayoutDetection, TableClassification, TableCellsDetection,
 from PIL import Image, ImageDraw, ImageFont
 
 # Source
-from json_to_excel.main import JsonToExcel
+from json_to_table.main import JsonToExcel
 from preprocessor import main as preprocessor
 
 def _checkEnvVariable(varKey):
@@ -265,17 +265,19 @@ class EnginePaddle:
     def _execute(self):
         self._createOutputDir()
 
-        image = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        self._inferenceText(image)
+        self._inferenceText(imageOpen)
 
-        self._inferenceLayout(image)
+        self._inferenceLayout(imageOpen)
 
-    def __init__(self, fileNameValue, languageValue, isCuda, isDebugValue, idValue):
-        self.fileName = fileNameValue
+    def __init__(self, languageValue, fileNameValue, isCuda, isDebugValue, uniqueIdValue):
         self.language = languageValue
+        self.fileName = fileNameValue
         self.device = "gpu" if isCuda else "cpu"
         self.isDebug = isDebugValue
+        self.uniqueId = uniqueIdValue
+
         self.ocr = PaddleOCR(
             text_detection_model_dir=PATH_MODEL_TEXT_DETECTION,
             text_detection_model_name=MODEL_DETECTION_NAME,
@@ -286,8 +288,7 @@ class EnginePaddle:
             use_textline_orientation=False,
             device=self.device
         )
-        self.uniqueId = idValue
 
         self._execute()
 
-        print("ok")
+        print("ok", flush=True)

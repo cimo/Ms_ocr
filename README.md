@@ -73,14 +73,29 @@ form-data
 
 key             value
 ---             ---
-file            "upload field"
 language        en
+file            "upload field"
 isCuda          false
 isDebug         true
 engine          tesseract
 ```
 
-4. Logout
+4. Download
+
+```
+url = https://localhost:1045/download
+method = POST
+
+json
+
+key             value
+---             ---
+"engine":       "tesseract",
+"uniqueId":     "mgsr5rff-2sp0c9",
+"pathFile":     "export/1_jp.pdf"
+```
+
+5. Logout
 
 ```
 url = https://localhost:1045/logout

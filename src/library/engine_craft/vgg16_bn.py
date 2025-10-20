@@ -54,7 +54,7 @@ class Vgg16Bn(torchNN.Module):
 
         self.slice5 = torchNN.Sequential(
                 torchNN.MaxPool2d(kernel_size=3, stride=1, padding=1),
-                torchNN.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6),
+                torchNN.Conv2d(512, 1024, kernel_size=3, padding=12, dilation=12),
                 torchNN.Conv2d(1024, 1024, kernel_size=1)
         )
 

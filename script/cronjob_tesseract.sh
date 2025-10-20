@@ -1,6 +1,6 @@
 #!/bin/bash
 
-path=${PATH_ROOT}file/output/paddle/*/
+path=${PATH_ROOT}file/output/tesseract/*/
 
 if [ -z "${PATH_ROOT}" ]; then
     exit 1

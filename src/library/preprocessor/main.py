@@ -37,15 +37,19 @@ def resize(image, sizeLimit):
     height, width = imageArray.shape[:2]
 
     if height >= width:
-        ratio = sizeLimit / height
-        targetHeight = sizeLimit
-        targetWidth = int(width * ratio)
-    else:
-        ratio = sizeLimit / width
-        targetWidth = sizeLimit
-        targetHeight = int(height * ratio)
+        ratioHeight = sizeLimit / height
+        ratioWidth = ratioHeight 
 
-    if ratio < 1:  
+        targetHeight = sizeLimit
+        targetWidth = int(width * ratioHeight)
+    else:
+        ratioWidth = sizeLimit / width
+        ratioHeight = ratioWidth
+        
+        targetWidth = sizeLimit
+        targetHeight = int(height * ratioWidth)
+
+    if ratioHeight < 1 and ratioWidth < 1:  
         interpolation = cv2.INTER_AREA
     else:  
         interpolation = cv2.INTER_CUBIC
@@ -57,7 +61,7 @@ def resize(image, sizeLimit):
     else:
         channel = imageResult.shape[2]
 
-    return targetWidth, targetHeight, ratio, imageResult, channel
+    return targetWidth, targetHeight, ratioWidth, ratioHeight, imageResult, channel
 
 def resizeLineHeight(image, heightTarget=30):
     imageGray = gray(image)

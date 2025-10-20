@@ -2,9 +2,22 @@ import torch
 import torch.nn as torchNN
 
 # Source
-from vgg16_bn import Vgg16Bn
+from .vgg16_bn import Vgg16Bn
 
 class RefineNet(torchNN.Module):
+    def forward(self, scoreMap, feature):
+        refine = torch.cat([scoreMap.permute(0, 3, 1, 2), feature], dim=1)
+        refine = self.last_conv(refine)
+
+        aspp1 = self.aspp1(refine)
+        aspp2 = self.aspp2(refine)
+        aspp3 = self.aspp3(refine)
+        aspp4 = self.aspp4(refine)
+
+        out = aspp1 + aspp2 + aspp3 + aspp4
+
+        return out.permute(0, 2, 3, 1)
+    
     def __init__(self):
         super(RefineNet, self).__init__()
 
@@ -43,16 +56,3 @@ class RefineNet(torchNN.Module):
         Vgg16Bn.weightInit(self.aspp2.modules())
         Vgg16Bn.weightInit(self.aspp3.modules())
         Vgg16Bn.weightInit(self.aspp4.modules())
-
-    def forward(self, scoreMap, feature):
-        refine = torch.cat([scoreMap.permute(0, 3, 1, 2), feature], dim=1)
-        refine = self.last_conv(refine)
-
-        aspp1 = self.aspp1(refine)
-        aspp2 = self.aspp2(refine)
-        aspp3 = self.aspp3(refine)
-        aspp4 = self.aspp4(refine)
-
-        out = aspp1 + aspp2 + aspp3 + aspp4
-
-        return out.permute(0, 2, 3, 1)

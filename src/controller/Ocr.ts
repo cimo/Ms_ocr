@@ -1,8 +1,6 @@
 import Express, { Request, Response } from "express";
 import { RateLimitRequestHandler } from "express-rate-limit";
 import { execFile } from "child_process";
-import Path from "path";
-import Fs from "fs";
 import { Ca } from "@cimo/authentication/dist/src/Main";
 
 // Source
@@ -34,12 +32,12 @@ export default class ControllerOcr {
                     let engine = "";
 
                     for (const resultControllerUpload of resultControllerUploadList) {
-                        if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
-                            fileName = resultControllerUpload.fileName;
-                        } else if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
+                        if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
                             language = resultControllerUpload.buffer.toString().match("^(jp|jp_vert|en)$")
                                 ? resultControllerUpload.buffer.toString()
                                 : "";
+                        } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
+                            fileName = resultControllerUpload.fileName;
                         } else if (resultControllerUpload.name === "isCuda" && resultControllerUpload.buffer) {
                             isCuda = resultControllerUpload.buffer.toString().match("^(true|false)$") ? resultControllerUpload.buffer.toString() : "";
                         } else if (resultControllerUpload.name === "isDebug" && resultControllerUpload.buffer) {
@@ -56,14 +54,11 @@ export default class ControllerOcr {
                     const uniqueId = helperSrc.generateUniqueId();
 
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${fileName}`;
-                    const outputCraftResult = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}craft/${uniqueId}/`;
-                    const outputEngineResult = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`;
-                    const fileNameParse = Path.parse(fileName).name;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${fileName}"`, `"${language}"`, `"${isCuda}"`, `"${isDebug}"`, `"${engine}"`, `"${uniqueId}"`];
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${isCuda}"`, `"${isDebug}"`, `"${engine}"`, `"${uniqueId}"`];
 
-                    execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
+                    execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
                         helperSrc.fileRemove(input, (resultFileRemove) => {
                             if (typeof resultFileRemove !== "boolean") {
                                 helperSrc.writeLog(
@@ -78,59 +73,35 @@ export default class ControllerOcr {
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
-                            helperSrc.fileReadStream(`${outputEngineResult}export/${fileNameParse}.pdf`, async (resultFileReadStream) => {
-                                if (Buffer.isBuffer(resultFileReadStream)) {
-                                    const dataList = await helperSrc.findFileInDirectoryRecursive(
-                                        `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}paddle/${uniqueId}/`,
-                                        ".xlsx"
-                                    );
+                            const dataPdfList = await helperSrc.findFileInDirectoryRecursive(
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/export/`,
+                                ".pdf"
+                            );
 
-                                    const excelList: string[] = [];
+                            const dataXlsxList = await helperSrc.findFileInDirectoryRecursive(
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/table/`,
+                                ".xlsx"
+                            );
 
-                                    for (const data of dataList) {
-                                        excelList.push(data.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}`, ""));
-                                    }
+                            const pdfList: string[] = [];
 
-                                    const responseJson = {
-                                        uniqueId,
-                                        pdf: resultFileReadStream.toString("base64"),
-                                        excelList
-                                    };
+                            for (const dataPdf of dataPdfList) {
+                                pdfList.push(dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                            }
 
-                                    helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
-                                } else {
-                                    helperSrc.writeLog(
-                                        "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream()",
-                                        resultFileReadStream.toString()
-                                    );
+                            const excelList: string[] = [];
 
-                                    helperSrc.responseBody("", resultFileReadStream.toString(), response, 500);
-                                }
+                            for (const dataXlsx of dataXlsxList) {
+                                excelList.push(dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                            }
 
-                                if (engine !== "paddle") {
-                                    Fs.readdir(outputCraftResult, (error) => {
-                                        if (error) {
-                                            helperSrc.writeLog(
-                                                "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult)",
-                                                error.toString()
-                                            );
+                            const responseJson = {
+                                uniqueId,
+                                pdfList,
+                                excelList
+                            };
 
-                                            return;
-                                        }
-
-                                        helperSrc.fileRemove(outputCraftResult, (resultFileRemove) => {
-                                            if (typeof resultFileRemove !== "boolean") {
-                                                helperSrc.writeLog(
-                                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileReadStream() - Fs.readdir(outputCraftResult) - fileRemove(resultFileRemove)",
-                                                    resultFileRemove.toString()
-                                                );
-
-                                                helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
-                                            }
-                                        });
-                                    });
-                                }
-                            });
+                            helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                         } else {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
@@ -143,6 +114,26 @@ export default class ControllerOcr {
 
                     helperSrc.responseBody("", error, response, 500);
                 });
+        });
+
+        this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
+            const requestBody = request.body;
+
+            const engine = requestBody.engine;
+            const uniqueId = requestBody.uniqueId;
+            const pathFile = requestBody.pathFile;
+
+            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/${pathFile}`;
+
+            helperSrc.fileReadStream(path, async (resultFileReadStream) => {
+                if (Buffer.isBuffer(resultFileReadStream)) {
+                    helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
+                } else {
+                    helperSrc.writeLog("Ocr.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
+
+                    helperSrc.responseBody("", resultFileReadStream.toString(), response, 500);
+                }
+            });
         });
     };
 }

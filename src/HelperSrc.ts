@@ -208,7 +208,7 @@ export const responseBody = (stdoutValue: string, stderrValue: string | Error, r
 export const keepProcess = (): void => {
     for (const event of ["uncaughtException", "unhandledRejection"]) {
         process.on(event, (error: Error) => {
-            writeLog("HelperSrc.ts - keepProcess()", `Event: ${event} - Error: ${error.toString()}`);
+            writeLog("HelperSrc.ts - keepProcess()", `Event: "${event}" - ${error.toString()}`);
         });
     }
 };
@@ -246,13 +246,13 @@ export const findFileInDirectoryRecursive = async (path: string, extension: stri
         const statData = await Fs.promises.stat(pathData);
 
         if (statData.isDirectory()) {
-            const dataSubList = await findFileInDirectoryRecursive(`${data}/`, extension);
+            const dataSubList = await findFileInDirectoryRecursive(`${pathData}/`, extension);
 
             for (const dataSub of dataSubList) {
                 resultList.push(dataSub);
             }
         } else if (statData.isFile() && data.endsWith(extension)) {
-            resultList.push(data);
+            resultList.push(pathData);
         }
     }
 

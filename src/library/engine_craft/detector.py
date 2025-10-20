@@ -3,9 +3,12 @@ import torch.nn as torchNN
 import torch.nn.functional as torchNNfunctional
 
 # Source
-from vgg16_bn import Vgg16Bn
+from .vgg16_bn import Vgg16Bn
 
 class _DoubleConvolution(torchNN.Module):
+    def forward(self, x):
+        return self.conv(x)
+
     def __init__(self, channelIn, channelMid, channelOut):
         super(_DoubleConvolution, self).__init__()
         
@@ -19,16 +22,32 @@ class _DoubleConvolution(torchNN.Module):
             torchNN.ReLU(inplace=True)
         )
 
-    def forward(self, x):
-        return self.conv(x)
-
 class Detector(torchNN.Module):
     def _upsampleAndConcatenate(self, scoreMap, basenet):
         scoreMap = torchNNfunctional.interpolate(scoreMap, size=basenet.size()[2:], mode="bilinear", align_corners=False)
 
         return torch.cat([scoreMap, basenet], dim=1)
 
-    def __init__(self, pretrained, freeze):
+    def forward(self, modelInput):
+        basenetList = self.basenet(modelInput)
+
+        scoreMap = torch.cat([basenetList[0], basenetList[1]], dim=1)
+        scoreMap = self.upconv1(scoreMap)
+
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[2])
+        scoreMap = self.upconv2(scoreMap)
+
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[3])
+        scoreMap = self.upconv3(scoreMap)
+
+        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[4])
+        feature = self.upconv4(scoreMap)
+
+        scoreMap = self.conv_cls(feature)
+
+        return scoreMap.permute(0, 2, 3, 1), feature
+
+    def __init__(self, pretrained=False, freeze=False):
         super(Detector, self).__init__()
 
         self.basenet = Vgg16Bn(pretrained, freeze)
@@ -50,22 +69,3 @@ class Detector(torchNN.Module):
 
         for convolution in [self.upconv1, self.upconv2, self.upconv3, self.upconv4, self.conv_cls]:
             Vgg16Bn.weightInit(convolution.modules())
-
-    def forward(self, modelInput):
-        basenetList = self.basenet(modelInput)
-
-        scoreMap = torch.cat([basenetList[0], basenetList[1]], dim=1)
-        scoreMap = self.upconv1(scoreMap)
-
-        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[2])
-        scoreMap = self.upconv2(scoreMap)
-
-        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[3])
-        scoreMap = self.upconv3(scoreMap)
-
-        scoreMap = self._upsampleAndConcatenate(scoreMap, basenetList[4])
-        feature = self.upconv4(scoreMap)
-
-        scoreMap = self.conv_cls(feature)
-
-        return scoreMap.permute(0, 2, 3, 1), feature
