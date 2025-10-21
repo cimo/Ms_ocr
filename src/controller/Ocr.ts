@@ -73,6 +73,11 @@ export default class ControllerOcr {
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
+                            const dataJsonList = await helperSrc.findFileInDirectoryRecursive(
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/export/`,
+                                ".json"
+                            );
+
                             const dataPdfList = await helperSrc.findFileInDirectoryRecursive(
                                 `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/export/`,
                                 ".pdf"
@@ -82,6 +87,12 @@ export default class ControllerOcr {
                                 `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/table/`,
                                 ".xlsx"
                             );
+
+                            const jsonList: string[] = [];
+
+                            for (const dataJson of dataJsonList) {
+                                jsonList.push(dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                            }
 
                             const pdfList: string[] = [];
 
@@ -97,6 +108,7 @@ export default class ControllerOcr {
 
                             const responseJson = {
                                 uniqueId,
+                                jsonList,
                                 pdfList,
                                 excelList
                             };

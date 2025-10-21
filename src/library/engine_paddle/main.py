@@ -3,8 +3,8 @@ import logging
 import ast
 import json
 import cv2
-from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, PaddleOCR
 from PIL import Image, ImageDraw, ImageFont
+from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, PaddleOCR
 
 # Source
 from json_to_table.main import JsonToExcel
@@ -29,18 +29,6 @@ ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
-
-MODEL_DETECTION_NAME = "PP-OCRv5_mobile_det"
-MODEL_RECOGNITION_NAME = "PP-OCRv5_mobile_rec"
-
-PATH_MODEL_LAYOUT = f"{PATH_ROOT}src/library/engine_paddle/PP-DocLayout_plus-L/"
-PATH_MODEL_TABLE_CLASSIFICATION = f"{PATH_ROOT}src/library/engine_paddle/PP-LCNet_x1_0_table_cls/"
-PATH_MODEL_TABLE_WIRED = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wired_table_cell_det/"
-PATH_MODEL_TABLE_WIRELESS = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wireless_table_cell_det/"
-PATH_MODEL_TEXT_DETECTION = f"{PATH_ROOT}src/library/engine_paddle/{MODEL_DETECTION_NAME}/"
-PATH_MODEL_TEXT_RECOGNITION = f"{PATH_ROOT}src/library/engine_paddle/{MODEL_RECOGNITION_NAME}/"
-
-FONT_NAME = "NotoSansCJK-Regular.ttc"
 
 class EnginePaddle:
     def _filterOverlapBbox(self, bboxList):
@@ -77,7 +65,7 @@ class EnginePaddle:
             inputHeight, inputWidth = input.shape[:2]
             resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
             imageDraw = ImageDraw.Draw(resultImage)
-            font = ImageFont.truetype(FONT_NAME, 14)
+            font = ImageFont.truetype(self.fontName, 14)
         
         resultMergeList = []
 
@@ -135,26 +123,24 @@ class EnginePaddle:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-        JsonToExcel(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}.xlsx")
+        JsonToExcel(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
 
     def _inferenceTableWireless(self, input, count):
-        model = TableCellsDetection(model_dir=PATH_MODEL_TABLE_WIRELESS, model_name="RT-DETR-L_wireless_table_cell_det", device=self.device)
+        model = TableCellsDetection(model_dir=self.pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=self.device)
         dataList = model.predict(input=input, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
-                #data.save_to_img(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg")
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.json")
 
             self._processTable("wireless", data, input, count)
 
     def _inferenceTableWired(self, input, count):
-        model = TableCellsDetection(model_dir=PATH_MODEL_TABLE_WIRED, model_name="RT-DETR-L_wired_table_cell_det", device=self.device)
+        model = TableCellsDetection(model_dir=self.pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=self.device)
         dataList = model.predict(input=input, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
-                #data.save_to_img(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg")
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.json")
 
             self._processTable("wired", data, input, count)
@@ -179,12 +165,11 @@ class EnginePaddle:
                 self._inferenceTableWireless(input, count)
 
     def _inferenceTableClassification(self, input, count):
-        model = TableClassification(model_dir=PATH_MODEL_TABLE_CLASSIFICATION, model_name="PP-LCNet_x1_0_table_cls", device=self.device)
+        model = TableClassification(model_dir=self.pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=self.device)
         dataList = model.predict(input=input, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
-                #data.save_to_img(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/{count}.jpg")
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/{count}.json")
 
             self._extractTableCell(data, input, count)
@@ -217,22 +202,22 @@ class EnginePaddle:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/", exist_ok=True)
 
     def _inferenceLayout(self, input):
-        model = LayoutDetection(model_dir=PATH_MODEL_LAYOUT, model_name="PP-DocLayout_plus-L", device=self.device)
+        model = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=self.device)
         dataList = model.predict(input=input, batch_size=1)
+
+        fileNameSplit = ".".join(self.fileName.split(".")[:-1])
 
         for data in dataList:
             if self.isDebug:
-                #data.save_to_img(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/result.jpg")
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/result.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/{fileNameSplit}.json")
 
             self._extractTable(data, input)
 
     def _inferenceText(self, input):
-        if self.isDebug:
-            inputHeight, inputWidth = input.shape[:2]
-            resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
-            imageDraw = ImageDraw.Draw(resultImage)
-            font = ImageFont.truetype(FONT_NAME, 14)
+        inputHeight, inputWidth = input.shape[:2]
+        resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+        imageDraw = ImageDraw.Draw(resultImage)
+        font = ImageFont.truetype(self.fontName, 14)
 
         resultMergeList = []
         
@@ -240,29 +225,41 @@ class EnginePaddle:
         
         for predictData in predictDataList:
             bboxGroupList = predictData.get("rec_boxes", [])
-            bboxList = [[int(bbox) for bbox in bboxGroup] for bboxGroup in bboxGroupList]
             textList = predictData.get("rec_texts", []) or [""]
+            
+            for index in range(len(bboxGroupList)):
+                bboxList = [int(coord) for coord in bboxGroupList[index]]
+                text = textList[index]
 
-            if self.isDebug:
-                for index in range(len(bboxList)):
-                    x1, y1, _, _ = bboxList[index]
+                x1, y1, _, _ = bboxList
+                
+                imageDraw.text((x1, y1), text, font=font, fill=(0, 0, 0))
 
-                    imageDraw.text((x1, y1), textList[index], font=font, fill=(0, 0, 0))
+                resultMergeList.append({
+                    "bbox_list": bboxList,
+                    "text": text
+                })
 
-            resultMergeList.append({
-                "bbox_list": bboxList,
-                "text_list": textList
-            })
 
         fileNameSplit = ".".join(self.fileName.split(".")[:-1])
 
-        if self.isDebug:
-            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}.json", "w", encoding="utf-8") as file:
-                json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
+        resultImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}_result.pdf", format="PDF")
 
-        resultImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}.pdf", format="PDF")
+        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+            json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
     def _execute(self):
+        self.ocr = PaddleOCR(
+            text_detection_model_dir=self.pathModelTextDetection,
+            text_detection_model_name=self.modelDetectionName,
+            text_recognition_model_dir=self.pathModelTextRecognition,
+            text_recognition_model_name=self.modelRecognitionName,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
+            device=self.device
+        )
+
         self._createOutputDir()
 
         imageOpen = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
@@ -278,16 +275,17 @@ class EnginePaddle:
         self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
 
-        self.ocr = PaddleOCR(
-            text_detection_model_dir=PATH_MODEL_TEXT_DETECTION,
-            text_detection_model_name=MODEL_DETECTION_NAME,
-            text_recognition_model_dir=PATH_MODEL_TEXT_RECOGNITION,
-            text_recognition_model_name=MODEL_RECOGNITION_NAME,
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-            device=self.device
-        )
+        self.modelDetectionName = "PP-OCRv5_mobile_det" if self.device == "cpu" else "PP-OCRv5_server_det"
+        self.modelRecognitionName = "PP-OCRv5_mobile_rec" if self.device == "cpu" else "PP-OCRv5_server_rec"
+
+        self.pathModelLayout = f"{PATH_ROOT}src/library/engine_paddle/PP-DocLayout_plus-L/"
+        self.pathModelTableClassification = f"{PATH_ROOT}src/library/engine_paddle/PP-LCNet_x1_0_table_cls/"
+        self.pathModelTableWired = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wired_table_cell_det/"
+        self.pathModelTableWireless = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wireless_table_cell_det/"
+        self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/{self.modelDetectionName}/"
+        self.pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
+
+        self.fontName = "NotoSansCJK-Regular.ttc"
 
         self._execute()
 

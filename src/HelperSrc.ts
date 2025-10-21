@@ -239,6 +239,15 @@ export const generateUniqueId = (): string => {
 export const findFileInDirectoryRecursive = async (path: string, extension: string): Promise<string[]> => {
     const resultList: string[] = [];
 
+    const directoryExists = await Fs.promises
+        .access(path, Fs.constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+
+    if (!directoryExists) {
+        return resultList;
+    }
+
     const dataList = await Fs.promises.readdir(path);
 
     for (const data of dataList) {

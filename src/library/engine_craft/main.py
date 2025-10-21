@@ -2,6 +2,7 @@ import os
 import logging
 import ast
 import numpy
+import json
 import cv2
 import torch
 import torch.backends.cudnn as torchBackendCudnn
@@ -173,23 +174,26 @@ class EngineCraft:
         return resultBoxList
 
     def _result(self, scoreText, scoreLink, imageOpen, ratioWidth, ratioHeight):
+        resultMergeList = []
+
         boxList = self._boxCreation(scoreText, scoreLink, ratioWidth, ratioHeight)
-
-        #fileNameSplit, _ = os.path.splitext(self.fileName)
-
-        #with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{fileNameSplit}.txt", "w") as file:
-            #for _, box in enumerate(boxList):
-            #    shapeList = numpy.array(box).astype(numpy.int32).reshape((-1))
-
-            #    file.write(",".join([str(shape) for shape in shapeList]) + "\r\n")
-
-            #    cv2.polylines(imageOpen, [shapeList.reshape(-1, 2).reshape((-1, 1, 2))], True, color=(0, 0, 255), thickness=1)
         
         for (x, y, w, h) in boxList:
             cv2.rectangle(imageOpen, (x, y), (x + w, y + h), (0, 0, 255), 1)
 
+            resultMergeList.append({
+                "bbox_list": [x, y, w, h]
+            })
+
         if self.isDebug:
             preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
+            
+            fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+
+            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+                json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
+        
+        return resultMergeList
 
     def _normalize(self, image, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
         imageResult = image.copy().astype(numpy.float32)
@@ -323,6 +327,7 @@ class EngineCraft:
         self.textThreshold = 0.1
         #self.linkThreshold = 0.1
         self.isRefine = False
+        self.resultMainList = None
 
         detector = Detector()
         detector = self._detectorEval(detector)
@@ -334,4 +339,7 @@ class EngineCraft:
 
         scoreText, scoreLink = self._inference(imageResizeCnn, detector, refineNet)
 
-        self._result(scoreText, scoreLink, imageOpen, ratioWidth, ratioHeight)
+        self.resultMainList = self._result(scoreText, scoreLink, imageOpen, ratioWidth, ratioHeight)
+    
+    def getResultMainList(self):
+        return self.resultMainList

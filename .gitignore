@@ -27,7 +27,7 @@ pnpm-debug.log*
 .ms_cronjob-volume
 .npm
 .pki
-.paddlex/*
+.paddlex
 certificate/*
 !certificate/.gitkeep
 certificate/proxy/*
