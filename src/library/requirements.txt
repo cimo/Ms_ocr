@@ -1,10 +1,11 @@
 torch==2.8.0
 torchvision==0.23.0
-opencv-python-headless==4.12.0.88
 numpy==2.2.6
+# cv2_processor
+opencv-python-headless==4.12.0.88
 pillow==11.3.0
-# json_to_table
+# data_to_table
 openpyxl==3.1.5
-# paddle
+# engine_paddle
 paddlepaddle==3.2.0
-paddleocr==3.2.0
+paddleocr[doc-parser]==3.3.0

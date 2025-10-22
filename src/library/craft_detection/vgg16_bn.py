@@ -1,8 +1,8 @@
 import torch
 import torch.nn as torchNN
 import torch.nn.init as torchNNinit
-from collections import namedtuple as collectionNamedTuple
 from torchvision import models as torchvisionModel
+from collections import namedtuple as collectionNamedTuple
 
 class Vgg16Bn(torchNN.Module):
     @staticmethod
