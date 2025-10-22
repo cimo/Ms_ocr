@@ -88,7 +88,7 @@ class EngineTesseract:
 
             imageCrop = imageOpen[top:bottom, left:right]
 
-            _, _, _, _, imageResize, _ = cv2Processor.resize(imageCrop, 25, "h")
+            _, _, _, _, imageResize, _ = cv2Processor.resize(imageCrop, 32, "h")
 
             cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
 

@@ -243,7 +243,7 @@ class CraftDetection:
     def _preprocess(self):
         imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = cv2Processor.resize(imageOpen, 2048)
+        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = cv2Processor.resize(imageOpen, 1280)
 
         imageGray = cv2Processor.gray(imageResize)
 
