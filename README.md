@@ -73,11 +73,11 @@ form-data
 
 key             value
 ---             ---
-language        en
-file            "upload field"
+language        jp
+file            jp_1.jpg
 isCuda          false
 isDebug         true
-engine          tesseract
+engine          paddle
 ```
 
 4. Download
@@ -90,9 +90,9 @@ json
 
 key             value
 ---             ---
-"engine":       "tesseract",
-"uniqueId":     "mgsr5rff-2sp0c9",
-"pathFile":     "export/1_jp.pdf"
+"engine":       "paddle",
+"uniqueId":     "1234",
+"pathFile":     "export/jp_1_result.pdf"
 ```
 
 5. Logout

@@ -2,13 +2,11 @@ import os
 import logging
 import ast
 import json
-import cv2
-from PIL import Image, ImageDraw, ImageFont
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, PaddleOCR
 
 # Source
-from json_to_table.main import JsonToExcel
-from preprocessor import main as preprocessor
+from cv2_processor import main as cv2Processor
+from data_to_table.main import DataToTable
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -62,10 +60,7 @@ class EnginePaddle:
 
     def _processTable(self, mode, data, input, count):
         if self.isDebug:
-            inputHeight, inputWidth = input.shape[:2]
-            resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
-            imageDraw = ImageDraw.Draw(resultImage)
-            font = ImageFont.truetype(self.fontName, 14)
+            pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
         
         resultMergeList = []
 
@@ -89,7 +84,7 @@ class EnginePaddle:
                     lineNumber = len(textList)
                     boxHeight = y2 - y1
 
-                    textBboxList = [imageDraw.textbbox((0, 0), text, font=font) for text in textList]
+                    textBboxList = [pilImageDraw.textbbox((0, 0), text, font=pilFont) for text in textList]
                     textWidthList = [textBox[2] - textBox[0] for textBox in textBboxList]
                     textHeightList = [textBox[3] - textBox[1] for textBox in textBboxList]
 
@@ -108,7 +103,7 @@ class EnginePaddle:
                         textPositionX = x1 + (x2 - x1 - textWidth) // 2
                         textPositionY = int(currentY)
 
-                        imageDraw.text((textPositionX, textPositionY), text, font=font, fill=(0, 0, 0))
+                        pilImageDraw.text((textPositionX, textPositionY), text, font=pilFont, fill=(0, 0, 0))
 
                         currentY += textHeight + extraSpace
 
@@ -118,12 +113,12 @@ class EnginePaddle:
                 })
 
         if self.isDebug:
-            resultImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-        JsonToExcel(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
 
     def _inferenceTableWireless(self, input, count):
         model = TableCellsDetection(model_dir=self.pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=self.device)
@@ -155,12 +150,12 @@ class EnginePaddle:
 
             if (resultLabel == "wired_table"):
                 if self.isDebug:
-                    cv2.imwrite(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}_crop.jpg", input)
+                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg", "_crop", input)
 
                 self._inferenceTableWired(input, count)
             elif (resultLabel == "wireless_table"):
                 if self.isDebug:
-                    cv2.imwrite(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}_crop.jpg", input)
+                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg", "_crop", input)
 
                 self._inferenceTableWireless(input, count)
 
@@ -194,30 +189,18 @@ class EnginePaddle:
 
                 count += 1
 
-    def _createOutputDir(self):
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/", exist_ok=True)
-
     def _inferenceLayout(self, input):
         model = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=self.device)
         dataList = model.predict(input=input, batch_size=1)
 
-        fileNameSplit = ".".join(self.fileName.split(".")[:-1])
-
         for data in dataList:
             if self.isDebug:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/{fileNameSplit}.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/{self.fileNameSplit}.json")
 
             self._extractTable(data, input)
 
     def _inferenceText(self, input):
-        inputHeight, inputWidth = input.shape[:2]
-        resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
-        imageDraw = ImageDraw.Draw(resultImage)
-        font = ImageFont.truetype(self.fontName, 14)
+        pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
 
         resultMergeList = []
         
@@ -233,20 +216,24 @@ class EnginePaddle:
 
                 x1, y1, _, _ = bboxList
                 
-                imageDraw.text((x1, y1), text, font=font, fill=(0, 0, 0))
+                pilImageDraw.text((x1, y1), text, font=pilFont, fill=(0, 0, 0))
 
                 resultMergeList.append({
                     "bbox_list": bboxList,
                     "text": text
                 })
 
+        pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
-        fileNameSplit = ".".join(self.fileName.split(".")[:-1])
-
-        resultImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}_result.pdf", format="PDF")
-
-        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
             json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
+
+    def _createOutputDir(self):
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/", exist_ok=True)
 
     def _execute(self):
         self.ocr = PaddleOCR(
@@ -262,7 +249,7 @@ class EnginePaddle:
 
         self._createOutputDir()
 
-        imageOpen = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
         self._inferenceText(imageOpen)
 
@@ -286,6 +273,8 @@ class EnginePaddle:
         self.pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
 
         self.fontName = "NotoSansCJK-Regular.ttc"
+
+        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
 
         self._execute()
 

@@ -2,7 +2,7 @@ import os
 import io
 import cv2
 import numpy
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 noiseRemoveModeList = {
     "close": cv2.MORPH_CLOSE,
@@ -27,27 +27,43 @@ def _imageArray(image, isRequestedFloat=False):
 
 def open(pathFull):
     result = Image.open(pathFull)
-    result.info["icc_profile"] = result.info.get("icc_profile")
+    pilIccProfile = result.info.get("icc_profile")
+    pilExif = result.info.get("exif")
 
-    return _imageArray(result)
+    result = cv2.cvtColor(numpy.array(result), cv2.COLOR_RGB2BGR)
 
-def resize(image, sizeLimit):
+    return _imageArray(result), pilIccProfile, pilExif
+
+def resize(image, sizeLimit, side=""):
     imageArray = _imageArray(image)
 
     height, width = imageArray.shape[:2]
 
-    if height >= width:
+    if side == "h":
         ratioHeight = sizeLimit / height
-        ratioWidth = ratioHeight 
+        ratioWidth = ratioHeight
 
         targetHeight = sizeLimit
         targetWidth = int(width * ratioHeight)
-    else:
+    elif side == "w":
         ratioWidth = sizeLimit / width
         ratioHeight = ratioWidth
-        
+
         targetWidth = sizeLimit
         targetHeight = int(height * ratioWidth)
+    else:    
+        if height >= width:
+            ratioHeight = sizeLimit / height
+            ratioWidth = ratioHeight 
+
+            targetHeight = sizeLimit
+            targetWidth = int(width * ratioHeight)
+        else:
+            ratioWidth = sizeLimit / width
+            ratioHeight = ratioWidth
+
+            targetWidth = sizeLimit
+            targetHeight = int(height * ratioWidth)
 
     if ratioHeight < 1 and ratioWidth < 1:  
         interpolation = cv2.INTER_AREA
@@ -63,50 +79,13 @@ def resize(image, sizeLimit):
 
     return targetWidth, targetHeight, ratioWidth, ratioHeight, imageResult, channel
 
-def resizeLineHeight(image, heightTarget=30):
-    imageGray = gray(image)
-
-    _, imageThreshold = cv2.threshold(imageGray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    contourList, _ = cv2.findContours(imageThreshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    heightList = []
-
-    for contour in contourList:
-        _, _, _, height = cv2.boundingRect(contour)
-        
-        if 8 <= height <= 100:
-            heightList.append(height)
-
-    if heightList:
-        heightCurrent = int(numpy.median(heightList))
-    else:
-        heightCurrent = 10
-
-    ratio = heightTarget / heightCurrent
-
-    targetWidth = int(image.shape[1] * ratio)
-    targetHeight = int(image.shape[0] * ratio)
-
-    imageResult = cv2.resize(image, (targetWidth, targetHeight), interpolation=cv2.INTER_CUBIC)
-
-    if imageResult.ndim == 2:
-        imageResult = numpy.expand_dims(imageResult, axis=-1)
-
-    if imageResult.shape[2] == 1:
-        imageResult = numpy.repeat(imageResult, 3, axis=-1)
-
-    _, _, channel = imageResult.shape
-
-    return targetWidth, targetHeight, ratio, imageResult, channel
-
 def gray(image):
     imageArray = _imageArray(image)
 
     if imageArray.ndim == 3 and imageArray.shape[2] == 3:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGR2GRAY)
     elif imageArray.ndim == 3 and imageArray.shape[2] == 4:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGBA2GRAY)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGRA2GRAY)
     
     return imageArray
 
@@ -118,7 +97,7 @@ def color(image):
     if imageArray.ndim == 3 and imageArray.shape[2] == 1:
         imageArray = cv2.cvtColor(imageArray.squeeze(-1), cv2.COLOR_GRAY2BGR)
     if imageArray.ndim == 3 and imageArray.shape[2] == 4:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGBA2BGR)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGRA2BGR)
     
     return imageArray
 
@@ -127,7 +106,7 @@ def medianBlur(image, value=5):
 
     return cv2.medianBlur(imageArray, value)
 
-def binarization(image, blur=7, threshold=11, block=2, isInverted=False):
+def binarization(image, threshold=11, block=2, isInverted=False):
     imageArray = _imageArray(image, True)
 
     imageBlur = medianBlur(imageArray)
@@ -139,10 +118,35 @@ def binarization(image, blur=7, threshold=11, block=2, isInverted=False):
     
     return cv2.adaptiveThreshold(imageBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType, threshold, block)
 
+def threshold(image, valueA, valueB, valueC):
+    imageArray = _imageArray(image, True)
+
+    return cv2.threshold(imageArray, valueA, valueB, valueC)
+
+def erode(image, valueA, valueB):
+    imageArray = _imageArray(image)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (valueA, valueB))
+    
+    return cv2.erode(imageArray, kernel)
+
+def dilate(image, valueA, valueB):
+    imageArray = _imageArray(image)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (valueA, valueB))
+    
+    return cv2.dilate(imageArray, kernel)
+
 def contour(image):
     imageArray = _imageArray(image)
 
     return cv2.findContours(imageArray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+def bbox(contour):
+    return cv2.boundingRect(contour)
+
+def rectangle(image, x, y, w, h, color, border):
+    return cv2.rectangle(image, (x, y), (x + w, y + h), color, border)
 
 def mask(image):
     imageArray = _imageArray(image)
@@ -220,7 +224,7 @@ def heatmap(scoreText):
 
     return cv2.applyColorMap(scoreTextNormalize, cv2.COLORMAP_JET)
 
-def write(pathFull, label, image, dpi=(300, 300)):
+def write(pathFull, label, image, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
     fileNameSplit, fileExtensionSplit = os.path.splitext(os.path.basename(pathFull))
     dirName = os.path.dirname(pathFull)
     pathJoin = os.path.join(dirName, f"{fileNameSplit}{label}{fileExtensionSplit}")
@@ -243,18 +247,19 @@ def write(pathFull, label, image, dpi=(300, 300)):
             elif image.shape[2] == 4:
                 image = Image.fromarray(image, mode="RGBA")
     
-    iccProfile = None
-    
-    if hasattr(image, "info"):
-        iccProfile = image.info.get("icc_profile")
+    parameterList = {"icc_profile": pilIccProfile, "dpi": dpi}
+
+    if pilExif is not None:
+        parameterList["exif"] = pilExif
 
     if fileExtensionSplit.lower() in [".jpg", ".jpeg"]:
-        image.save(pathJoin, quality=100, subsampling=0, icc_profile=iccProfile, dpi=dpi)
-    else:
-        image.save(pathJoin, icc_profile=iccProfile, dpi=dpi)
+        parameterList["quality"] = 100
+        parameterList["subsampling"] = 0
 
-def writeMemory(image, fileName, dpi=(300, 300)):
-    fileNameSplit, _ = os.path.splitext(fileName)
+    image.save(pathJoin, **parameterList)
+
+def writeMemory(image, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
+    _, fileExtensionSplit = os.path.splitext(fileName)
 
     if isinstance(image, numpy.ndarray):
         if numpy.issubdtype(image.dtype, numpy.floating):
@@ -274,16 +279,25 @@ def writeMemory(image, fileName, dpi=(300, 300)):
     
     buffer = io.BytesIO()
 
-    iccProfile = None
-    
-    if hasattr(image, "info"):
-        iccProfile = image.info.get("icc_profile")
+    parameterList = {"icc_profile": pilIccProfile, "dpi": dpi}
 
-    if fileNameSplit.lower() in [".jpg", ".jpeg"]:
-        image.save(buffer, quality=100, subsampling=0, icc_profile=iccProfile, dpi=dpi)
-    else:
-        image.save(buffer, icc_profile=iccProfile, dpi=dpi)
+    if pilExif is not None:
+        parameterList["exif"] = pilExif
+
+    if fileExtensionSplit.lower() in [".jpg", ".jpeg"]:
+        parameterList["quality"] = 100
+        parameterList["subsampling"] = 0
+
+    image.save(buffer, **parameterList)
     
     buffer.seek(0)
     
     return buffer
+
+def pilImage(image, fontName, fontSize):
+    inputHeight, inputWidth = image.shape[:2]
+    imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+    imageDraw = ImageDraw.Draw(imageNew)
+    font = ImageFont.truetype(fontName, fontSize)
+
+    return imageNew, imageDraw, font

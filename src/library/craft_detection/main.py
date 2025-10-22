@@ -1,9 +1,8 @@
 import os
 import logging
 import ast
-import numpy
 import json
-import cv2
+import numpy
 import torch
 import torch.backends.cudnn as torchBackendCudnn
 from torch.autograd import Variable as torchAutogradVariable
@@ -12,9 +11,7 @@ from collections import OrderedDict as collectionOrderDict
 # Source
 from .detector import Detector
 from .refine_net import RefineNet
-
-# Source
-from preprocessor import main as preprocessor
+from cv2_processor import main as cv2Processor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -36,7 +33,7 @@ PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
-class EngineCraft:
+class CraftDetection:
     def _boxCreation(self, scoreText, _, ratioWidth, ratioHeight):
         scoreText = numpy.where(scoreText > 0.2, scoreText, 0)
         #scoreLink = numpy.where(scoreLink > 0.2, scoreLink, 0)
@@ -53,31 +50,26 @@ class EngineCraft:
             if colMean < 0.005:
                 scoreText[:, b] = 0
 
-        _, binaryTextMap = cv2.threshold(scoreText, self.textThreshold, 1, 0)
-        #_, binaryLinkMap = cv2.threshold(scoreLink, self.linkThreshold, 1, 0)
-
+        _, binaryTextMap = cv2Processor.threshold(scoreText, self.textThreshold, 1, 0)
+        #_, binaryLinkMap = cv2Processor.threshold(scoreLink, self.textThreshold, 1, 0)
         #scoreCombined = numpy.clip(binaryTextMap + binaryLinkMap, 0, 1)
-        #imageScoreCombined = (scoreCombined * 255).astype(numpy.uint8)
-        imageBinaryTextMap = (binaryTextMap * 255).astype(numpy.uint8)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))
-        imageEroded = cv2.erode(imageBinaryTextMap.astype(numpy.uint8), kernel)
+        imageEroded = cv2Processor.erode(binaryTextMap, 2, 1)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
-        imageDilate = cv2.dilate(imageEroded, kernel)
+        imageDilate = cv2Processor.dilate(imageEroded, 3, 1)
 
         if self.isDebug:
-            preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", imageDilate)
+            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
 
         mergeBoxTollerance = 10
         mergeBoxRowTollerance = 8
 
-        contourList, _ = cv2.findContours(imageDilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contourList, _ = cv2Processor.contour(imageDilate)
 
         boxList = []
 
         for contour in contourList:
-            x, y, w, h = cv2.boundingRect(contour)
+            x, y, w, h = cv2Processor.bbox(contour)
 
             if w < 4 or h < 4:
                 continue
@@ -179,18 +171,16 @@ class EngineCraft:
         boxList = self._boxCreation(scoreText, scoreLink, ratioWidth, ratioHeight)
         
         for (x, y, w, h) in boxList:
-            cv2.rectangle(imageOpen, (x, y), (x + w, y + h), (0, 0, 255), 1)
+            cv2Processor.rectangle(imageOpen, x, y, w, h, (0, 0, 255), 1)
 
             resultMergeList.append({
                 "bbox_list": [x, y, w, h]
             })
 
         if self.isDebug:
-            preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
-            
-            fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
 
-            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
         
         return resultMergeList
@@ -251,22 +241,22 @@ class EngineCraft:
         return imageResult
 
     def _preprocess(self):
-        imageOpen = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = preprocessor.resize(imageOpen, 2048)
+        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = cv2Processor.resize(imageOpen, 2048)
 
-        imageGray = preprocessor.gray(imageResize)
+        imageGray = cv2Processor.gray(imageResize)
 
-        imageBinarize = preprocessor.binarization(imageGray)
+        imageBinarize = cv2Processor.binarization(imageGray)
 
-        imageNoiseRemove = preprocessor.noiseRemove(imageBinarize)
+        imageNoiseRemove = cv2Processor.noiseRemove(imageBinarize)
 
-        imageColor = preprocessor.color(imageNoiseRemove)
+        imageColor = cv2Processor.color(imageNoiseRemove)
 
         imageResizeCnn = self._resizeCnn(targetWidth, targetHeight, channel, imageColor)
 
         if self.isDebug:
-            preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
+            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
         return imageOpen, ratioWidth, ratioHeight, imageResizeCnn
 
@@ -322,18 +312,23 @@ class EngineCraft:
         self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
 
-        self.pathWeightMain = f"{PATH_ROOT}src/library/engine_craft/mlt_25k.pth"
-        self.pathWeightRefine = f"{PATH_ROOT}src/library/engine_craft/refiner_CTW1500.pth"
+        self.pathWeightMain = f"{PATH_ROOT}src/library/craft_detection/mlt_25k.pth"
+        self.pathWeightRefine = f"{PATH_ROOT}src/library/craft_detection/refiner_CTW1500.pth"
         self.textThreshold = 0.1
         #self.linkThreshold = 0.1
         self.isRefine = False
         self.resultMainList = None
 
+        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+
         detector = Detector()
         detector = self._detectorEval(detector)
 
-        refineNet = RefineNet()
-        refineNet = self._refineNetEval(refineNet)
+        refineNet = None
+
+        if self.isRefine:
+            refineNet = RefineNet()
+            refineNet = self._refineNetEval(refineNet)
 
         imageOpen, ratioWidth, ratioHeight, imageResizeCnn = self._preprocess()
 

@@ -1,13 +1,12 @@
 import os
 import logging
 import ast
-import subprocess
 import json
-from PIL import Image, ImageDraw, ImageFont
+import subprocess
 
 # Source
-from preprocessor import main as preprocessor
-from engine_craft.main import EngineCraft
+from craft_detection.main import CraftDetection
+from cv2_processor import main as cv2Processor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -30,7 +29,7 @@ PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
 class EngineTesseract:
-    def _subprocess(self, index, fileNameSplit):
+    def _subprocess(self, index):
         resultLanguage = ""
         resultPsm = 6
 
@@ -47,7 +46,7 @@ class EngineTesseract:
         subprocess.run([
             f"{PATH_ROOT}src/library/engine_tesseract/executable",
             f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}_crop.jpg",
-            f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{fileNameSplit}",
+            f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}",
             f"-l", f"eng+{resultLanguage}" if resultLanguage != "eng" else resultLanguage,
             "--psm", str(resultPsm),
             "--oem", "1",
@@ -75,12 +74,7 @@ class EngineTesseract:
     def _crop(self, resultMainList, imageOpen):
         resultList = []
 
-        inputHeight, inputWidth = imageOpen.shape[:2]
-        resultImage = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
-        imageDraw = ImageDraw.Draw(resultImage)
-        font = ImageFont.truetype(self.fontName, 14)
-
-        fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+        pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(imageOpen, self.fontName, 14)
 
         for index, bboxList in enumerate(resultMainList):
             bbox = bboxList["bbox_list"]
@@ -94,27 +88,27 @@ class EngineTesseract:
 
             imageCrop = imageOpen[top:bottom, left:right]
 
-            _, _, _, _, imageResize, _ = preprocessor.resize(imageCrop, 320)
+            _, _, _, _, imageResize, _ = cv2Processor.resize(imageCrop, 25, "h")
 
-            preprocessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
+            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
 
-            self._subprocess(index, fileNameSplit)
+            self._subprocess(index)
 
             text = ""
 
-            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{fileNameSplit}.txt", "r", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}.txt", "r", encoding="utf-8") as file:
                 text = file.read().strip()
 
-                imageDraw.text((left, top), text, font=font, fill=(0, 0, 0))
+                pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
         
             resultList.append({
                 "bbox_list": bbox,
                 "text": text
             })
         
-        resultImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{fileNameSplit}_result.pdf", format="PDF")
+        pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
-        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
             json.dump(resultList, file, ensure_ascii=False, indent=2)
 
     def _createOutputDir(self):
@@ -122,13 +116,13 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/", exist_ok=True)
 
     def _execute(self):
-        engineCraft = EngineCraft(self.fileName, self.device, self.isDebug, self.uniqueId)
+        craftDetection = CraftDetection(self.fileName, self.device, self.isDebug, self.uniqueId)
 
         self._createOutputDir()
 
-        imageOpen = preprocessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        self._crop(engineCraft.resultMainList, imageOpen)
+        self._crop(craftDetection.resultMainList, imageOpen)
 
     def __init__(self, languageValue, fileNameValue, isCuda, isDebugValue, uniqueIdValue):
         self.language = languageValue
@@ -138,6 +132,8 @@ class EngineTesseract:
         self.uniqueId = uniqueIdValue
 
         self.fontName = "NotoSansCJK-Regular.ttc"
+
+        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
 
         self._execute()
 
