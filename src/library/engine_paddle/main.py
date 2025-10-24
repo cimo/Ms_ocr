@@ -2,7 +2,6 @@ import os
 import logging
 import ast
 import json
-from PIL import ImageFont
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 
 # Source
@@ -30,11 +29,34 @@ PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
 class EnginePaddle:
-    def _filterOverlapBbox(self, bboxList):
+    def _textOverlapCell(self, textBbox, cellBbox, overlapThreshold=0.5):
+        textX, textY, textW, textH = textBbox
+        textX1, textY1 = textX, textY
+        textX2, textY2 = textX + textW, textY + textH
+        
+        cellX1, cellY1, cellX2, cellY2 = cellBbox
+
+        overlapX1 = max(textX1, cellX1)
+        overlapY1 = max(textY1, cellY1)
+        overlapX2 = min(textX2, cellX2)
+        overlapY2 = min(textY2, cellY2)
+        
+        overlapWidth = max(0, overlapX2 - overlapX1)
+        overlapHeight = max(0, overlapY2 - overlapY1)
+        overlapArea = overlapWidth * overlapHeight
+        
+        textArea = textW * textH
+        
+        if textArea > 0:
+            return (overlapArea / textArea) > overlapThreshold
+        
+        return False
+
+    def _filterOverlapBox(self, boxList):
         resultList = []
 
-        for bbox in bboxList:
-            x1, y1, x2, y2 = [int(bboxCoordinate) for bboxCoordinate in bbox["coordinate"]]
+        for box in boxList:
+            x1, y1, x2, y2 = [int(boxCoordinate) for boxCoordinate in box["coordinate"]]
             
             isIgnore = False
             
@@ -55,7 +77,7 @@ class EnginePaddle:
             if isIgnore:
                 continue
 
-            resultList.append(bbox)
+            resultList.append(box)
         
         return resultList
 
@@ -64,66 +86,43 @@ class EnginePaddle:
 
         if self.isDebug:
             pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
-        
-        imageInputDebug = input.copy()
-        imageInputDebug.fill(255)
-        pilImageTest, pilImageDrawTest, pilFontTest = cv2Processor.pilImage(imageInputDebug, self.fontName, 14)
 
-        bboxList = data.get("boxes", [])
-        bboxList.sort(key=lambda box: (int(box["coordinate"][1]), int(box["coordinate"][0])))
-        #bboxFilterList = self._filterOverlapBbox(bboxList)
+        inferenceTextDataList = self._inferenceText(input, False)
 
-        for index, bbox in enumerate(bboxList):
-            coordinateList = bbox.get("coordinate", [])
-            coordinateList = [int(coordinate) for coordinate in coordinateList]
-            
-            x1, y1, x2, y2 = coordinateList
-            
-            height, width = input.shape[:2]
-            x1 = max(0, min(x1, width))
-            x2 = max(0, min(x2, width))
-            y1 = max(0, min(y1, height))
-            y2 = max(0, min(y2, height))
+        boxList = data.get("boxes", [])
+        #boxFilterList = self._filterOverlapBox(boxList)
 
-            if x2 <= x1 or y2 <= y1:
-                print("cimo")
+        for index, box in enumerate(boxList):
+            coordinateList = box.get("coordinate", [])
+            x1, y1, x2, y2 = [int(coordinate) for coordinate in coordinateList]
 
             inputCrop = input[y1:y2, x1:x2, :]
 
-            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", inputCrop)
+            if self.isDebug:
+                cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", inputCrop)
 
             resultMergeList.append({
-                "bbox_list": coordinateList,
+                "bbox_list": [x1, y1, x2, y2],
                 "text_list": []
             })
-
-            inferenceTextDataList, pilImageDrawTest = self._inferenceText(inputCrop, False, x1, y1, pilImageDrawTest, pilFontTest)
-            inferenceTextDataList.sort(key=lambda item: (item["bbox_list"][1], item["bbox_list"][0]))
-
+        
             for inferenceTextData in inferenceTextDataList:
-                bboxSubList = inferenceTextData.get("bbox_list", [])
-                text = inferenceTextData.get("text", "")
-
-                if self.isDebug:
-                    fontSize = max(10, int(bboxSubList[3] * 0.8))
-                    pilFont = ImageFont.truetype(self.fontName, fontSize)
-
-                    pilImageDraw.text((bboxSubList[0], bboxSubList[1]), text, font=pilFont, fill=(0, 0, 0))
-
-                    x, y, _, _ = bboxSubList
-
-                    if x1 <= x <= x2 and y1 <= y <= y2:
-                        resultMergeList[index]["text_list"].append(text)
+                bboxList = inferenceTextData["bbox_list"]
+                text = inferenceTextData["text"]
+                
+                if self._textOverlapCell(bboxList, [x1, y1, x2, y2]):
+                    if self.isDebug:
+                        pilImageDraw.text((bboxList[0], bboxList[1]), text, font=pilFont, fill=(0, 0, 0))
+                    
+                    resultMergeList[index]["text_list"].append(text)
 
         if self.isDebug:
             pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
-        
-        pilImageTest.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result_test.jpg", format="JPEG")
 
-        #DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
 
     def _inferenceTableWireless(self, input, count):
         dataList = self.tableCellDetectionWireless.predict(input=input, batch_size=1)
@@ -172,18 +171,17 @@ class EnginePaddle:
             self._extractTableCell(data, input, count)
 
     def _extractTable(self, data, input):
-        bboxList = data.get("boxes", [])
-        boxFilterList = self._filterOverlapBbox(bboxList)
+        boxList = data.get("boxes", [])
+        boxFilterList = self._filterOverlapBox(boxList)
 
         count = 0
 
-        for bbox in boxFilterList:
-            label = bbox.get("label", "")
+        for box in boxFilterList:
+            label = box.get("label", "")
             label = str(label).lower()
 
             if label == "table":
-                coordinateList = bbox.get("coordinate", [])
-
+                coordinateList = box.get("coordinate", [])
                 x1, y1, x2, y2 = [int(coordinate) for coordinate in coordinateList]
 
                 inputCrop = input[y1:y2, x1:x2, :]
@@ -201,30 +199,25 @@ class EnginePaddle:
 
             self._extractTable(data, input)
 
-    def _inferenceText(self, input, isWriteFileOutput=True, offsetX=0, offsetY=0, pilImageDrawTest=None, pilFontTest=None):
+    def _inferenceText(self, input, isWriteOutput=True):
         resultMergeList = []
 
-        if isWriteFileOutput:
+        if isWriteOutput:
             pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
-        
-        _, _, ratioWidth, ratioHeight, input, _ = cv2Processor.resize(input, 1280, "w")
 
         dataList = self.textDetectionInit.predict(input=input, batch_size=1)
 
         for data in dataList:
-            if self.isDebug and isWriteFileOutput:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/detection.json")
-
             dtPolyList = data.get("dt_polys", [])
             
             for dtPoly in dtPolyList:
-                a = [point[0] for point in dtPoly]
-                b = [point[1] for point in dtPoly]
+                x = [point[0] for point in dtPoly]
+                y = [point[1] for point in dtPoly]
 
-                left = int(min(a))
-                top = int(min(b))
-                right = int(max(a))
-                bottom = int(max(b))
+                left = int(min(x))
+                top = int(min(y))
+                right = int(max(x))
+                bottom = int(max(y))
                 width = right - left
                 height = bottom - top
 
@@ -233,40 +226,24 @@ class EnginePaddle:
                 dataSubList = self.textRecognitionInit.predict(input=inputCrop, batch_size=1)
 
                 for dataSub in dataSubList:
-                    if self.isDebug and isWriteFileOutput:
-                        dataSub.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/recognition.json")
-
-                    #if self.isDebug:
-                    #    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{offsetX}_{offsetY}_recognition.jpg", "", inputCrop)
-                    
                     text = dataSub.get("rec_text", "")
 
-                    scaleX = 1 / ratioWidth
-                    scaleY = 1 / ratioHeight
-
-                    originalLeft = int((offsetX + left) * scaleX)
-                    originalTop = int((offsetY + top) * scaleY)
-                    originalWidth = int(width * scaleX)
-                    originalHeight = int(height * scaleY)
-
-                    if isWriteFileOutput:
-                        pilImageDraw.text((originalLeft, originalTop), text, font=pilFont, fill=(0, 0, 0))
-                    
-                    pilImageDrawTest.rectangle([originalLeft, originalTop, originalLeft + originalWidth, originalTop + originalHeight], outline="red", width=1)
-                    pilImageDrawTest.text((originalLeft, originalTop), text, font=pilFontTest, fill=(0, 0, 0))
+                    if isWriteOutput:
+                        pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList.append({
-                        "bbox_list": [originalLeft, originalTop, originalWidth, originalHeight],
+                        "bbox_list": [left, top, width, height],
                         "text": text
                     })
 
-        if isWriteFileOutput:
+        if isWriteOutput:
             pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
+        if self.isDebug and isWriteOutput:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
         
-        return resultMergeList, pilImageDrawTest
+        return resultMergeList
 
     def _createOutputDir(self):
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/", exist_ok=True)
@@ -282,7 +259,7 @@ class EnginePaddle:
 
         imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        #self._inferenceText(imageOpen)
+        self._inferenceText(imageOpen)
 
         self._inferenceLayout(imageOpen)
 

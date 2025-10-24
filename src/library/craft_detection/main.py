@@ -95,11 +95,11 @@ class CraftDetection:
 
         boxFilterList = []
 
-        for a, (x1, y1, w1, h1) in enumerate(boxList):
+        for indexA, (x1, y1, w1, h1) in enumerate(boxList):
             isNested = False
 
-            for b, (x2, y2, w2, h2) in enumerate(boxList):
-                if a != b:
+            for indexB, (x2, y2, w2, h2) in enumerate(boxList):
+                if indexA != indexB:
                     if x1 >= x2 and y1 >= y2 and x1 + w1 <= x2 + w2 and y1 + h1 <= y2 + h2:
                         isNested = True
 
