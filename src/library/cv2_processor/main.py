@@ -2,7 +2,7 @@ import os
 import io
 import cv2
 import numpy
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 noiseRemoveModeList = {
     "close": cv2.MORPH_CLOSE,
@@ -10,6 +10,9 @@ noiseRemoveModeList = {
     "dilate": cv2.MORPH_DILATE,
     "erode": cv2.MORPH_ERODE
 }
+
+def _roundToMultiple(value, multiple):
+    return int((value + multiple - 1) // multiple) * multiple
 
 def _imageArray(image, isRequestedFloat=False):
     if isinstance(image, numpy.ndarray):
@@ -26,46 +29,35 @@ def _imageArray(image, isRequestedFloat=False):
     return result
 
 def open(pathFull):
-    result = Image.open(pathFull)
+    result = Image.open(pathFull).convert("RGB")
     pilIccProfile = result.info.get("icc_profile")
     pilExif = result.info.get("exif")
 
-    result = cv2.cvtColor(numpy.array(result), cv2.COLOR_RGB2BGR)
-
     return _imageArray(result), pilIccProfile, pilExif
 
-def resize(image, sizeLimit, side=""):
+def resize(image, sizeLimit, side="w", multiple=0):
     imageArray = _imageArray(image)
 
     height, width = imageArray.shape[:2]
 
-    if side == "h":
-        ratioHeight = sizeLimit / height
-        ratioWidth = ratioHeight
-
-        targetHeight = sizeLimit
-        targetWidth = int(width * ratioHeight)
-    elif side == "w":
+    if side == "w":
         ratioWidth = sizeLimit / width
         ratioHeight = ratioWidth
 
         targetWidth = sizeLimit
         targetHeight = int(height * ratioWidth)
-    else:    
-        if height >= width:
-            ratioHeight = sizeLimit / height
-            ratioWidth = ratioHeight 
+    elif side == "h":
+        ratioHeight = sizeLimit / height
+        ratioWidth = ratioHeight
 
-            targetHeight = sizeLimit
-            targetWidth = int(width * ratioHeight)
-        else:
-            ratioWidth = sizeLimit / width
-            ratioHeight = ratioWidth
+        targetHeight = sizeLimit
+        targetWidth = int(width * ratioHeight)
+    
+    if multiple > 0:
+        targetWidth = _roundToMultiple(targetWidth, multiple)
+        targetHeight = _roundToMultiple(targetHeight, multiple)
 
-            targetWidth = sizeLimit
-            targetHeight = int(height * ratioWidth)
-
-    if ratioHeight < 1 and ratioWidth < 1:  
+    if ratioWidth < 1 and ratioHeight < 1:
         interpolation = cv2.INTER_AREA
     else:  
         interpolation = cv2.INTER_CUBIC
@@ -79,26 +71,24 @@ def resize(image, sizeLimit, side=""):
 
     return targetWidth, targetHeight, ratioWidth, ratioHeight, imageResult, channel
 
-def gray(image):
+def rgbToGray(image):
     imageArray = _imageArray(image)
 
     if imageArray.ndim == 3 and imageArray.shape[2] == 3:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGR2GRAY)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
     elif imageArray.ndim == 3 and imageArray.shape[2] == 4:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGRA2GRAY)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGBA2GRAY)
     
     return imageArray
 
-def color(image):
+def grayToRgb(image):
     imageArray = _imageArray(image)
 
     if imageArray.ndim == 2:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_GRAY2BGR)
+        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_GRAY2RGB)
     if imageArray.ndim == 3 and imageArray.shape[2] == 1:
-        imageArray = cv2.cvtColor(imageArray.squeeze(-1), cv2.COLOR_GRAY2BGR)
-    if imageArray.ndim == 3 and imageArray.shape[2] == 4:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_BGRA2BGR)
-    
+        imageArray = cv2.cvtColor(imageArray.squeeze(-1), cv2.COLOR_GRAY2RGB)
+
     return imageArray
 
 def medianBlur(image, value=5):
@@ -163,9 +153,9 @@ def gamma(image, gamma=2.2):
 
     gammaBA = 1.0 / gamma
     
-    table = numpy.array([(a / 255.0) ** gammaBA * 255 for a in range(256)]).astype("uint8")
+    table = numpy.array([(a / 255.0) ** gammaBA * 255 for a in range(256)])
     
-    return cv2.LUT(imageArray.astype(numpy.uint8), table)
+    return cv2.LUT(imageArray, table)
 
 def noiseRemove(image, modeValue="close", unit=1):
     imageArray = _imageArray(image)
@@ -186,7 +176,7 @@ def noiseRemove(image, modeValue="close", unit=1):
         else:
             mode = noiseRemoveModeList["open"]
 
-        _, label = cv2.connectedComponents((imageArray > 127).astype(numpy.uint8))
+        _, label = cv2.connectedComponents((imageArray > 127))
 
         unique, countList = numpy.unique(label, return_counts=True)
         sizeList = countList[unique != 0]
@@ -220,7 +210,7 @@ def addOrRemoveBorder(image, unit=1, color=125):
         return imageArray[unitNegative:height-unitNegative, unitNegative:width-unitNegative]
 
 def heatmap(scoreText):
-    scoreTextNormalize = cv2.normalize(scoreText, None, 0, 255, cv2.NORM_MINMAX).astype(numpy.uint8)
+    scoreTextNormalize = cv2.normalize(scoreText, None, 0, 255, cv2.NORM_MINMAX)
 
     return cv2.applyColorMap(scoreTextNormalize, cv2.COLORMAP_JET)
 
@@ -301,3 +291,79 @@ def pilImage(image, fontName, fontSize):
     font = ImageFont.truetype(fontName, fontSize)
 
     return imageNew, imageDraw, font
+
+def resizeToMultipleRatio(image, multiple=32):
+    image = Image.fromarray(image)        
+    width, height = image.size
+
+    widthResult = width % multiple
+    widthDown = width - widthResult
+    widthUp = widthDown + multiple
+    widthSnap = widthUp if widthResult >= (multiple / 2) else widthDown
+    
+    if widthSnap < multiple:
+        widthSnap = multiple
+
+    ratioOriginal = width / float(height)
+    heightResult = int(round(widthSnap / ratioOriginal))
+    heightDown = max(multiple, heightResult - (heightResult % multiple))
+    heightUp = heightDown + multiple
+    heightStart = heightUp if (heightResult - heightDown) >= (heightUp - heightResult) else heightDown
+    heightEnd = heightStart
+
+    errorMin = abs((widthSnap / heightStart) - ratioOriginal) / max(1e-9, ratioOriginal)
+
+    for a in range(1, 11):
+        upCandidate = heightStart + a * multiple
+        upError = abs((widthSnap / upCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
+
+        if upError < errorMin:
+            errorMin = upError
+            heightEnd = upCandidate
+
+        downCandidate = max(multiple, heightStart - a * multiple)
+        downError = abs((widthSnap / downCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
+        
+        if downError < errorMin:
+            errorMin = downError
+            heightEnd = downCandidate
+    
+    heightSnap = heightEnd
+
+    if widthSnap % 2 == 1:
+        widthSnap += 1
+
+    if heightSnap % 2 == 1:
+        heightSnap += 1
+
+    scaleX = widthSnap / float(width)
+    scaleY = heightSnap / float(height)
+    scaleMax = max(scaleX, scaleY)
+
+    if scaleX < 1.0 or scaleY < 1.0:
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
+    elif scaleMax <= 2.0:
+        resample = Image.BICUBIC
+        resampleName = "BICUBIC"
+    else:
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
+    
+    resized = image.resize((widthSnap, heightSnap), resample)
+    
+    if scaleX < 1.0 or scaleY < 1.0:
+        resized = resized.filter(ImageFilter.SHARPEN)
+
+    result = numpy.array(resized)
+
+    return {
+        "sizeOriginal": (width, height),
+        "sizeNew": (widthSnap, heightSnap),
+        "ratioError": errorMin * 100.0,
+        "scaleX": scaleX,
+        "scaleY": scaleY,
+        "scaleMax": scaleMax,
+        "resampleName": resampleName,
+        "result": result
+    }

@@ -16,7 +16,7 @@ Hpi:
           - - 8
             - 3
             - 48
-            - 640
+            - 3200
     tensorrt:
       dynamic_shapes: *id001
 PreProcess:
@@ -31,7 +31,6 @@ PreProcess:
           - 3
           - 48
           - 320
-        keep_ratio: true
     - KeepKeys:
         keep_keys:
           - image
@@ -41,7 +40,6 @@ PreProcess:
           - valid_ratio
 PostProcess:
   name: CTCLabelDecode
-  use_space_char: true
   character_dict:
     -
     - 一

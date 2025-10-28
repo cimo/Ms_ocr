@@ -2,6 +2,7 @@ import os
 import logging
 import ast
 import json
+from PIL import ImageFont
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 
 # Source
@@ -29,27 +30,29 @@ PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
 class EnginePaddle:
-    def _textOverlapCell(self, textBbox, cellBbox, overlapThreshold=0.5):
+    def _textOverlapCell(self, textBbox, cellBbox, overlapThreshold=0.7):
         textX, textY, textW, textH = textBbox
-        textX1, textY1 = textX, textY
-        textX2, textY2 = textX + textW, textY + textH
-        
+        textX1 = textX
+        textY1 = textY
+        textX2 = textX + textW
+        textY2 = textY + textH
+
         cellX1, cellY1, cellX2, cellY2 = cellBbox
 
         overlapX1 = max(textX1, cellX1)
         overlapY1 = max(textY1, cellY1)
         overlapX2 = min(textX2, cellX2)
         overlapY2 = min(textY2, cellY2)
-        
+
         overlapWidth = max(0, overlapX2 - overlapX1)
         overlapHeight = max(0, overlapY2 - overlapY1)
         overlapArea = overlapWidth * overlapHeight
-        
+
         textArea = textW * textH
-        
+
         if textArea > 0:
-            return (overlapArea / textArea) > overlapThreshold
-        
+            return (overlapArea / textArea) >= overlapThreshold
+
         return False
 
     def _filterOverlapBox(self, boxList):
@@ -81,39 +84,62 @@ class EnginePaddle:
         
         return resultList
 
-    def _processTable(self, mode, data, input, count):
+    def _processTable(self, mode, data, imageOpenCrop, count):
         resultMergeList = []
 
         if self.isDebug:
-            pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
+            pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(imageOpenCrop, self.fontName, 14)
 
-        inferenceTextDataList = self._inferenceText(input, False)
+        inferenceTextDataList = self._inferenceText(imageOpenCrop, False)
 
         boxList = data.get("boxes", [])
-        #boxFilterList = self._filterOverlapBox(boxList)
+        boxFilterList = self._filterOverlapBox(boxList)
 
-        for index, box in enumerate(boxList):
+        for index, box in enumerate(boxFilterList):
             coordinateList = box.get("coordinate", [])
-            x1, y1, x2, y2 = [int(coordinate) for coordinate in coordinateList]
+            x = [int(coordinateList[0]), int(coordinateList[2])]
+            y = [int(coordinateList[1]), int(coordinateList[3])]
 
-            inputCrop = input[y1:y2, x1:x2, :]
-
+            left = int(min(x))
+            top = int(min(y))
+            right = int(max(x))
+            bottom = int(max(y))
+            #width = right - left
+            #height = bottom - top
+            
             if self.isDebug:
-                cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", inputCrop)
+                crop = imageOpenCrop[top:bottom, left:right, :]
 
+                cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", crop)
+            
             resultMergeList.append({
-                "bbox_list": [x1, y1, x2, y2],
+                "bbox_list": [left, top, right, bottom],
                 "text_list": []
             })
         
             for inferenceTextData in inferenceTextDataList:
                 bboxList = inferenceTextData["bbox_list"]
                 text = inferenceTextData["text"]
-                
-                if self._textOverlapCell(bboxList, [x1, y1, x2, y2]):
+
+                if self.isDebug:
+                    cx1 = min(left, right)
+                    cy1 = min(top, bottom)
+                    cx2 = max(left, right)
+                    cy2 = max(top, bottom)
+                    pilImageDraw.rectangle([(cx1, cy1), (cx2, cy2)], outline=(255, 0, 0), width=1)
+
+                    tx1 = bboxList[0]
+                    ty1 = bboxList[1]
+                    tx2 = bboxList[0] + bboxList[2]
+                    ty2 = bboxList[1] + bboxList[3]
+                    pilImageDraw.rectangle([(tx1, ty1), (tx2, ty2)], outline=(0, 0, 255), width=1)
+
+                if self._textOverlapCell(bboxList, [left, top, right, bottom]):
                     if self.isDebug:
+                        #fontSize = max(20, int(min(width, height) * 0.2)) 
+                        #pilFont = ImageFont.truetype(self.fontName, fontSize)
                         pilImageDraw.text((bboxList[0], bboxList[1]), text, font=pilFont, fill=(0, 0, 0))
-                    
+
                     resultMergeList[index]["text_list"].append(text)
 
         if self.isDebug:
@@ -124,25 +150,25 @@ class EnginePaddle:
 
         DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
 
-    def _inferenceTableWireless(self, input, count):
-        dataList = self.tableCellDetectionWireless.predict(input=input, batch_size=1)
+    def _inferenceTableWireless(self, imageOpenCrop, count):
+        dataList = self.tableCellDetectionWireless.predict(input=imageOpenCrop, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.json")
 
-            self._processTable("wireless", data, input, count)
+            self._processTable("wireless", data, imageOpenCrop, count)
 
-    def _inferenceTableWired(self, input, count):
-        dataList = self.tableCellDetectionWired.predict(input=input, batch_size=1)
+    def _inferenceTableWired(self, imageOpenCrop, count):
+        dataList = self.tableCellDetectionWired.predict(input=imageOpenCrop, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.json")
 
-            self._processTable("wired", data, input, count)
+            self._processTable("wired", data, imageOpenCrop, count)
 
-    def _extractTableCell(self, data, input, count):
+    def _extractTableCell(self, data, imageOpenCrop, count):
         labelNameList = data.get("label_names", [])
         scoreList = data.get("scores", [])
 
@@ -152,25 +178,25 @@ class EnginePaddle:
 
             if (resultLabel == "wired_table"):
                 if self.isDebug:
-                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/crop/{count}.jpg", "", input)
+                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg", "", imageOpenCrop)
 
-                self._inferenceTableWired(input, count)
+                self._inferenceTableWired(imageOpenCrop, count)
             elif (resultLabel == "wireless_table"):
                 if self.isDebug:
-                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/crop/{count}.jpg", "", input)
+                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", imageOpenCrop)
 
-                self._inferenceTableWireless(input, count)
+                self._inferenceTableWireless(imageOpenCrop, count)
 
-    def _inferenceTableClassification(self, input, count):
-        dataList = self.tableClassificationInit.predict(input=input, batch_size=1)
+    def _inferenceTableClassification(self, imageOpenCrop, count):
+        dataList = self.tableClassificationInit.predict(input=imageOpenCrop, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/{count}.json")
 
-            self._extractTableCell(data, input, count)
+            self._extractTableCell(data, imageOpenCrop, count)
 
-    def _extractTable(self, data, input):
+    def _extractTable(self, data, imageOpen):
         boxList = data.get("boxes", [])
         boxFilterList = self._filterOverlapBox(boxList)
 
@@ -181,31 +207,41 @@ class EnginePaddle:
             label = str(label).lower()
 
             if label == "table":
-                coordinateList = box.get("coordinate", [])
-                x1, y1, x2, y2 = [int(coordinate) for coordinate in coordinateList]
+                coordinateList = box.get("coordinate", [])    
+                x = [int(coordinateList[0]), int(coordinateList[2])]
+                y = [int(coordinateList[1]), int(coordinateList[3])]
 
-                inputCrop = input[y1:y2, x1:x2, :]
+                left = int(min(x))
+                top = int(min(y))
+                right = int(max(x))
+                bottom = int(max(y))
 
-                self._inferenceTableClassification(inputCrop, count)
+                imageOpenCrop = imageOpen[top:bottom, left:right, :]
+
+                resize = cv2Processor.resizeToMultipleRatio(imageOpenCrop)
+
+                self._inferenceTableClassification(resize["result"], count)
 
                 count += 1
 
-    def _inferenceLayout(self, input):
-        dataList = self.layoutInit.predict(input=input, batch_size=1)
+    def _inferenceLayout(self, imageOpen):
+        dataList = self.layoutInit.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
             if self.isDebug:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/{self.fileNameSplit}.json")
 
-            self._extractTable(data, input)
+            self._extractTable(data, imageOpen)
 
-    def _inferenceText(self, input, isWriteOutput=True):
+    def _inferenceText(self, image, isWriteOutput=True):
         resultMergeList = []
 
         if isWriteOutput:
-            pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(input, self.fontName, 14)
+            image = cv2Processor.resizeToMultipleRatio(image)["result"]
 
-        dataList = self.textDetectionInit.predict(input=input, batch_size=1)
+            pilImage, pilImageDraw, _ = cv2Processor.pilImage(image, self.fontName, 14)
+
+        dataList = self.textDetectionInit.predict(input=image, batch_size=1)
 
         for data in dataList:
             dtPolyList = data.get("dt_polys", [])
@@ -221,14 +257,29 @@ class EnginePaddle:
                 width = right - left
                 height = bottom - top
 
-                inputCrop = input[top:bottom, left:right]
+                imageCrop = image[top:bottom, left:right, :]
 
-                dataSubList = self.textRecognitionInit.predict(input=inputCrop, batch_size=1)
+                dataSubList = self.textRecognitionInit.predict(input=imageCrop, batch_size=1)
 
                 for dataSub in dataSubList:
                     text = dataSub.get("rec_text", "")
 
                     if isWriteOutput:
+                        fontScaleMax = 1 if len(text) <= 2 else 0.8
+                        fontSize = min(height, int(height * fontScaleMax))
+
+                        while fontSize > 1:
+                            pilFont = ImageFont.truetype(self.fontName, fontSize)
+                            bboxText = pilFont.getbbox(text)
+
+                            textWidth = bboxText[2] - bboxText[0]
+                            textHeight = bboxText[3] - bboxText[1]
+
+                            if textWidth <= width and textHeight <= height:
+                                break
+
+                            fontSize -= 1
+
                         pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList.append({
@@ -237,7 +288,7 @@ class EnginePaddle:
                     })
 
         if isWriteOutput:
-            pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.jpg", format="JPEG")
 
         if self.isDebug and isWriteOutput:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
@@ -261,7 +312,7 @@ class EnginePaddle:
 
         self._inferenceText(imageOpen)
 
-        self._inferenceLayout(imageOpen)
+        #self._inferenceLayout(imageOpen)
 
     def __init__(self, languageValue, fileNameValue, isCuda, isDebugValue, uniqueIdValue):
         self.language = languageValue
@@ -270,10 +321,9 @@ class EnginePaddle:
         self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
 
-        self.modelDetectionName = "PP-OCRv5_mobile_det" if self.device == "cpu" else "PP-OCRv5_server_det"
         self.modelRecognitionName = "PP-OCRv5_mobile_rec" if self.device == "cpu" else "PP-OCRv5_server_rec"
 
-        self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/{self.modelDetectionName}/"
+        self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_det/"
         self.pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
         self.pathModelLayout = f"{PATH_ROOT}src/library/engine_paddle/PP-DocLayout_plus-L/"
         self.pathModelTableClassification = f"{PATH_ROOT}src/library/engine_paddle/PP-LCNet_x1_0_table_cls/"
@@ -284,7 +334,7 @@ class EnginePaddle:
 
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
 
-        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name=self.modelDetectionName, device=self.device)
+        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name="PP-OCRv5_server_det", device=self.device)
         self.textRecognitionInit = TextRecognition(model_dir=self.pathModelTextRecognition, model_name=self.modelRecognitionName, device=self.device)
         self.layoutInit = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=self.device)
         self.tableClassificationInit = TableClassification(model_dir=self.pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=self.device)
