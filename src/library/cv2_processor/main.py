@@ -11,9 +11,6 @@ noiseRemoveModeList = {
     "erode": cv2.MORPH_ERODE
 }
 
-def _roundToMultiple(value, multiple):
-    return int((value + multiple - 1) // multiple) * multiple
-
 def _imageArray(image, isRequestedFloat=False):
     if isinstance(image, numpy.ndarray):
         result = image
@@ -35,41 +32,113 @@ def open(pathFull):
 
     return _imageArray(result), pilIccProfile, pilExif
 
-def resize(image, sizeLimit, side="w", multiple=0):
+def resizeMultiple(image, multiple=32):
+    image = Image.fromarray(image)
+    
+    width, height = image.size
+
+    widthResult = width % multiple
+    widthDown = width - widthResult
+    widthUp = widthDown + multiple
+    widthSnap = widthUp if widthResult >= (multiple / 2) else widthDown
+    
+    if widthSnap < multiple:
+        widthSnap = multiple
+
+    ratioOriginal = width / float(height)
+    heightResult = int(round(widthSnap / ratioOriginal))
+    heightDown = max(multiple, heightResult - (heightResult % multiple))
+    heightUp = heightDown + multiple
+    heightStart = heightUp if (heightResult - heightDown) >= (heightUp - heightResult) else heightDown
+    heightEnd = heightStart
+
+    errorMin = abs((widthSnap / heightStart) - ratioOriginal) / max(1e-9, ratioOriginal)
+
+    for a in range(1, 11):
+        upCandidate = heightStart + a * multiple
+        upError = abs((widthSnap / upCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
+
+        if upError < errorMin:
+            errorMin = upError
+            heightEnd = upCandidate
+
+        downCandidate = max(multiple, heightStart - a * multiple)
+        downError = abs((widthSnap / downCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
+        
+        if downError < errorMin:
+            errorMin = downError
+            heightEnd = downCandidate
+    
+    heightSnap = heightEnd
+
+    if widthSnap % 2 == 1:
+        widthSnap += 1
+
+    if heightSnap % 2 == 1:
+        heightSnap += 1
+
+    scaleX = widthSnap / float(width)
+    scaleY = heightSnap / float(height)
+    scaleMax = max(scaleX, scaleY)
+
+    if scaleX < 1.0 or scaleY < 1.0:
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
+    elif scaleMax <= 2.0:
+        resample = Image.BICUBIC
+        resampleName = "BICUBIC"
+    else:
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
+    
+    resized = image.resize((widthSnap, heightSnap), resample)
+    
+    if scaleX < 1.0 or scaleY < 1.0:
+        resized = resized.filter(ImageFilter.SHARPEN)
+
+    result = numpy.array(resized)
+
+    return {
+        "sizeOriginal": (width, height),
+        "sizeNew": (widthSnap, heightSnap),
+        "ratioError": errorMin * 100.0,
+        "scaleX": scaleX,
+        "scaleY": scaleY,
+        "scaleMax": scaleMax,
+        "resampleName": resampleName,
+        "result": result
+    }
+
+def resize(image, sizeLimit, side="w"):
     imageArray = _imageArray(image)
 
     height, width = imageArray.shape[:2]
 
     if side == "w":
-        ratioWidth = sizeLimit / width
-        ratioHeight = ratioWidth
-
+        ratio = sizeLimit / width
+        
         targetWidth = sizeLimit
-        targetHeight = int(height * ratioWidth)
+        targetHeight = int(height * ratio)
     elif side == "h":
-        ratioHeight = sizeLimit / height
-        ratioWidth = ratioHeight
+        ratio = sizeLimit / height
 
         targetHeight = sizeLimit
-        targetWidth = int(width * ratioHeight)
-    
-    if multiple > 0:
-        targetWidth = _roundToMultiple(targetWidth, multiple)
-        targetHeight = _roundToMultiple(targetHeight, multiple)
+        targetWidth = int(width * ratio)
 
-    if ratioWidth < 1 and ratioHeight < 1:
-        interpolation = cv2.INTER_AREA
-    else:  
+    if ratio < 1.0:
+        interpolation = cv2.INTER_LANCZOS4
+    else:
         interpolation = cv2.INTER_CUBIC
 
     imageResult = cv2.resize(imageArray, (targetWidth, targetHeight), interpolation=interpolation)
 
-    if imageResult.ndim == 2:
-        channel = 1
-    else:
-        channel = imageResult.shape[2]
+    if ratio < 1.0:
+        kernelSharpening = numpy.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+        imageResult = cv2.filter2D(imageResult, -1, kernelSharpening)
 
-    return targetWidth, targetHeight, ratioWidth, ratioHeight, imageResult, channel
+    channel = 1 if imageResult.ndim == 2 else imageResult.shape[2]
+
+    return targetWidth, targetHeight, ratio, imageResult, channel
 
 def rgbToGray(image):
     imageArray = _imageArray(image)
@@ -284,86 +353,27 @@ def writeMemory(image, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300
     
     return buffer
 
-def pilImage(image, fontName, fontSize):
+def pilImage(image):
     inputHeight, inputWidth = image.shape[:2]
     imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
     imageDraw = ImageDraw.Draw(imageNew)
-    font = ImageFont.truetype(fontName, fontSize)
 
-    return imageNew, imageDraw, font
+    return imageNew, imageDraw
 
-def resizeToMultipleRatio(image, multiple=32):
-    image = Image.fromarray(image)        
-    width, height = image.size
+def pilFont(text, width, height, fontName):
+    fontScaleMax = 1 if len(text) <= 2 else 0.8
+    fontSize = min(height, int(height * fontScaleMax))
 
-    widthResult = width % multiple
-    widthDown = width - widthResult
-    widthUp = widthDown + multiple
-    widthSnap = widthUp if widthResult >= (multiple / 2) else widthDown
+    while fontSize > 1:
+        pilFont = ImageFont.truetype(fontName, fontSize)
+        bboxText = pilFont.getbbox(text)
+
+        textWidth = bboxText[2] - bboxText[0]
+        textHeight = bboxText[3] - bboxText[1]
+
+        if textWidth <= width and textHeight <= height:
+            break
+
+        fontSize -= 1
     
-    if widthSnap < multiple:
-        widthSnap = multiple
-
-    ratioOriginal = width / float(height)
-    heightResult = int(round(widthSnap / ratioOriginal))
-    heightDown = max(multiple, heightResult - (heightResult % multiple))
-    heightUp = heightDown + multiple
-    heightStart = heightUp if (heightResult - heightDown) >= (heightUp - heightResult) else heightDown
-    heightEnd = heightStart
-
-    errorMin = abs((widthSnap / heightStart) - ratioOriginal) / max(1e-9, ratioOriginal)
-
-    for a in range(1, 11):
-        upCandidate = heightStart + a * multiple
-        upError = abs((widthSnap / upCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
-
-        if upError < errorMin:
-            errorMin = upError
-            heightEnd = upCandidate
-
-        downCandidate = max(multiple, heightStart - a * multiple)
-        downError = abs((widthSnap / downCandidate) - ratioOriginal) / max(1e-9, ratioOriginal)
-        
-        if downError < errorMin:
-            errorMin = downError
-            heightEnd = downCandidate
-    
-    heightSnap = heightEnd
-
-    if widthSnap % 2 == 1:
-        widthSnap += 1
-
-    if heightSnap % 2 == 1:
-        heightSnap += 1
-
-    scaleX = widthSnap / float(width)
-    scaleY = heightSnap / float(height)
-    scaleMax = max(scaleX, scaleY)
-
-    if scaleX < 1.0 or scaleY < 1.0:
-        resample = Image.LANCZOS
-        resampleName = "LANCZOS"
-    elif scaleMax <= 2.0:
-        resample = Image.BICUBIC
-        resampleName = "BICUBIC"
-    else:
-        resample = Image.LANCZOS
-        resampleName = "LANCZOS"
-    
-    resized = image.resize((widthSnap, heightSnap), resample)
-    
-    if scaleX < 1.0 or scaleY < 1.0:
-        resized = resized.filter(ImageFilter.SHARPEN)
-
-    result = numpy.array(resized)
-
-    return {
-        "sizeOriginal": (width, height),
-        "sizeNew": (widthSnap, heightSnap),
-        "ratioError": errorMin * 100.0,
-        "scaleX": scaleX,
-        "scaleY": scaleY,
-        "scaleMax": scaleMax,
-        "resampleName": resampleName,
-        "result": result
-    }
+    return pilFont
