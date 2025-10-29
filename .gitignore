@@ -22,11 +22,9 @@ pnpm-debug.log*
 
 # cimo +
 .cache
-.config
 .local
 .ms_cronjob-volume
 .npm
-.pki
 .paddlex
 certificate/*
 !certificate/.gitkeep
