@@ -30,11 +30,11 @@ PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
 class EnginePaddle:
     def _textOverlapCell(self, textBbox, cellBbox, overlapThreshold=0.7):
-        textX, textY, textW, textH = textBbox
+        textX, textY, textWidth, textHeight = textBbox
         textX1 = textX
         textY1 = textY
-        textX2 = textX + textW
-        textY2 = textY + textH
+        textX2 = textX + textWidth
+        textY2 = textY + textHeight
 
         cellX1, cellY1, cellX2, cellY2 = cellBbox
 
@@ -47,7 +47,7 @@ class EnginePaddle:
         overlapHeight = max(0, overlapY2 - overlapY1)
         overlapArea = overlapWidth * overlapHeight
 
-        textArea = textW * textH
+        textArea = textWidth * textHeight
 
         if textArea > 0:
             return (overlapArea / textArea) >= overlapThreshold
@@ -103,8 +103,6 @@ class EnginePaddle:
             top = int(min(y))
             right = int(max(x))
             bottom = int(max(y))
-            width = right - left
-            height = bottom - top
             
             if self.isDebug:
                 resizeMultipleResultCrop = resizeMultipleResult[top:bottom, left:right, :]
@@ -134,8 +132,9 @@ class EnginePaddle:
                     pilImageDraw.rectangle([(textX1, textY1), (textX2, textY2)], outline=(0, 0, 255), width=1)
 
                 if self._textOverlapCell(bboxList, [left, top, right, bottom]):
+                    pilFont = cv2Processor.pilFont(text, bboxList[2], bboxList[3], self.fontName)
+
                     if self.isDebug:
-                        pilFont = cv2Processor.pilFont(text, width, height, self.fontName)
                         pilImageDraw.text((bboxList[0], bboxList[1]), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList[index]["text_list"].append(text)
@@ -146,7 +145,7 @@ class EnginePaddle:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx")
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx", "DejaVuSans.ttf")
 
     def _inferenceTableWireless(self, resizeMultipleResult, count):
         dataList = self.tableCellDetectionWireless.predict(input=resizeMultipleResult, batch_size=1)
@@ -272,7 +271,7 @@ class EnginePaddle:
                     })
 
         if isWriteOutput:
-            pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.jpg", format="JPEG")
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
@@ -293,7 +292,7 @@ class EnginePaddle:
 
         imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        self._inferenceText(imageOpen)
+        #self._inferenceText(imageOpen)
 
         self._inferenceLayout(imageOpen)
 

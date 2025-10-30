@@ -1,7 +1,7 @@
 import os
 import io
-import cv2
 import numpy
+import cv2
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 noiseRemoveModeList = {
@@ -24,6 +24,31 @@ def _imageArray(image, isRequestedFloat=False):
             result = numpy.clip(result, 0, 255).astype(numpy.uint8)
 
     return result
+
+def pilImage(image):
+    inputHeight, inputWidth = image.shape[:2]
+    imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+    imageDraw = ImageDraw.Draw(imageNew)
+
+    return imageNew, imageDraw
+
+def pilFont(text, width, height, fontName):
+    fontScaleMax = 1 if len(text) <= 2 else 0.8
+    fontSize = min(height, int(height * fontScaleMax))
+
+    while fontSize > 1:
+        pilFont = ImageFont.truetype(fontName, fontSize)
+        bboxText = pilFont.getbbox(text)
+
+        textWidth = bboxText[2] - bboxText[0]
+        textHeight = bboxText[3] - bboxText[1]
+
+        if textWidth <= width and textHeight <= height:
+            break
+
+        fontSize -= 1
+    
+    return pilFont
 
 def open(pathFull):
     result = Image.open(pathFull).convert("RGB")
@@ -352,28 +377,3 @@ def writeMemory(image, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300
     buffer.seek(0)
     
     return buffer
-
-def pilImage(image):
-    inputHeight, inputWidth = image.shape[:2]
-    imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
-    imageDraw = ImageDraw.Draw(imageNew)
-
-    return imageNew, imageDraw
-
-def pilFont(text, width, height, fontName):
-    fontScaleMax = 1 if len(text) <= 2 else 0.8
-    fontSize = min(height, int(height * fontScaleMax))
-
-    while fontSize > 1:
-        pilFont = ImageFont.truetype(fontName, fontSize)
-        bboxText = pilFont.getbbox(text)
-
-        textWidth = bboxText[2] - bboxText[0]
-        textHeight = bboxText[3] - bboxText[1]
-
-        if textWidth <= width and textHeight <= height:
-            break
-
-        fontSize -= 1
-    
-    return pilFont
