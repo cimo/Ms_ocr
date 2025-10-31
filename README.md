@@ -4,6 +4,10 @@ Microservice OCR.
 
 Depend from Ms_cronjob (use the volume "ms_cronjob-volume" for share the certificate).
 
+## Info:
+
+-   Engine: Craft, Tesseract, Paddle (default).
+
 ## Installation
 
 1. For full build write on terminal:
@@ -74,7 +78,7 @@ form-data
 
 key             value
 ---             ---
-language        (For paddle is not required. For tesseract will be like: en+jp)
+language        (For paddle is empty. For tesseract will be like en+jp)
 file            jp_1.jpg
 isCuda          false
 isDebug         true
