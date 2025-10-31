@@ -43,6 +43,7 @@ docker compose -f docker-compose.yaml --env-file ./env/local.env up --detach --p
 ## Tesseract
 
 1. For compile "tesseract" from source with custom setting write on terminal:
+    
     ```
     cd src/library/engine_tesseract/
     tar -xvzf 5.5.1.tar.gz
