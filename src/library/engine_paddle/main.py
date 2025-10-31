@@ -145,7 +145,8 @@ class EnginePaddle:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx", "DejaVuSans.ttf")
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx", pilFont)
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.html", pilFont)
 
     def _inferenceTableWireless(self, resizeMultipleResult, count):
         dataList = self.tableCellDetectionWireless.predict(input=resizeMultipleResult, batch_size=1)
@@ -292,7 +293,7 @@ class EnginePaddle:
 
         imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        #self._inferenceText(imageOpen)
+        self._inferenceText(imageOpen)
 
         self._inferenceLayout(imageOpen)
 

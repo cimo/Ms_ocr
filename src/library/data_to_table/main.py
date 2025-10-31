@@ -1,13 +1,101 @@
 import os
 import numpy
 import pandas
+import unicodedata
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, Font
-from PIL import ImageFont
+from openpyxl.styles import Alignment, Font, Border, Side
 
 class DataToTable:
+    def _isCellInMergedRange(self, cellRow, cellColumn, cellMergeList):
+        isMerge = False
+        isMergeHorizontal = False
+
+        for rowMin, rowMax, columnMin, columnMax in cellMergeList:
+            if rowMin <= cellRow <= rowMax and columnMin <= cellColumn <= columnMax:
+                isMerge = True
+
+                if columnMin != columnMax:
+                    isMergeHorizontal = True
+
+        return isMerge, isMergeHorizontal
+
+    def _unicodeTextLength(self, text):
+        length = 0
+
+        for char in text:
+            if unicodedata.east_asian_width(char) in ["F", "W"]:
+                length += 2
+            elif char.isspace():
+                length += 0.5
+            else:
+                length += 1
+
+        return length
+    
     def _html(self):
-        return
+        resultList = ["<html><head><style>"]
+        resultList.append("""
+            table {
+                border-collapse: collapse;
+                table-layout: fixed;
+            }
+                    
+            td {
+                border: 1px solid #000000;
+                text-align: center;
+                vertical-align: middle;
+                word-wrap: break-word;
+                white-space: pre-wrap;
+                font-family: Calibri, sans-serif;
+                font-size: 11pt;
+                padding: 4px;
+            }
+        """)
+        resultList.append("</style></head><body><table>")
+
+        cellMergeList = []
+
+        for merge in self.mergeList:
+            rowStart = merge["row_start"]
+            columnStart = merge["column_start"]
+            rowEnd = merge["row_end"]
+            columnEnd = merge["column_end"]
+
+            cellMergeList.append((rowStart, columnStart, rowEnd, columnEnd))
+
+        cellSkipList = []
+
+        for indexRow, row in enumerate(self.dataFrame.values):
+            resultList.append("<tr>")
+
+            for indexColumn, cellValue in enumerate(row):
+                if (indexRow, indexColumn) in cellSkipList:
+                    continue
+
+                rowSpan, columnSpan = 1, 1
+                
+                for rowStart, colStart, rowEnd, colEnd in cellMergeList:
+                    if indexRow == rowStart and indexColumn == colStart:
+                        rowSpan = rowEnd - indexRow + 1
+                        columnSpan = colEnd - indexColumn + 1
+
+                        for a in range(rowStart, rowEnd + 1):
+                            for b in range(colStart, colEnd + 1):
+                                if (a, b) != (indexRow, indexColumn):
+                                    cellSkipList.append((a, b))
+
+                        break
+
+                text = str(cellValue).replace("\n", "<br>")
+
+                resultList.append(f'<td rowspan="{rowSpan}" colspan="{columnSpan}">{text}</td>')
+
+            resultList.append("</tr>")
+
+        resultList.append("</table></body></html>")
+
+        with open(self.pathOutput, "w", encoding="utf-8") as file:
+            file.write("\n".join(resultList))
     
     def _excel(self):
         writer = pandas.ExcelWriter(self.pathOutput, engine="openpyxl")
@@ -27,20 +115,18 @@ class DataToTable:
             if rowStart != rowEnd or columnStart != columnEnd:
                 worksheet.merge_cells(start_row=rowStart, start_column=columnStart, end_row=rowEnd, end_column=columnEnd)
         
-        cellMergeList = [(cellRange.min_row, cellRange.max_row, cellRange.min_col, cellRange.max_col) for cellRange in worksheet.merged_cells.ranges]
+        cellMergeList = [(cellMergeRange.min_row, cellMergeRange.max_row, cellMergeRange.min_col, cellMergeRange.max_col) for cellMergeRange in worksheet.merged_cells.ranges]
 
         for indexRow, rowList in enumerate(worksheet.iter_rows(), 1):
             lineTotal = 1
 
             for cell in rowList:
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                
-                isCellMerged = any(
-                    rowMin <= cell.row <= rowMax and columnMin <= cell.column <= columnMax
-                    for rowMin, rowMax, columnMin, columnMax in cellMergeList
-                )
+                cell.border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
 
-                if not isCellMerged:
+                isMerge, _ = self._isCellInMergedRange(cell.row, cell.column, cellMergeList)
+
+                if not isMerge:
                     if isinstance(cell.value, str) and "\n" in cell.value:
                         lineCount = cell.value.count("\n") + 1
 
@@ -49,8 +135,8 @@ class DataToTable:
 
             worksheet.row_dimensions[indexRow].height = max(self.cellHeightDefault * lineTotal, self.cellHeightDefault)
         
-        for rowMin, rowMax, colMin, _ in cellMergeList:
-            cell = worksheet.cell(rowMin, colMin)
+        for rowMin, rowMax, columnMin, _ in cellMergeList:
+            cell = worksheet.cell(rowMin, columnMin)
 
             if isinstance(cell.value, str):
                 lineCount = cell.value.count("\n") + 1
@@ -66,27 +152,26 @@ class DataToTable:
             textWidthMax = 0
 
             for cell in cellList:
+                _, isMergeHorizontal = self._isCellInMergedRange(cell.row, cell.column, cellMergeList)
+
+                if isMergeHorizontal:
+                    continue
+
                 if isinstance(cell.value, str) and len(cell.value) > 0:
-                    if isinstance(self.pilFont, str):
-                        fontScaleMax = 1 if len(cell.value) <= 2 else 0.8
-                        fontSize = min(self.cellHeightDefault, int(self.cellHeightDefault * fontScaleMax))
-                        imageFont = ImageFont.truetype(self.pilFont, fontSize)
-                    else:
-                        imageFont = self.pilFont
-
-                    textBbox = imageFont.getbbox(cell.value)
+                    text = max(cell.value.split("\n"), key=self._unicodeTextLength)
+                    textBbox = self.pilFont.getbbox(text)
                     textWidth = textBbox[2] - textBbox[0]
-
+                    
                     if textWidth > textWidthMax:
                         textWidthMax = textWidth
 
                     cell.font = Font(name="Calibri", size=11)
 
             if textWidthMax > 0:
-                columnWidth = (textWidthMax * (imageFont.size / 1000)) + imageFont.size
+                columnWidth =  round(textWidthMax / 7, 2) + 2
                 columnLetter = get_column_letter(indexColumn)
                 worksheet.column_dimensions[columnLetter].width = columnWidth
-        
+
         writer.close()
 
     def _buildDataFrame(self, cellList, rowIndexList, columnIndexList):

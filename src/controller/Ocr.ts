@@ -29,7 +29,6 @@ export default class ControllerOcr {
                     let language = "";
                     let isCuda = "";
                     let isDebug = "";
-                    let engine = "";
 
                     for (const resultControllerUpload of resultControllerUploadList) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
@@ -44,10 +43,6 @@ export default class ControllerOcr {
                             isDebug = resultControllerUpload.buffer.toString().match("^(true|false)$")
                                 ? resultControllerUpload.buffer.toString()
                                 : "";
-                        } else if (resultControllerUpload.name === "engine" && resultControllerUpload.buffer) {
-                            engine = resultControllerUpload.buffer.toString().match("^(paddle|tesseract)$")
-                                ? resultControllerUpload.buffer.toString()
-                                : "";
                         }
                     }
 
@@ -56,7 +51,7 @@ export default class ControllerOcr {
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${fileName}`;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${isCuda}"`, `"${isDebug}"`, `"${engine}"`, `"${uniqueId}"`];
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${isCuda}"`, `"${isDebug}"`, `"${uniqueId}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
                         helperSrc.fileRemove(input, (resultFileRemove) => {
@@ -74,43 +69,63 @@ export default class ControllerOcr {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
                             const dataJsonList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/export/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/export/`,
                                 ".json"
                             );
 
                             const dataPdfList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/export/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/export/`,
                                 ".pdf"
                             );
 
                             const dataXlsxList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/table/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/table/`,
                                 ".xlsx"
+                            );
+
+                            const dataHtmlList = await helperSrc.findFileInDirectoryRecursive(
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/table/`,
+                                ".html"
                             );
 
                             const jsonList: string[] = [];
 
                             for (const dataJson of dataJsonList) {
-                                jsonList.push(dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                                jsonList.push(
+                                    dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                );
                             }
 
                             const pdfList: string[] = [];
 
                             for (const dataPdf of dataPdfList) {
-                                pdfList.push(dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                                pdfList.push(
+                                    dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                );
                             }
 
                             const excelList: string[] = [];
 
                             for (const dataXlsx of dataXlsxList) {
-                                excelList.push(dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/`, ""));
+                                excelList.push(
+                                    dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                );
+                            }
+
+                            const htmlList: string[] = [];
+
+                            for (const dataHtml of dataHtmlList) {
+                                htmlList.push(
+                                    dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                );
                             }
 
                             const responseJson = {
                                 uniqueId,
                                 jsonList,
                                 pdfList,
-                                excelList
+                                excelList,
+                                htmlList
                             };
 
                             helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
@@ -131,11 +146,10 @@ export default class ControllerOcr {
         this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
             const requestBody = request.body;
 
-            const engine = requestBody.engine;
             const uniqueId = requestBody.uniqueId;
             const pathFile = requestBody.pathFile;
 
-            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${engine}/${uniqueId}/${pathFile}`;
+            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/${pathFile}`;
 
             helperSrc.fileReadStream(path, async (resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {

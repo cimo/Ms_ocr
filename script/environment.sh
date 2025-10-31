@@ -1,3 +1,5 @@
+#!/bin/bash
+
 pathEnvFile="./env/${ENV_NAME}.env"
 
 if [ -f "${pathEnvFile}" ]

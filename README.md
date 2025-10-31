@@ -36,7 +36,9 @@ docker compose -f docker-compose.yaml --env-file ./env/local.env up --detach --p
 
 2. Follow the "Installation" instructions.
 
-3. For compile "tesseract" from source write on terminal:
+## Tesseract
+
+1. For compile "tesseract" from source with custom setting write on terminal:
     ```
     cd src/library/engine_tesseract/
     tar -xvzf 5.5.1.tar.gz
@@ -72,11 +74,10 @@ form-data
 
 key             value
 ---             ---
-language        jp
+language        (For paddle is not required. For tesseract will be like: en+jp)
 file            jp_1.jpg
 isCuda          false
 isDebug         true
-engine          paddle
 ```
 
 4. Download
@@ -89,7 +90,6 @@ json
 
 key             value
 ---             ---
-"engine":       "paddle",
 "uniqueId":     "1234",
 "pathFile":     "export/jp_1_result.pdf"
 ```

@@ -61,6 +61,7 @@ export const PATH_FILE_OUTPUT = Ce.checkVariable("MS_O_PATH_FILE_OUTPUT");
 export const PATH_FILE_SCRIPT = Ce.checkVariable("MS_O_PATH_FILE_SCRIPT");
 export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
+export const ENGINE = Ce.checkVariable("MS_O_ENGINE") || (process.env.MS_O_FILE_SIZE_MB as string);
 
 export const localeFromEnvName = (): string => {
     let result = ENV_NAME.split("_").pop();
