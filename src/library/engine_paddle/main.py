@@ -233,6 +233,8 @@ class EnginePaddle:
 
     def _inferenceText(self, image, isWriteOutput=True):
         resultMergeList = []
+        imageCropList = []
+        bboxList = []
 
         if isWriteOutput:
             image = cv2Processor.resizeMultiple(image)["result"]
@@ -256,18 +258,21 @@ class EnginePaddle:
                 height = bottom - top
 
                 imageCrop = image[top:bottom, left:right, :]
+                imageCropList.append(imageCrop)
+                bboxList.append((left, top, width, height))
 
-                dataSubList = self.textRecognitionInit.predict(input=imageCrop, batch_size=1)
+                dataSubList = self.textRecognitionInit.predict(input=imageCrop, batch_size=len(imageCropList))
 
-                for dataSub in dataSubList:
+                for index, dataSub in enumerate(dataSubList):
                     text = dataSub.get("rec_text", "")
+                    bboxLeft, bboxTop, bboxWidth, bboxHeight = bboxList[index]
 
                     if isWriteOutput:
                         pilFont = cv2Processor.pilFont(text, width, height, self.fontName)
                         pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList.append({
-                        "bbox_list": [left, top, width, height],
+                        "bbox_list": [bboxLeft, bboxTop, bboxWidth, bboxHeight],
                         "text": text
                     })
 
