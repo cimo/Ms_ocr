@@ -156,7 +156,7 @@ export const fileReadStream = (filePath: string, callback: (result: NodeJS.Errno
     });
 };
 
-export const fileRemove = (path: string, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
+export const fileOrFolderRemove = (path: string, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
     Fs.stat(path, (error, stats) => {
         if (error) {
             return callback(error);

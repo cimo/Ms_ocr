@@ -54,10 +54,10 @@ export default class ControllerOcr {
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${isCuda}"`, `"${isDebug}"`, `"${uniqueId}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
-                        helperSrc.fileRemove(input, (resultFileRemove) => {
+                        helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
                             if (typeof resultFileRemove !== "boolean") {
                                 helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileRemove(input)",
+                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderRemove(input)",
                                     resultFileRemove.toString()
                                 );
 
