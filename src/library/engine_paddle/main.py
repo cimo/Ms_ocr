@@ -5,7 +5,7 @@ import json
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 
 # Source
-from image_processor import main as cv2Processor
+from image_processor import main as imageProcessor
 from data_to_table.main import DataToTable
 
 def _checkEnvVariable(varKey):
@@ -27,6 +27,7 @@ ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
+DEVICE = _checkEnvVariable("MS_O_DEVICE")
 
 class EnginePaddle:
     def _textOverlapCell(self, textBbox, cellBbox, overlapThreshold=0.7):
@@ -87,7 +88,7 @@ class EnginePaddle:
         resultMergeList = []
 
         if self.isDebug:
-            pilImage, pilImageDraw = cv2Processor.pilImage(resizeMultipleResult)
+            pilImage, pilImageDraw = imageProcessor.pilImage(resizeMultipleResult)
 
         inferenceTextDataList = self._inferenceText(resizeMultipleResult, False)
 
@@ -107,7 +108,7 @@ class EnginePaddle:
             if self.isDebug:
                 resizeMultipleResultCrop = resizeMultipleResult[top:bottom, left:right, :]
 
-                cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", resizeMultipleResultCrop)
+                imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", resizeMultipleResultCrop)
             
             resultMergeList.append({
                 "bbox_list": [left, top, right, bottom],
@@ -132,7 +133,7 @@ class EnginePaddle:
                     pilImageDraw.rectangle([(textX1, textY1), (textX2, textY2)], outline=(0, 0, 255), width=1)
 
                 if self._textOverlapCell(bboxList, [left, top, right, bottom]):
-                    pilFont = cv2Processor.pilFont(text, bboxList[2], bboxList[3], self.fontName)
+                    pilFont = imageProcessor.pilFont(text, bboxList[2], bboxList[3], self.fontName)
 
                     if self.isDebug:
                         pilImageDraw.text((bboxList[0], bboxList[1]), text, font=pilFont, fill=(0, 0, 0))
@@ -176,12 +177,12 @@ class EnginePaddle:
 
             if (resultLabel == "wired_table"):
                 if self.isDebug:
-                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg", "", resizeMultipleResult)
+                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg", "", resizeMultipleResult)
 
                 self._inferenceTableWired(resizeMultipleResult, count)
             elif (resultLabel == "wireless_table"):
                 if self.isDebug:
-                    cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", resizeMultipleResult)
+                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", resizeMultipleResult)
 
                 self._inferenceTableWireless(resizeMultipleResult, count)
 
@@ -216,7 +217,7 @@ class EnginePaddle:
 
                 imageOpenCrop = imageOpen[top:bottom, left:right, :]
 
-                resizeMultiple = cv2Processor.resizeMultiple(imageOpenCrop)
+                resizeMultiple = imageProcessor.resizeMultiple(imageOpenCrop)
 
                 self._inferenceTableClassification(resizeMultiple["result"], count)
 
@@ -237,9 +238,9 @@ class EnginePaddle:
         bboxList = []
 
         if isWriteOutput:
-            image = cv2Processor.resizeMultiple(image)["result"]
+            image = imageProcessor.resizeMultiple(image)["result"]
 
-            pilImage, pilImageDraw = cv2Processor.pilImage(image)
+            pilImage, pilImageDraw = imageProcessor.pilImage(image)
 
         dataList = self.textDetectionInit.predict(input=image, batch_size=1)
 
@@ -268,7 +269,7 @@ class EnginePaddle:
                     bboxLeft, bboxTop, bboxWidth, bboxHeight = bboxList[index]
 
                     if isWriteOutput:
-                        pilFont = cv2Processor.pilFont(text, width, height, self.fontName)
+                        pilFont = imageProcessor.pilFont(text, width, height, self.fontName)
                         pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList.append({
@@ -293,23 +294,31 @@ class EnginePaddle:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self):
+    def _execute(self, languageValue, fileNameValue, isDebugValue, uniqueIdValue):
+        self.language = languageValue
+        self.fileName = fileNameValue
+        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+        self.isDebug = isDebugValue
+        self.uniqueId = uniqueIdValue
+        
         self._createOutputDir()
 
-        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
         self._inferenceText(imageOpen)
 
         self._inferenceLayout(imageOpen)
 
-    def __init__(self, languageValue, fileNameValue, isCuda, isDebugValue, uniqueIdValue):
-        self.language = languageValue
-        self.fileName = fileNameValue
-        self.device = "gpu" if isCuda else "cpu"
-        self.isDebug = isDebugValue
-        self.uniqueId = uniqueIdValue
+        print("ok", flush=True)
 
-        self.modelRecognitionName = "PP-OCRv5_mobile_rec" if self.device == "cpu" else "PP-OCRv5_server_rec"
+    def __init__(self):
+        self.language = ""
+        self.fileName = ""
+        self.isDebug = False
+        self.uniqueId = ""
+        self.fontName = "NotoSansCJK-Regular.ttc"
+
+        self.modelRecognitionName = "PP-OCRv5_mobile_rec" if DEVICE == "cpu" else "PP-OCRv5_server_rec"
 
         self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_det/"
         self.pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
@@ -318,17 +327,9 @@ class EnginePaddle:
         self.pathModelTableWired = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wired_table_cell_det/"
         self.pathModelTableWireless = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wireless_table_cell_det/"
 
-        self.fontName = "NotoSansCJK-Regular.ttc"
-
-        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
-
-        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name="PP-OCRv5_server_det", device=self.device)
-        self.textRecognitionInit = TextRecognition(model_dir=self.pathModelTextRecognition, model_name=self.modelRecognitionName, device=self.device)
-        self.layoutInit = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=self.device)
-        self.tableClassificationInit = TableClassification(model_dir=self.pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=self.device)
-        self.tableCellDetectionWired = TableCellsDetection(model_dir=self.pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=self.device)
-        self.tableCellDetectionWireless = TableCellsDetection(model_dir=self.pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=self.device)
-
-        self._execute()
-
-        print("ok", flush=True)
+        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name="PP-OCRv5_server_det", device=DEVICE)
+        self.textRecognitionInit = TextRecognition(model_dir=self.pathModelTextRecognition, model_name=self.modelRecognitionName, device=DEVICE)
+        self.layoutInit = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=DEVICE)
+        self.tableClassificationInit = TableClassification(model_dir=self.pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=DEVICE)
+        self.tableCellDetectionWired = TableCellsDetection(model_dir=self.pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=DEVICE)
+        self.tableCellDetectionWireless = TableCellsDetection(model_dir=self.pathModelTableWireless, model_name="RT-DETR-L_wireless_table_cell_det", device=DEVICE)

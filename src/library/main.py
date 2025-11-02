@@ -1,7 +1,7 @@
 import os
 import logging
 import ast
-import sys
+import subprocess
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -18,19 +18,19 @@ def _checkEnvVariable(varKey):
 
     return os.environ.get(varKey)
 
+PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 ENGINE = _checkEnvVariable("MS_O_ENGINE")
 
-language = sys.argv[1]
-fileName = sys.argv[2]
-isCuda = sys.argv[3].lower() == "true"
-isDebug = sys.argv[4].lower() == "true"
-uniqueId = sys.argv[5]
+engineActive = None
 
 if ENGINE == "tesseract":
     from engine_tesseract.main import EngineTesseract
 
-    EngineTesseract(language, fileName, isCuda, isDebug, uniqueId)
+    subprocess.run([f"{PATH_ROOT}src/library/engine_tesseract/executable", "--version"], check=True)
+    subprocess.run([f"{PATH_ROOT}src/library/engine_tesseract/executable", "--list-langs"], check=True)
+
+    engineActive = EngineTesseract()
 elif ENGINE == "paddle":
     from engine_paddle.main import EnginePaddle
 
-    EnginePaddle(language, fileName, isCuda, isDebug, uniqueId)
+    engineActive = EnginePaddle()

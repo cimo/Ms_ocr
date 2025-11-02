@@ -11,7 +11,7 @@ from collections import OrderedDict as collectionOrderDict
 # Source
 from .detector import Detector
 from .refine_net import RefineNet
-from image_processor import main as cv2Processor
+from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -32,6 +32,7 @@ ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
+DEVICE = _checkEnvVariable("MS_O_DEVICE")
 
 class CraftDetection:
     def _boxCreation(self, scoreText, _, ratioWidth, ratioHeight):
@@ -50,26 +51,26 @@ class CraftDetection:
             if colMean < 0.005:
                 scoreText[:, b] = 0
 
-        _, binaryTextMap = cv2Processor.threshold(scoreText, self.textThreshold, 1, 0)
-        #_, binaryLinkMap = cv2Processor.threshold(scoreLink, self.textThreshold, 1, 0)
+        _, binaryTextMap = imageProcessor.threshold(scoreText, self.textThreshold, 1, 0)
+        #_, binaryLinkMap = imageProcessor.threshold(scoreLink, self.textThreshold, 1, 0)
         #scoreCombined = numpy.clip(binaryTextMap + binaryLinkMap, 0, 1)
 
-        imageEroded = cv2Processor.erode(binaryTextMap, 2, 1)
+        imageEroded = imageProcessor.erode(binaryTextMap, 2, 1)
 
-        imageDilate = cv2Processor.dilate(imageEroded, 3, 1)
+        imageDilate = imageProcessor.dilate(imageEroded, 3, 1)
 
         if self.isDebug:
-            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
 
         mergeBoxTollerance = 10
         mergeBoxRowTollerance = 8
 
-        contourList, _ = cv2Processor.contour(imageDilate)
+        contourList, _ = imageProcessor.contour(imageDilate)
 
         boxList = []
 
         for contour in contourList:
-            x, y, w, h = cv2Processor.bbox(contour)
+            x, y, w, h = imageProcessor.bbox(contour)
 
             if w < 4 or h < 4:
                 continue
@@ -171,14 +172,14 @@ class CraftDetection:
         boxList = self._boxCreation(scoreText, scoreLink, ratioWidth, ratioHeight)
         
         for (x, y, w, h) in boxList:
-            cv2Processor.rectangle(imageOpen, x, y, w, h, (0, 0, 255), 1)
+            imageProcessor.rectangle(imageOpen, x, y, w, h, (0, 0, 255), 1)
 
             resultMergeList.append({
                 "bbox_list": [x, y, w, h]
             })
 
         if self.isDebug:
-            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
@@ -204,7 +205,7 @@ class CraftDetection:
         imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
         modelInput = torchAutogradVariable(imageTensor.unsqueeze(0))
         
-        if self.device == "gpu":
+        if DEVICE == "gpu":
             modelInput = modelInput.cuda()
 
         with torch.no_grad():
@@ -241,22 +242,22 @@ class CraftDetection:
         return imageResult
 
     def _preprocess(self):
-        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
-        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = cv2Processor.resize(imageOpen, 1280)
+        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = imageProcessor.resize(imageOpen, 1280)
 
-        imageGray = cv2Processor.gray(imageResize)
+        imageGray = imageProcessor.gray(imageResize)
 
-        imageBinarize = cv2Processor.binarization(imageGray)
+        imageBinarize = imageProcessor.binarization(imageGray)
 
-        imageNoiseRemove = cv2Processor.noiseRemove(imageBinarize)
+        imageNoiseRemove = imageProcessor.noiseRemove(imageBinarize)
 
-        imageColor = cv2Processor.color(imageNoiseRemove)
+        imageColor = imageProcessor.color(imageNoiseRemove)
 
         imageResizeCnn = self._resizeCnn(targetWidth, targetHeight, channel, imageColor)
 
         if self.isDebug:
-            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
         return imageOpen, ratioWidth, ratioHeight, imageResizeCnn
 
@@ -277,7 +278,7 @@ class CraftDetection:
 
     def _refineNetEval(self, refineNet):
         if self.isRefine:
-            if self.device == "gpu":
+            if DEVICE == "gpu":
                 refineNet.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightRefine)))
 
                 refineNet = torch.nn.DataParallel(refineNet.cuda())
@@ -293,7 +294,7 @@ class CraftDetection:
             return None
 
     def _detectorEval(self, detector):
-        if self.device == "gpu":
+        if DEVICE == "gpu":
             detector.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightMain)))
 
             detector = torch.nn.DataParallel(detector.cuda())
@@ -306,9 +307,8 @@ class CraftDetection:
 
         return detector
 
-    def __init__(self, fileNameValue, deviceValue, isDebugValue, uniqueIdValue):
+    def __init__(self, fileNameValue, isDebugValue, uniqueIdValue):
         self.fileName = fileNameValue
-        self.device = deviceValue
         self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
 

@@ -81,7 +81,6 @@ key             value
 ---             ---
 language        (For paddle is empty. For tesseract will be like en+jp)
 file            jp_1.jpg
-isCuda          false
 isDebug         true
 ```
 

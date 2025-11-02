@@ -50,6 +50,7 @@ RUN cd ~ \
     fonts-noto-cjk \
     media-types \
     python3-pip \
+    # Tesseract
     cmake \
     g++ \
     pkg-config \
@@ -76,9 +77,8 @@ RUN python3 -m pip install pip --upgrade \
     && npm install \
     && npm run build
 
-# Tesseract
-CMD ${PATH_ROOT}src/library/engine_tesseract/executable --version \
-    && ${PATH_ROOT}src/library/engine_tesseract/executable --list-langs \
+# Library
+CMD python3 ${PATH_ROOT}src/library/main.py \
     # Node
     && node ${PATH_ROOT}dist/src/controller/Server.js
 

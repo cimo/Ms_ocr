@@ -6,7 +6,7 @@ import subprocess
 
 # Source
 from craft_detection.main import CraftDetection
-from image_processor import main as cv2Processor
+from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -74,7 +74,7 @@ class EngineTesseract:
     def _crop(self, resultMainList, imageOpen):
         resultList = []
 
-        pilImage, pilImageDraw, pilFont = cv2Processor.pilImage(imageOpen, self.fontName, 14)
+        pilImage, pilImageDraw, pilFont = imageProcessor.pilImage(imageOpen, self.fontName, 14)
 
         for index, bboxList in enumerate(resultMainList):
             bbox = bboxList["bbox_list"]
@@ -88,9 +88,9 @@ class EngineTesseract:
 
             imageCrop = imageOpen[top:bottom, left:right]
 
-            _, _, _, _, imageResize, _ = cv2Processor.resize(imageCrop, 32, "h")
+            _, _, _, _, imageResize, _ = imageProcessor.resize(imageCrop, 32, "h")
 
-            cv2Processor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
 
             self._subprocess(index)
 
@@ -115,26 +115,26 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self):
-        craftDetection = CraftDetection(self.fileName, self.device, self.isDebug, self.uniqueId)
+    def _execute(self, languageValue, fileNameValue, isDebugValue, uniqueIdValue):
+        self.language = languageValue
+        self.fileName = fileNameValue
+        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+        self.isDebug = isDebugValue
+        self.uniqueId = uniqueIdValue
+        
+        craftDetection = CraftDetection(self.fileName, self.isDebug, self.uniqueId)
 
         self._createOutputDir()
 
-        imageOpen, _, _ = cv2Processor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
 
         self._crop(craftDetection.resultMainList, imageOpen)
 
-    def __init__(self, languageValue, fileNameValue, isCuda, isDebugValue, uniqueIdValue):
-        self.language = languageValue
-        self.fileName = fileNameValue
-        self.device = "gpu" if isCuda else "cpu"
-        self.isDebug = isDebugValue
-        self.uniqueId = uniqueIdValue
-
-        self.fontName = "NotoSansCJK-Regular.ttc"
-
-        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
-
-        self._execute()
-
         print("ok", flush=True)
+
+    def __init__(self):
+        self.language = ""
+        self.fileName = ""
+        self.isDebug = False
+        self.uniqueId = ""
+        self.fontName = "NotoSansCJK-Regular.ttc"
