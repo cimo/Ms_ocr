@@ -26,9 +26,6 @@ engineActive = None
 if ENGINE == "tesseract":
     from engine_tesseract.main import EngineTesseract
 
-    subprocess.run([f"{PATH_ROOT}src/library/engine_tesseract/executable", "--version"], check=True)
-    subprocess.run([f"{PATH_ROOT}src/library/engine_tesseract/executable", "--list-langs"], check=True)
-
     engineActive = EngineTesseract()
 elif ENGINE == "paddle":
     from engine_paddle.main import EnginePaddle
