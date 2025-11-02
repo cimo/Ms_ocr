@@ -5,7 +5,7 @@ import json
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 
 # Source
-from cv2_processor import main as cv2Processor
+from image_processor import main as cv2Processor
 from data_to_table.main import DataToTable
 
 def _checkEnvVariable(varKey):

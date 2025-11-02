@@ -1,7 +1,7 @@
 torch==2.8.0
 torchvision==0.23.0
 numpy==2.2.6
-# cv2_processor
+# image_processor
 opencv-python-headless==4.12.0.88
 pillow==11.3.0
 # data_to_table

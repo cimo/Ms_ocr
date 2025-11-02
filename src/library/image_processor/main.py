@@ -11,13 +11,13 @@ noiseRemoveModeList = {
     "erode": cv2.MORPH_ERODE
 }
 
-def _imageArray(image, isRequestedFloat=False):
-    if isinstance(image, numpy.ndarray):
-        result = image
+def _fileArray(file, isFloat=False):
+    if isinstance(file, numpy.ndarray):
+        result = file
     else:
-        result = numpy.array(image)
+        result = numpy.array(file)
 
-    if isRequestedFloat:
+    if isFloat:
         result = result.astype(numpy.float32)
     else:
         if result.dtype != numpy.uint8:
@@ -25,8 +25,8 @@ def _imageArray(image, isRequestedFloat=False):
 
     return result
 
-def pilImage(image):
-    inputHeight, inputWidth = image.shape[:2]
+def pilImage(file):
+    inputHeight, inputWidth = file.shape[:2]
     imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
     imageDraw = ImageDraw.Draw(imageNew)
 
@@ -55,12 +55,12 @@ def open(pathFull):
     pilIccProfile = result.info.get("icc_profile")
     pilExif = result.info.get("exif")
 
-    return _imageArray(result), pilIccProfile, pilExif
+    return _fileArray(result), pilIccProfile, pilExif
 
-def resizeMultiple(image, multiple=32):
-    image = Image.fromarray(image)
+def resizeMultiple(file, multiple=32):
+    file = Image.fromarray(file)
     
-    width, height = image.size
+    width, height = file.size
 
     widthResult = width % multiple
     widthDown = width - widthResult
@@ -116,7 +116,7 @@ def resizeMultiple(image, multiple=32):
         resample = Image.LANCZOS
         resampleName = "LANCZOS"
     
-    resized = image.resize((widthSnap, heightSnap), resample)
+    resized = file.resize((widthSnap, heightSnap), resample)
     
     if scaleX < 1.0 or scaleY < 1.0:
         resized = resized.filter(ImageFilter.SHARPEN)
@@ -134,10 +134,10 @@ def resizeMultiple(image, multiple=32):
         "result": result
     }
 
-def resize(image, sizeLimit, side="w"):
-    imageArray = _imageArray(image)
+def resize(file, sizeLimit, side="w"):
+    fileArray = _fileArray(file)
 
-    height, width = imageArray.shape[:2]
+    height, width = fileArray.shape[:2]
 
     if side == "w":
         ratio = sizeLimit / width
@@ -155,7 +155,7 @@ def resize(image, sizeLimit, side="w"):
     else:
         interpolation = cv2.INTER_CUBIC
 
-    imageResult = cv2.resize(imageArray, (targetWidth, targetHeight), interpolation=interpolation)
+    imageResult = cv2.resize(fileArray, (targetWidth, targetHeight), interpolation=interpolation)
 
     if ratio < 1.0:
         kernelSharpening = numpy.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
@@ -165,35 +165,35 @@ def resize(image, sizeLimit, side="w"):
 
     return targetWidth, targetHeight, ratio, imageResult, channel
 
-def rgbToGray(image):
-    imageArray = _imageArray(image)
+def rgbToGray(file):
+    fileArray = _fileArray(file)
 
-    if imageArray.ndim == 3 and imageArray.shape[2] == 3:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
-    elif imageArray.ndim == 3 and imageArray.shape[2] == 4:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGBA2GRAY)
+    if fileArray.ndim == 3 and fileArray.shape[2] == 3:
+        fileArray = cv2.cvtColor(fileArray, cv2.COLOR_RGB2GRAY)
+    elif fileArray.ndim == 3 and fileArray.shape[2] == 4:
+        fileArray = cv2.cvtColor(fileArray, cv2.COLOR_RGBA2GRAY)
     
-    return imageArray
+    return fileArray
 
-def grayToRgb(image):
-    imageArray = _imageArray(image)
+def grayToRgb(file):
+    fileArray = _fileArray(file)
 
-    if imageArray.ndim == 2:
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_GRAY2RGB)
-    if imageArray.ndim == 3 and imageArray.shape[2] == 1:
-        imageArray = cv2.cvtColor(imageArray.squeeze(-1), cv2.COLOR_GRAY2RGB)
+    if fileArray.ndim == 2:
+        fileArray = cv2.cvtColor(fileArray, cv2.COLOR_GRAY2RGB)
+    if fileArray.ndim == 3 and fileArray.shape[2] == 1:
+        fileArray = cv2.cvtColor(fileArray.squeeze(-1), cv2.COLOR_GRAY2RGB)
 
-    return imageArray
+    return fileArray
 
-def medianBlur(image, value=5):
-    imageArray = _imageArray(image)
+def medianBlur(file, value=5):
+    fileArray = _fileArray(file)
 
-    return cv2.medianBlur(imageArray, value)
+    return cv2.medianBlur(fileArray, value)
 
-def binarization(image, threshold=11, block=2, isInverted=False):
-    imageArray = _imageArray(image, True)
+def binarization(file, threshold=11, block=2, isInverted=False):
+    fileArray = _fileArray(file, True)
 
-    imageBlur = medianBlur(imageArray)
+    imageBlur = medianBlur(fileArray)
 
     if isInverted:
         thresholdType = cv2.THRESH_BINARY_INV
@@ -202,57 +202,55 @@ def binarization(image, threshold=11, block=2, isInverted=False):
     
     return cv2.adaptiveThreshold(imageBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType, threshold, block)
 
-def threshold(image, valueA, valueB, valueC):
-    imageArray = _imageArray(image, True)
+def threshold(file, value, valueMax, type):
+    fileArray = _fileArray(file, True)
 
-    return cv2.threshold(imageArray, valueA, valueB, valueC)
+    return cv2.threshold(fileArray, value, valueMax, type)
 
-def erode(image, valueA, valueB):
-    imageArray = _imageArray(image)
+def erode(file, kernelWidth, kernelHeight):
+    fileArray = _fileArray(file)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (valueA, valueB))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernelWidth, kernelHeight))
     
-    return cv2.erode(imageArray, kernel)
+    return cv2.erode(fileArray, kernel)
 
-def dilate(image, valueA, valueB):
-    imageArray = _imageArray(image)
+def dilate(file, kernelWidth, kernelHeight):
+    fileArray = _fileArray(file)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (valueA, valueB))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernelWidth, kernelHeight))
     
-    return cv2.dilate(imageArray, kernel)
+    return cv2.dilate(fileArray, kernel)
 
-def contour(image):
-    imageArray = _imageArray(image)
+def contour(file):
+    fileArray = _fileArray(file)
 
-    return cv2.findContours(imageArray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return cv2.findContours(fileArray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 def bbox(contour):
     return cv2.boundingRect(contour)
 
-def rectangle(image, x, y, w, h, color, border):
-    return cv2.rectangle(image, (x, y), (x + w, y + h), color, border)
+def rectangle(file, x, y, w, h, color, border):
+    return cv2.rectangle(file, (x, y), (x + w, y + h), color, border)
 
-def mask(image):
-    imageArray = _imageArray(image)
+def mask(file):
+    fileArray = _fileArray(file)
 
-    return numpy.zeros_like(imageArray)
+    return numpy.zeros_like(fileArray)
 
-def maskApply(image, imageMask):
-    imageArray = _imageArray(image)
+def maskApply(file, imageMask):
+    fileArray = _fileArray(file)
 
-    return cv2.bitwise_and(imageArray, imageArray, mask=imageMask)
+    return cv2.bitwise_and(fileArray, fileArray, mask=imageMask)
 
-def gamma(image, gamma=2.2):
-    imageArray = _imageArray(image)
+def gamma(file, value=2.2):
+    fileArray = _fileArray(file)
 
-    gammaBA = 1.0 / gamma
+    table = numpy.array([(a / 255.0) ** (1.0 / value) * 255 for a in range(256)])
     
-    table = numpy.array([(a / 255.0) ** gammaBA * 255 for a in range(256)])
-    
-    return cv2.LUT(imageArray, table)
+    return cv2.LUT(fileArray, table)
 
-def noiseRemove(image, modeValue="close", unit=1):
-    imageArray = _imageArray(image)
+def noiseRemove(file, modeValue="close", unit=1):
+    fileArray = _fileArray(file)
     
     mode = modeValue
 
@@ -260,9 +258,9 @@ def noiseRemove(image, modeValue="close", unit=1):
         mode = "auto"
     
     if mode == "auto":
-        totalPixel = imageArray.size
+        totalPixel = fileArray.size
 
-        whitePixel = numpy.sum(imageArray > 127)
+        whitePixel = numpy.sum(fileArray > 127)
         blackPixel = totalPixel - whitePixel
 
         if whitePixel > blackPixel:
@@ -270,7 +268,7 @@ def noiseRemove(image, modeValue="close", unit=1):
         else:
             mode = noiseRemoveModeList["open"]
 
-        _, label = cv2.connectedComponents((imageArray > 127))
+        _, label = cv2.connectedComponents((fileArray > 127))
 
         unique, countList = numpy.unique(label, return_counts=True)
         sizeList = countList[unique != 0]
@@ -289,47 +287,47 @@ def noiseRemove(image, modeValue="close", unit=1):
 
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (unit, unit))
     
-    return cv2.morphologyEx(imageArray, mode, kernel)
+    return cv2.morphologyEx(fileArray, mode, kernel)
 
-def addOrRemoveBorder(image, unit=1, color=125):
-    imageArray = _imageArray(image)
+def addOrRemoveBorder(file, unit=1, color=125):
+    fileArray = _fileArray(file)
 
     if unit > 0:
-        return cv2.copyMakeBorder(imageArray, top=unit, bottom=unit, left=unit, right=unit, borderType=cv2.BORDER_CONSTANT, value=color)
+        return cv2.copyMakeBorder(fileArray, top=unit, bottom=unit, left=unit, right=unit, borderType=cv2.BORDER_CONSTANT, value=color)
     else:
         unitNegative = -unit
 
-        height, width = imageArray.shape[:2]
+        height, width = fileArray.shape[:2]
 
-        return imageArray[unitNegative:height-unitNegative, unitNegative:width-unitNegative]
+        return fileArray[unitNegative:height-unitNegative, unitNegative:width-unitNegative]
 
 def heatmap(scoreText):
     scoreTextNormalize = cv2.normalize(scoreText, None, 0, 255, cv2.NORM_MINMAX)
 
     return cv2.applyColorMap(scoreTextNormalize, cv2.COLORMAP_JET)
 
-def write(pathFull, label, image, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
+def write(pathFull, label, file, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
     fileNameSplit, fileExtensionSplit = os.path.splitext(os.path.basename(pathFull))
     dirName = os.path.dirname(pathFull)
     pathJoin = os.path.join(dirName, f"{fileNameSplit}{label}{fileExtensionSplit}")
 
     os.makedirs(dirName, exist_ok=True)
 
-    if isinstance(image, numpy.ndarray):
-        if numpy.issubdtype(image.dtype, numpy.floating):
-            image = numpy.clip(image, 0, 255).astype(numpy.uint8)
-        elif image.dtype != numpy.uint8:
-            image = numpy.clip(image, 0, 255).astype(numpy.uint8)
+    if isinstance(file, numpy.ndarray):
+        if numpy.issubdtype(file.dtype, numpy.floating):
+            file = numpy.clip(file, 0, 255).astype(numpy.uint8)
+        elif file.dtype != numpy.uint8:
+            file = numpy.clip(file, 0, 255).astype(numpy.uint8)
 
-        if image.ndim == 2:
-            image = Image.fromarray(image, mode="L")
-        elif image.ndim == 3:
-            if image.shape[2] == 1:
-                image = Image.fromarray(image.squeeze(-1), mode="L")
-            elif image.shape[2] == 3:
-                image = Image.fromarray(image, mode="RGB")
-            elif image.shape[2] == 4:
-                image = Image.fromarray(image, mode="RGBA")
+        if file.ndim == 2:
+            file = Image.fromarray(file, mode="L")
+        elif file.ndim == 3:
+            if file.shape[2] == 1:
+                file = Image.fromarray(file.squeeze(-1), mode="L")
+            elif file.shape[2] == 3:
+                file = Image.fromarray(file, mode="RGB")
+            elif file.shape[2] == 4:
+                file = Image.fromarray(file, mode="RGBA")
     
     parameterList = {"icc_profile": pilIccProfile, "dpi": dpi}
 
@@ -340,26 +338,26 @@ def write(pathFull, label, image, pilIccProfile=None, pilExif=None, dpi=(300, 30
         parameterList["quality"] = 100
         parameterList["subsampling"] = 0
 
-    image.save(pathJoin, **parameterList)
+    file.save(pathJoin, **parameterList)
 
-def writeMemory(image, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
+def writeMemory(file, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300)):
     _, fileExtensionSplit = os.path.splitext(fileName)
 
-    if isinstance(image, numpy.ndarray):
-        if numpy.issubdtype(image.dtype, numpy.floating):
-            image = numpy.clip(image, 0, 255).astype(numpy.uint8)
-        elif image.dtype != numpy.uint8:
-            image = numpy.clip(image, 0, 255).astype(numpy.uint8)
+    if isinstance(file, numpy.ndarray):
+        if numpy.issubdtype(file.dtype, numpy.floating):
+            file = numpy.clip(file, 0, 255).astype(numpy.uint8)
+        elif file.dtype != numpy.uint8:
+            file = numpy.clip(file, 0, 255).astype(numpy.uint8)
 
-        if image.ndim == 2:
-            image = Image.fromarray(image, mode="L")
-        elif image.ndim == 3:
-            if image.shape[2] == 1:
-                image = Image.fromarray(image.squeeze(-1), mode="L")
-            elif image.shape[2] == 3:
-                image = Image.fromarray(image, mode="RGB")
-            elif image.shape[2] == 4:
-                image = Image.fromarray(image, mode="RGBA")
+        if file.ndim == 2:
+            file = Image.fromarray(file, mode="L")
+        elif file.ndim == 3:
+            if file.shape[2] == 1:
+                file = Image.fromarray(file.squeeze(-1), mode="L")
+            elif file.shape[2] == 3:
+                file = Image.fromarray(file, mode="RGB")
+            elif file.shape[2] == 4:
+                file = Image.fromarray(file, mode="RGBA")
     
     buffer = io.BytesIO()
 
@@ -372,7 +370,7 @@ def writeMemory(image, fileName, pilIccProfile=None, pilExif=None, dpi=(300, 300
         parameterList["quality"] = 100
         parameterList["subsampling"] = 0
 
-    image.save(buffer, **parameterList)
+    file.save(buffer, **parameterList)
     
     buffer.seek(0)
     

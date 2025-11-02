@@ -11,7 +11,7 @@ from collections import OrderedDict as collectionOrderDict
 # Source
 from .detector import Detector
 from .refine_net import RefineNet
-from cv2_processor import main as cv2Processor
+from image_processor import main as cv2Processor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:

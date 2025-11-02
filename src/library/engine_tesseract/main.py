@@ -6,7 +6,7 @@ import subprocess
 
 # Source
 from craft_detection.main import CraftDetection
-from cv2_processor import main as cv2Processor
+from image_processor import main as cv2Processor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
