@@ -27,6 +27,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
+COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
@@ -46,13 +47,9 @@ RUN cd ~ \
     && apt-get install -y nodejs \
     # Apt
     && apt-get update && apt-get install -y \
-    fonts-noto \
-    fonts-noto-cjk \
     media-types \
     python3-pip \
     # GPU
-    fuse \
-    libfuse2 \
     libglib2.0-0 \
     libgtk-3-0 \
     libnss3 \
