@@ -8,7 +8,7 @@ Depend from Ms_cronjob (use the volume "ms_cronjob-volume" for share the certifi
 
 -   Cross platform (Windows, Linux)
 -   X11 for WSL2 (Run linux GUI app directly in windows) with full GPU host support.
--   Engine: Craft, Tesseract, Paddle (default).
+-   Craft, Tesseract, Paddle (default).
 
 ## Installation
 
