@@ -318,6 +318,7 @@ class EnginePaddle:
         self.uniqueId = ""
         self.fontName = "NotoSansCJK-Regular.ttc"
 
+        self.modelDetextionName = "PP-OCRv5_mobile_det" if DEVICE == "cpu" else "PP-OCRv5_server_det"
         self.modelRecognitionName = "PP-OCRv5_mobile_rec" if DEVICE == "cpu" else "PP-OCRv5_server_rec"
 
         self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_det/"
