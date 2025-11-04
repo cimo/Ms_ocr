@@ -116,12 +116,14 @@ def resizeMultiple(file, multiple=32):
         resample = Image.LANCZOS
         resampleName = "LANCZOS"
     
-    resized = file.resize((widthSnap, heightSnap), resample)
+    fileResize = file.resize((widthSnap, heightSnap), resample)
     
     if scaleX < 1.0 or scaleY < 1.0:
-        resized = resized.filter(ImageFilter.SHARPEN)
+        fileResize = fileResize.filter(ImageFilter.SHARPEN)
 
-    result = numpy.array(resized)
+    result = numpy.array(fileResize)
+
+    channel = 1 if result.ndim == 2 else result.shape[2]
 
     return {
         "sizeOriginal": (width, height),
@@ -131,39 +133,53 @@ def resizeMultiple(file, multiple=32):
         "scaleY": scaleY,
         "scaleMax": scaleMax,
         "resampleName": resampleName,
-        "result": result
+        "result": result,
+        "channel": channel
     }
 
-def resize(file, sizeLimit, side="w"):
-    fileArray = _fileArray(file)
+def resize(file, sizeLimit=2024, side="w"):
+    file = Image.fromarray(file)
 
-    height, width = fileArray.shape[:2]
+    width, height = file.size
 
     if side == "w":
         ratio = sizeLimit / width
         
-        targetWidth = sizeLimit
-        targetHeight = int(height * ratio)
+        widthTarget = sizeLimit
+        heightTarget = int(height * ratio)
     elif side == "h":
         ratio = sizeLimit / height
 
-        targetHeight = sizeLimit
-        targetWidth = int(width * ratio)
+        heightTarget = sizeLimit
+        widthTarget = int(width * ratio)
 
     if ratio < 1.0:
-        interpolation = cv2.INTER_LANCZOS4
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
+    elif ratio <= 2.0:
+        resample = Image.BICUBIC
+        resampleName = "BICUBIC"
     else:
-        interpolation = cv2.INTER_CUBIC
+        resample = Image.LANCZOS
+        resampleName = "LANCZOS"
 
-    imageResult = cv2.resize(fileArray, (targetWidth, targetHeight), interpolation=interpolation)
+    fileResize = file.resize((widthTarget, heightTarget), resample)
 
     if ratio < 1.0:
-        kernelSharpening = numpy.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-        imageResult = cv2.filter2D(imageResult, -1, kernelSharpening)
+        fileResize = fileResize.filter(ImageFilter.SHARPEN)
 
-    channel = 1 if imageResult.ndim == 2 else imageResult.shape[2]
+    result = numpy.array(fileResize)
 
-    return targetWidth, targetHeight, ratio, imageResult, channel
+    channel = 1 if result.ndim == 2 else result.shape[2]
+
+    return {
+        "sizeOriginal": (width, height),
+        "sizeNew": (widthTarget, heightTarget),
+        "ratio": ratio,
+        "resampleName": resampleName,
+        "result": result,
+        "channel": channel
+    }
 
 def rgbToGray(file):
     fileArray = _fileArray(file)

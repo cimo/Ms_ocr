@@ -35,7 +35,7 @@ PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 DEVICE = _checkEnvVariable("MS_O_DEVICE")
 
 class CraftDetection:
-    def _boxCreation(self, scoreText, _, ratioWidth, ratioHeight):
+    def _boxCreation(self, scoreText, _, scaleX, scaleY):
         scoreText = numpy.where(scoreText > 0.2, scoreText, 0)
         #scoreLink = numpy.where(scoreLink > 0.2, scoreLink, 0)
 
@@ -87,10 +87,10 @@ class CraftDetection:
                 w = newW
                 h = newH
 
-            x = int(x / ratioWidth * 2)
-            y = int(y / ratioHeight * 2)
-            w = int(w / ratioWidth * 2)
-            h = int(h / ratioHeight * 2)
+            x = int(x / scaleX * 2)
+            y = int(y / scaleY * 2)
+            w = int(w / scaleX * 2)
+            h = int(h / scaleY * 2)
 
             boxList.append((x, y, w, h))
 
@@ -166,10 +166,10 @@ class CraftDetection:
 
         return resultBoxList
 
-    def _result(self, scoreText, scoreLink, imageOpen, ratioWidth, ratioHeight):
+    def _result(self, scoreText, scoreLink, scaleX, scaleY, imageOpen):
         resultMergeList = []
 
-        boxList = self._boxCreation(scoreText, scoreLink, ratioWidth, ratioHeight)
+        boxList = self._boxCreation(scoreText, scoreLink, scaleX, scaleY)
         
         for (x, y, w, h) in boxList:
             imageProcessor.rectangle(imageOpen, x, y, w, h, (0, 0, 255), 1)
@@ -200,8 +200,8 @@ class CraftDetection:
 
         return imageResult
 
-    def _inference(self, imageResizeCnn, detector, refineNet):
-        imageNormalize  = self._normalize(imageResizeCnn)
+    def _inference(self, imageResizeMultipleResult, detector, refineNet):
+        imageNormalize  = self._normalize(imageResizeMultipleResult)
         imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
         modelInput = torchAutogradVariable(imageTensor.unsqueeze(0))
         
@@ -226,40 +226,26 @@ class CraftDetection:
 
         return scoreText, scoreLink
 
-    def _resizeCnn(self, targetWidth, targetHeight, channel, imageResize):
-        target32Width = targetWidth
-        target32Height = targetHeight
-        
-        if targetHeight % 32 != 0:
-            target32Height = targetHeight + (32 - targetHeight % 32)
-        
-        if targetWidth % 32 != 0:
-            target32Width = targetWidth + (32 - targetWidth % 32)
-        
-        imageResult = numpy.zeros((target32Height, target32Width, channel), dtype=numpy.float32)
-        imageResult[0:targetHeight, 0:targetWidth, :] = imageResize
-
-        return imageResult
-
     def _preprocess(self):
         imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageResize = imageProcessor.resize(imageOpen)
+        imageResizeMultiple = imageProcessor.resizeMultiple(imageResize["result"])
 
-        targetWidth, targetHeight, ratioWidth, ratioHeight, imageResize, channel = imageProcessor.resize(imageOpen, 1280)
+        scaleX = imageResize["ratio"] * imageResizeMultiple["scaleX"]
+        scaleY = imageResize["ratio"] * imageResizeMultiple["scaleY"]
 
-        imageGray = imageProcessor.gray(imageResize)
+        imageGray = imageProcessor.rgbToGray(imageResize["result"])
 
         imageBinarize = imageProcessor.binarization(imageGray)
 
         imageNoiseRemove = imageProcessor.noiseRemove(imageBinarize)
 
-        imageColor = imageProcessor.color(imageNoiseRemove)
-
-        imageResizeCnn = self._resizeCnn(targetWidth, targetHeight, channel, imageColor)
+        imageColor = imageProcessor.grayToRgb(imageNoiseRemove)
 
         if self.isDebug:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
-        return imageOpen, ratioWidth, ratioHeight, imageResizeCnn
+        return imageOpen, imageResizeMultiple, scaleX, scaleY
 
     def _removeDataParallel(self, stateDict):
         if list(stateDict.keys())[0].startswith("module"):
@@ -330,11 +316,11 @@ class CraftDetection:
             refineNet = RefineNet()
             refineNet = self._refineNetEval(refineNet)
 
-        imageOpen, ratioWidth, ratioHeight, imageResizeCnn = self._preprocess()
+        imageOpen, imageResizeMultiple, scaleX, scaleY = self._preprocess()
 
-        scoreText, scoreLink = self._inference(imageResizeCnn, detector, refineNet)
+        scoreText, scoreLink = self._inference(imageResizeMultiple["result"], detector, refineNet)
 
-        self.resultMainList = self._result(scoreText, scoreLink, imageOpen, ratioWidth, ratioHeight)
+        self.resultMainList = self._result(scoreText, scoreLink, scaleX, scaleY, imageOpen)
     
     def getResultMainList(self):
         return self.resultMainList

@@ -294,8 +294,7 @@ class EnginePaddle:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue, fileNameValue, isDebugValue, uniqueIdValue):
-        self.language = languageValue
+    def _execute(self, fileNameValue, isDebugValue, uniqueIdValue):
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.isDebug = isDebugValue
@@ -312,7 +311,6 @@ class EnginePaddle:
         print("ok", flush=True)
 
     def __init__(self):
-        self.language = ""
         self.fileName = ""
         self.isDebug = False
         self.uniqueId = ""

@@ -41,8 +41,6 @@ class EngineTesseract:
             resultLanguage = "jpn_vert"
             resultPsm = 5
 
-        os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/engine_tesseract/language/"
-
         subprocess.run([
             f"{PATH_ROOT}src/library/engine_tesseract/executable",
             f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}_crop.jpg",
@@ -71,26 +69,26 @@ class EngineTesseract:
             "-c", "tessedit_create_boxfile=0"
         ], check=True)
 
-    def _crop(self, resultMainList, imageOpen):
+    def _inference(self, resultMainList, imageOpen):
         resultList = []
 
-        pilImage, pilImageDraw, pilFont = imageProcessor.pilImage(imageOpen, self.fontName, 14)
+        pilImage, pilImageDraw = imageProcessor.pilImage(imageOpen)
 
-        for index, bboxList in enumerate(resultMainList):
-            bbox = bboxList["bbox_list"]
+        for index, resultMain in enumerate(resultMainList):
+            bboxList = resultMain["bbox_list"]
 
-            left = int(bbox[0])
-            top = int(bbox[1])
-            width = int(bbox[2])
-            height = int(bbox[3])
+            left = int(bboxList[0])
+            top = int(bboxList[1])
+            width = int(bboxList[2])
+            height = int(bboxList[3])
             right = left + width
             bottom = top + height
 
             imageCrop = imageOpen[top:bottom, left:right]
 
-            _, _, _, _, imageResize, _ = imageProcessor.resize(imageCrop, 32, "h")
+            imageResizeMultiple = imageProcessor.resizeMultiple(imageCrop)
 
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResize)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResizeMultiple["result"])
 
             self._subprocess(index)
 
@@ -99,10 +97,11 @@ class EngineTesseract:
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}.txt", "r", encoding="utf-8") as file:
                 text = file.read().strip()
 
+                pilFont = imageProcessor.pilFont(text, width, height, self.fontName)
                 pilImageDraw.text((left, top), text, font=pilFont, fill=(0, 0, 0))
         
             resultList.append({
-                "bbox_list": bbox,
+                "bbox_list": bboxList,
                 "text": text
             })
         
@@ -127,12 +126,14 @@ class EngineTesseract:
         self._createOutputDir()
 
         imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
-
-        self._crop(craftDetection.resultMainList, imageOpen)
+        
+        self._inference(craftDetection.resultMainList, imageOpen)
 
         print("ok", flush=True)
 
     def __init__(self):
+        os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/engine_tesseract/language/"
+
         self.language = ""
         self.fileName = ""
         self.isDebug = False

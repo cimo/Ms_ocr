@@ -79,7 +79,7 @@ form-data
 
 key             value
 ---             ---
-language        (For paddle is empty. For tesseract will be like en+jp)
+language        (For paddle is empty. For tesseract will be like "en", "jp" or "jp_vert")
 file            jp_1.jpg
 isDebug         true
 ```
