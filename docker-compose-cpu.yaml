@@ -1,6 +1,6 @@
 services:
-  cimo_ms_ocr:
-    container_name: cimo-ms-ocr
+  cimo_ms_ocr_cpu:
+    container_name: cimo-ms-ocr-cpu
     env_file:
       - ./env/local.env
     build:
@@ -13,11 +13,16 @@ services:
         _LANG: ${LANG}
         _SERVER_PORT: ${SERVER_PORT}
         _PATH_ROOT: ${PATH_ROOT}
-    ports:
-      - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
+    network_mode: "host"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./:${PATH_ROOT}
       - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
 volumes:
   ms_cronjob-volume:

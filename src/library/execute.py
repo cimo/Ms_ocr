@@ -5,7 +5,6 @@ from main import engineActive
 
 language = sys.argv[1]
 fileName = sys.argv[2]
-isDebug = sys.argv[3].lower() == "true"
-uniqueId = sys.argv[4]
+uniqueId = sys.argv[3]
 
-engineActive._execute(language, fileName, isDebug, uniqueId)
+engineActive._execute(language, fileName, uniqueId)

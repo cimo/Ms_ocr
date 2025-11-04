@@ -1,0 +1,30 @@
+services:
+  cimo_ms_ocr_gpu:
+    container_name: cimo-ms-ocr-gpu
+    env_file:
+      - ./env/local.env
+    build:
+      context: ./
+      dockerfile: ./docker/${DOCKERFILE}
+      args:
+        _ENV_NAME: ${ENV_NAME}
+        _DOMAIN: ${DOMAIN}
+        _TIME_ZONE: ${TIME_ZONE}
+        _LANG: ${LANG}
+        _SERVER_PORT: ${SERVER_PORT}
+        _PATH_ROOT: ${PATH_ROOT}
+    network_mode: "host"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:${PATH_ROOT}
+      - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
+      - /dev/dri:/dev/dri
+    runtime: "nvidia"
+volumes:
+  ms_cronjob-volume:

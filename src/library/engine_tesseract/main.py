@@ -86,9 +86,9 @@ class EngineTesseract:
 
             imageCrop = imageOpen[top:bottom, left:right]
 
-            imageResizeMultiple = imageProcessor.resizeMultiple(imageCrop)
+            resizeMultiple = imageProcessor.resizeMultiple(imageCrop)
 
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", imageResizeMultiple["result"])
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", resizeMultiple["result"])
 
             self._subprocess(index)
 
@@ -114,14 +114,13 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue, fileNameValue, isDebugValue, uniqueIdValue):
+    def _execute(self, languageValue, fileNameValue, uniqueIdValue):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
-        self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
         
-        craftDetection = CraftDetection(self.fileName, self.isDebug, self.uniqueId)
+        craftDetection = CraftDetection(self.fileName, self.uniqueId)
 
         self._createOutputDir()
 
@@ -136,6 +135,5 @@ class EngineTesseract:
 
         self.language = ""
         self.fileName = ""
-        self.isDebug = False
         self.uniqueId = ""
         self.fontName = "NotoSansCJK-Regular.ttc"

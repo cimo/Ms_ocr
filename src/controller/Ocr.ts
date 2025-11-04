@@ -27,7 +27,6 @@ export default class ControllerOcr {
                 .then((resultControllerUploadList) => {
                     let fileName = "";
                     let language = "";
-                    let isDebug = "";
 
                     for (const resultControllerUpload of resultControllerUploadList) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
@@ -36,10 +35,6 @@ export default class ControllerOcr {
                                 : "";
                         } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
                             fileName = resultControllerUpload.fileName;
-                        } else if (resultControllerUpload.name === "isDebug" && resultControllerUpload.buffer) {
-                            isDebug = resultControllerUpload.buffer.toString().match("^(true|false)$")
-                                ? resultControllerUpload.buffer.toString()
-                                : "";
                         }
                     }
 
@@ -48,7 +43,7 @@ export default class ControllerOcr {
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${fileName}`;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${isDebug}"`, `"${uniqueId}"`];
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {

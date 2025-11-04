@@ -50,6 +50,29 @@ RUN cd ~ \
     fonts-noto-cjk \
     media-types \
     python3-pip \
+    # GPU
+    fuse \
+    libfuse2 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnss3 \
+    libnspr4 \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libxrandr2 \
+    libfreetype6 \
+    libfontconfig1 \
+    libasound2 \
+    libgomp1 \
+    libgbm1 \
+    libglu1-mesa \
+    libvulkan1 \
+    mesa-vulkan-drivers \
+    mesa-utils \
+    xdg-utils \
+    dbus \
+    dbus-x11 \
     # Tesseract
     cmake \
     g++ \
@@ -77,8 +100,14 @@ RUN python3 -m pip install pip --upgrade \
     && npm install \
     && npm run build
 
-# Library
-CMD python3 ${PATH_ROOT}src/library/main.py \
+# Nvidia
+CMD command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU." \
+    # Vulkan
+    && command -v vulkaninfo > /dev/null && vulkaninfo | grep "deviceName" || echo "Host without vulkan support." \
+    # OpenGL
+    && command -v glxinfo > /dev/null && glxinfo | grep "OpenGL renderer string" || echo "Host without opengl support." \
+    # Library
+    && python3 ${PATH_ROOT}src/library/main.py \
     # Node
     && node ${PATH_ROOT}dist/src/controller/Server.js
 

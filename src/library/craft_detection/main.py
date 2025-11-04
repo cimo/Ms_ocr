@@ -2,6 +2,8 @@ import os
 import logging
 import ast
 import json
+import subprocess
+import shutil
 import numpy
 import torch
 import torch.backends.cudnn as torchBackendCudnn
@@ -30,9 +32,9 @@ def _checkEnvVariable(varKey):
 
 ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
+DEBUG = _checkEnvVariable("MS_O_DEBUG")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
-DEVICE = _checkEnvVariable("MS_O_DEVICE")
 
 class CraftDetection:
     def _boxCreation(self, scoreText, _, scaleX, scaleY):
@@ -59,7 +61,7 @@ class CraftDetection:
 
         imageDilate = imageProcessor.dilate(imageEroded, 3, 1)
 
-        if self.isDebug:
+        if DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
 
         mergeBoxTollerance = 10
@@ -178,7 +180,7 @@ class CraftDetection:
                 "bbox_list": [x, y, w, h]
             })
 
-        if self.isDebug:
+        if DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
@@ -200,12 +202,12 @@ class CraftDetection:
 
         return imageResult
 
-    def _inference(self, imageResizeMultipleResult, detector, refineNet):
-        imageNormalize  = self._normalize(imageResizeMultipleResult)
+    def _inference(self, resizeMultipleResult, detector, refineNet):
+        imageNormalize  = self._normalize(resizeMultipleResult)
         imageTensor = torch.from_numpy(imageNormalize).permute(2, 0, 1)
         modelInput = torchAutogradVariable(imageTensor.unsqueeze(0))
         
-        if DEVICE == "gpu":
+        if self.device == "gpu":
             modelInput = modelInput.cuda()
 
         with torch.no_grad():
@@ -228,13 +230,13 @@ class CraftDetection:
 
     def _preprocess(self):
         imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
-        imageResize = imageProcessor.resize(imageOpen)
-        imageResizeMultiple = imageProcessor.resizeMultiple(imageResize["result"])
+        resize = imageProcessor.resize(imageOpen)
+        resizeMultiple = imageProcessor.resizeMultiple(resize["result"])
 
-        scaleX = imageResize["ratio"] * imageResizeMultiple["scaleX"]
-        scaleY = imageResize["ratio"] * imageResizeMultiple["scaleY"]
+        scaleX = resize["ratio"] * resizeMultiple["scaleX"]
+        scaleY = resize["ratio"] * resizeMultiple["scaleY"]
 
-        imageGray = imageProcessor.rgbToGray(imageResize["result"])
+        imageGray = imageProcessor.rgbToGray(resize["result"])
 
         imageBinarize = imageProcessor.binarization(imageGray)
 
@@ -242,10 +244,10 @@ class CraftDetection:
 
         imageColor = imageProcessor.grayToRgb(imageNoiseRemove)
 
-        if self.isDebug:
+        if DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
-        return imageOpen, imageResizeMultiple, scaleX, scaleY
+        return imageOpen, resizeMultiple, scaleX, scaleY
 
     def _removeDataParallel(self, stateDict):
         if list(stateDict.keys())[0].startswith("module"):
@@ -264,7 +266,7 @@ class CraftDetection:
 
     def _refineNetEval(self, refineNet):
         if self.isRefine:
-            if DEVICE == "gpu":
+            if self.device == "gpu":
                 refineNet.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightRefine)))
 
                 refineNet = torch.nn.DataParallel(refineNet.cuda())
@@ -280,7 +282,7 @@ class CraftDetection:
             return None
 
     def _detectorEval(self, detector):
-        if DEVICE == "gpu":
+        if self.device == "gpu":
             detector.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightMain)))
 
             detector = torch.nn.DataParallel(detector.cuda())
@@ -293,10 +295,17 @@ class CraftDetection:
 
         return detector
 
-    def __init__(self, fileNameValue, isDebugValue, uniqueIdValue):
+    def __init__(self, fileNameValue, uniqueIdValue):
         self.fileName = fileNameValue
-        self.isDebug = isDebugValue
         self.uniqueId = uniqueIdValue
+        
+        self.device = "cpu"
+
+        if shutil.which("nvidia-smi") is not None:
+            subprocessRun = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            
+            if subprocessRun.returncode == 0 and subprocessRun.stdout.strip():
+                self.device = "gpu"
 
         self.pathWeightMain = f"{PATH_ROOT}src/library/craft_detection/mlt_25k.pth"
         self.pathWeightRefine = f"{PATH_ROOT}src/library/craft_detection/refiner_CTW1500.pth"
@@ -316,9 +325,9 @@ class CraftDetection:
             refineNet = RefineNet()
             refineNet = self._refineNetEval(refineNet)
 
-        imageOpen, imageResizeMultiple, scaleX, scaleY = self._preprocess()
+        imageOpen, resizeMultiple, scaleX, scaleY = self._preprocess()
 
-        scoreText, scoreLink = self._inference(imageResizeMultiple["result"], detector, refineNet)
+        scoreText, scoreLink = self._inference(resizeMultiple["result"], detector, refineNet)
 
         self.resultMainList = self._result(scoreText, scoreLink, scaleX, scaleY, imageOpen)
     
