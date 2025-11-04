@@ -318,17 +318,17 @@ class EnginePaddle:
         self.uniqueId = ""
         self.fontName = "NotoSansCJK-Regular.ttc"
 
-        self.modelDetextionName = "PP-OCRv5_mobile_det" if DEVICE == "cpu" else "PP-OCRv5_server_det"
+        self.modelDetectionName = "PP-OCRv5_mobile_det" if DEVICE == "cpu" else "PP-OCRv5_server_det"
         self.modelRecognitionName = "PP-OCRv5_mobile_rec" if DEVICE == "cpu" else "PP-OCRv5_server_rec"
 
-        self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_det/"
+        self.pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/{self.modelDetectionName}/"
         self.pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
         self.pathModelLayout = f"{PATH_ROOT}src/library/engine_paddle/PP-DocLayout_plus-L/"
         self.pathModelTableClassification = f"{PATH_ROOT}src/library/engine_paddle/PP-LCNet_x1_0_table_cls/"
         self.pathModelTableWired = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wired_table_cell_det/"
         self.pathModelTableWireless = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wireless_table_cell_det/"
 
-        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name="PP-OCRv5_server_det", device=DEVICE)
+        self.textDetectionInit = TextDetection(model_dir=self.pathModelTextDetection, model_name=self.modelDetectionName, device=DEVICE)
         self.textRecognitionInit = TextRecognition(model_dir=self.pathModelTextRecognition, model_name=self.modelRecognitionName, device=DEVICE)
         self.layoutInit = LayoutDetection(model_dir=self.pathModelLayout, model_name="PP-DocLayout_plus-L", device=DEVICE)
         self.tableClassificationInit = TableClassification(model_dir=self.pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=DEVICE)
