@@ -48,7 +48,7 @@ export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVE
 export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
 export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
 export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
-export const DEBUG = Ce.checkVariable("MS_O_DEBUG") || (process.env.MS_O_DEBUG as string);
+export const IS_DEBUG = Ce.checkVariable("MS_O_IS_DEBUG") || (process.env.MS_O_IS_DEBUG as string);
 export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
 export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
 export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
@@ -108,7 +108,7 @@ export const localeFormat = (value: number | Date, isTime = true): string | unde
 };
 
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
-    if (DEBUG === "true") {
+    if (IS_DEBUG === "true") {
         if (typeof process !== "undefined") {
             Fs.appendFile(`${PATH_ROOT}${PATH_LOG}debug.log`, `${tag}: ${value.toString()}\n`, () => {
                 // eslint-disable-next-line no-console

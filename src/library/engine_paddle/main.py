@@ -26,7 +26,7 @@ def _checkEnvVariable(varKey):
 
 ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
-DEBUG = _checkEnvVariable("MS_O_DEBUG")
+IS_DEBUG = _checkEnvVariable("MS_O_IS_DEBUG")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
@@ -87,7 +87,7 @@ class EnginePaddle:
         resultMergeList = []
         pilFont = None
 
-        if DEBUG:
+        if IS_DEBUG:
             pilImage, pilImageDraw = imageProcessor.pilImage(imageOpen)
 
         inferenceTextDataList = self._inferenceText(imageOpen, False)
@@ -105,7 +105,7 @@ class EnginePaddle:
             right = int(max(x))
             bottom = int(max(y))
             
-            if DEBUG:
+            if IS_DEBUG:
                 imageCrop = imageOpen[top:bottom, left:right, :]
 
                 imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", imageCrop)
@@ -119,7 +119,7 @@ class EnginePaddle:
                 bboxList = inferenceTextData["bbox_list"]
                 text = inferenceTextData["text"]
 
-                if DEBUG:
+                if IS_DEBUG:
                     cellX1 = min(left, right)
                     cellY1 = min(top, bottom)
                     cellX2 = max(left, right)
@@ -135,12 +135,12 @@ class EnginePaddle:
                 if self._textOverlapCell(bboxList, [left, top, right, bottom]):
                     pilFont = imageProcessor.pilFont(text, bboxList[2], bboxList[3], self.fontName)
 
-                    if DEBUG:
+                    if IS_DEBUG:
                         pilImageDraw.text((bboxList[0], bboxList[1]), text, font=pilFont, fill=(0, 0, 0))
 
                     resultMergeList[index]["text_list"].append(text)
 
-        if DEBUG:
+        if IS_DEBUG:
             pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
@@ -153,7 +153,7 @@ class EnginePaddle:
         dataList = self.tableCellDetectionWireless.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
-            if DEBUG:
+            if IS_DEBUG:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.json")
 
             self._processTable("wireless", data, imageOpen, count)
@@ -162,7 +162,7 @@ class EnginePaddle:
         dataList = self.tableCellDetectionWired.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
-            if DEBUG:
+            if IS_DEBUG:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.json")
 
             self._processTable("wired", data, imageOpen, count)
@@ -176,12 +176,12 @@ class EnginePaddle:
             resultLabel = labelNameList[resultIndex]
 
             if (resultLabel == "wired_table"):
-                if DEBUG:
+                if IS_DEBUG:
                     imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wired/{count}.jpg", "", imageOpen)
 
                 self._inferenceTableWired(imageOpen, count)
             elif (resultLabel == "wireless_table"):
-                if DEBUG:
+                if IS_DEBUG:
                     imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", imageOpen)
 
                 self._inferenceTableWireless(imageOpen, count)
@@ -190,7 +190,7 @@ class EnginePaddle:
         dataList = self.tableClassification.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
-            if DEBUG:
+            if IS_DEBUG:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/table/classification/{count}.json")
 
             self._extractTableCell(data, imageOpen, count)
@@ -225,7 +225,7 @@ class EnginePaddle:
         dataList = self.layout.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
-            if DEBUG:
+            if IS_DEBUG:
                 data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE_OUTPUT}paddle/{self.uniqueId}/layout/{self.fileNameSplit}.json")
 
             self._extractTable(data, imageOpen)

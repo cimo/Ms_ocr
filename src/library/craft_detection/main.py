@@ -32,7 +32,7 @@ def _checkEnvVariable(varKey):
 
 ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
-DEBUG = _checkEnvVariable("MS_O_DEBUG")
+IS_DEBUG = _checkEnvVariable("MS_O_IS_DEBUG")
 PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
 PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
 
@@ -61,7 +61,7 @@ class CraftDetection:
 
         imageDilate = imageProcessor.dilate(imageEroded, 3, 1)
 
-        if DEBUG:
+        if IS_DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
 
         mergeBoxTollerance = 10
@@ -180,7 +180,7 @@ class CraftDetection:
                 "bbox_list": [x, y, w, h]
             })
 
-        if DEBUG:
+        if IS_DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
 
             with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
@@ -244,7 +244,7 @@ class CraftDetection:
 
         imageColor = imageProcessor.grayToRgb(imageNoiseRemove)
 
-        if DEBUG:
+        if IS_DEBUG:
             imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
         return imageOpen, resizeMultiple, scaleX, scaleY
