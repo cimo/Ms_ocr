@@ -58,6 +58,7 @@ RUN cd ~ \
     dbus \
     dbus-x11 \
     # GPU
+    && apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgtk-3-0 \
     libnss3 \
@@ -77,6 +78,7 @@ RUN cd ~ \
     mesa-utils \
     xdg-utils \
     # Tesseract
+    && apt-get update && apt-get install -y \
     cmake \
     g++ \
     pkg-config \
