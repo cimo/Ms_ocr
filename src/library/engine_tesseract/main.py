@@ -136,4 +136,4 @@ class EngineTesseract:
         self.language = ""
         self.fileName = ""
         self.uniqueId = ""
-        self.fontName = "NotoSansCJK-Regular.ttc"
+        self.fontName = "NotoSansJP-Regular.ttf"

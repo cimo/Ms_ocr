@@ -20,6 +20,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NOWARNINGS=yes
 ENV SUDO_FORCE_REMOVE=yes
 ENV NODE_OPTIONS=--use-openssl-ca
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 ENV PATH="${PATH}:${PATH_ROOT}.local/bin/:/root/.local/bin/"
 ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
@@ -92,6 +95,8 @@ WORKDIR ${PATH_ROOT}
 # Pip
 RUN python3 -m pip install pip --upgrade \
     && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
+    # Engine package
+    && bash ${PATH_ROOT}script/engine_package.sh \
     # Npm
     && rm -rf node_modules package-lock.json \
     && npm install \

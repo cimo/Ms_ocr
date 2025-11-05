@@ -25,6 +25,7 @@ pnpm-debug.log*
 .local
 .ms_cronjob-volume
 .npm
+.nv
 .paddlex
 certificate/*
 !certificate/.gitkeep

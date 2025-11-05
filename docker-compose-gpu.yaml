@@ -13,7 +13,8 @@ services:
         _LANG: ${LANG}
         _SERVER_PORT: ${SERVER_PORT}
         _PATH_ROOT: ${PATH_ROOT}
-    network_mode: "host"
+    ports:
+      - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
     volumes:
       - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
       - /var/run/docker.sock:/var/run/docker.sock

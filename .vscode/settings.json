@@ -6,6 +6,7 @@
         ".local",
         ".ms_cronjob-volume",
         ".npm",
+        ".nv",
         ".paddlex",
         "dist",
         "file",

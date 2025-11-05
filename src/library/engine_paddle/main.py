@@ -2,7 +2,6 @@ import os
 import logging
 import ast
 import json
-import subprocess
 import shutil
 from paddleocr import LayoutDetection, TableClassification, TableCellsDetection, TextDetection, TextRecognition
 
@@ -313,15 +312,9 @@ class EnginePaddle:
     def __init__(self):
         self.fileName = ""
         self.uniqueId = ""
-        self.fontName = "NotoSansCJK-Regular.ttc"
+        self.fontName = "NotoSansJP-Regular.ttf"
         
-        self.device = "cpu"
-
-        if shutil.which("nvidia-smi") is not None:
-            subprocessRun = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-            
-            if subprocessRun.returncode == 0 and subprocessRun.stdout.strip():
-                self.device = "gpu"
+        self.device = "gpu" if shutil.which("nvidia-smi") is not None else "cpu"
 
         self.modelDetectionName = "PP-OCRv5_mobile_det" if self.device == "cpu" else "PP-OCRv5_server_det"
         self.modelRecognitionName = "PP-OCRv5_mobile_rec" if self.device == "cpu" else "PP-OCRv5_server_rec"
