@@ -30,7 +30,7 @@ export default class Upload {
                 if (resultCheckRequest === "") {
                     for (const formData of formDataList) {
                         if (formData.name === "file" && formData.fileName && formData.buffer) {
-                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${formData.fileName}`;
+                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${formData.fileName}`;
 
                             if (isFileExists && Fs.existsSync(input)) {
                                 reject("File exists.");

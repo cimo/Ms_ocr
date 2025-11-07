@@ -16,9 +16,9 @@ services:
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
     volumes:
+      - ./:${PATH_ROOT}
       - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./:${PATH_ROOT}
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
 volumes:

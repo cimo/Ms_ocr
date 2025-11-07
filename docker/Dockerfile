@@ -20,23 +20,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NOWARNINGS=yes
 ENV SUDO_FORCE_REMOVE=yes
 ENV NODE_OPTIONS=--use-openssl-ca
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=all
-ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 ENV PATH="${PATH}:${PATH_ROOT}.local/bin/:/root/.local/bin/"
 ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 
-COPY ./certificate/proxy/ /usr/local/share/ca-certificates/
+COPY ./.ms_cronjob-volume/certificate/proxy/* /usr/local/share/ca-certificates/
 COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
     # No root
-    && mkdir -p ${PATH_ROOT} \
     && useradd -U node -d ${PATH_ROOT} -s /bin/bash \
+    && mkdir -p ${PATH_ROOT} \
     && chown -R node:node ${PATH_ROOT} \
     && chmod -R 775 ${PATH_ROOT} \
     # Update
@@ -100,8 +100,6 @@ WORKDIR ${PATH_ROOT}
 # Pip
 RUN python3 -m pip install pip --upgrade \
     && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
-    # Engine package
-    && bash ${PATH_ROOT}script/engine_package.sh \
     # Npm
     && rm -rf node_modules package-lock.json \
     && npm install \
@@ -113,6 +111,8 @@ CMD command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=cs
     && command -v vulkaninfo > /dev/null && vulkaninfo | grep "deviceName" || echo "Host without vulkan support." \
     # OpenGL
     && command -v glxinfo > /dev/null && glxinfo | grep "OpenGL renderer string" || echo "Host without opengl support." \
+    # Engine package
+    && bash ${PATH_ROOT}script/engine_package.sh \
     # Library
     && python3 ${PATH_ROOT}src/library/main.py \
     # Node

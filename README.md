@@ -2,7 +2,8 @@
 
 Microservice OCR.
 
-Depend from Ms_cronjob (use the volume "ms_cronjob-volume" for share the certificate).
+Depend from Ms_cronjob (use "ms_cronjob-volume" for share the certificate).
+It's possible use personal certificate instead "Ms_cronjob", just put the certificate in ".ms_cronjob-volume" folder before the build.
 
 ## Info:
 
@@ -46,15 +47,11 @@ OpenGL renderer string: llvmpipe (LLVM 15.0.7, 256 bits) - (OpenGL emulate on CP
 
     - .cache
     - .local
-    - .ms_cronjob-volume
     - .npm
     - .nv
     - .paddlex
     - node_modules
     - package-lock.json
-    - certificate/tls.crt
-    - certificate/tls.key
-    - certificate/tls.pem
 
 2. Follow the "Installation" instructions.
 

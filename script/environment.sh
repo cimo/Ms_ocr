@@ -13,7 +13,7 @@ then
             value=$(echo "${line}" | cut -d "=" -f 2-)
             value=$(echo "${value}" | sed "s/^'\(.*\)'$/\1/")
 
-            if [ -z "$(printenv ${key})" ]
+            if [ -z "$(printenv "${key}")" ]
             then
                 export "${key}=${value}"
             fi

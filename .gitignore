@@ -23,14 +23,9 @@ pnpm-debug.log*
 # cimo +
 .cache
 .local
-.ms_cronjob-volume
 .npm
 .nv
 .paddlex
-certificate/*
-!certificate/.gitkeep
-certificate/proxy/*
-!certificate/proxy/.gitkeep
 dist
 file/input/*
 !file/input/.gitkeep

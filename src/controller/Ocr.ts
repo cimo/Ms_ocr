@@ -40,9 +40,9 @@ export default class ControllerOcr {
 
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_INPUT}${fileName}`;
+                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
 
-                    const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_SCRIPT}command1.sh`;
+                    const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
@@ -61,22 +61,22 @@ export default class ControllerOcr {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
                             const dataJsonList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/export/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`,
                                 ".json"
                             );
 
                             const dataPdfList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/export/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`,
                                 ".pdf"
                             );
 
                             const dataXlsxList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/table/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`,
                                 ".xlsx"
                             );
 
                             const dataHtmlList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/table/`,
+                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`,
                                 ".html"
                             );
 
@@ -84,7 +84,7 @@ export default class ControllerOcr {
 
                             for (const dataJson of dataJsonList) {
                                 jsonList.push(
-                                    dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
                                 );
                             }
 
@@ -92,7 +92,7 @@ export default class ControllerOcr {
 
                             for (const dataPdf of dataPdfList) {
                                 pdfList.push(
-                                    dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
                                 );
                             }
 
@@ -100,7 +100,7 @@ export default class ControllerOcr {
 
                             for (const dataXlsx of dataXlsxList) {
                                 excelList.push(
-                                    dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
                                 );
                             }
 
@@ -108,7 +108,7 @@ export default class ControllerOcr {
 
                             for (const dataHtml of dataHtmlList) {
                                 htmlList.push(
-                                    dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
                                 );
                             }
 
@@ -141,7 +141,7 @@ export default class ControllerOcr {
             const uniqueId = requestBody.uniqueId;
             const pathFile = requestBody.pathFile;
 
-            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE_OUTPUT}${helperSrc.ENGINE}/${uniqueId}/${pathFile}`;
+            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/${pathFile}`;
 
             helperSrc.fileReadStream(path, async (resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {

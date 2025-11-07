@@ -25,8 +25,7 @@ def _checkEnvVariable(varKey):
 
 ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
-PATH_FILE_INPUT = _checkEnvVariable("MS_O_PATH_FILE_INPUT")
-PATH_FILE_OUTPUT = _checkEnvVariable("MS_O_PATH_FILE_OUTPUT")
+PATH_FILE = _checkEnvVariable("MS_O_PATH_FILE")
 
 class EngineTesseract:
     def _subprocess(self, index):
@@ -43,8 +42,8 @@ class EngineTesseract:
 
         subprocess.run([
             f"{PATH_ROOT}src/library/engine_tesseract/executable",
-            f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}_crop.jpg",
-            f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}",
+            f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/layout/{index}_crop.jpg",
+            f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/export/{self.fileNameSplit}",
             f"-l", f"eng+{resultLanguage}" if resultLanguage != "eng" else resultLanguage,
             "--psm", str(resultPsm),
             "--oem", "1",
@@ -88,13 +87,13 @@ class EngineTesseract:
 
             resizeMultiple = imageProcessor.resizeMultiple(imageCrop)
 
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", resizeMultiple["result"])
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/layout/{index}.jpg", "_crop", resizeMultiple["result"])
 
             self._subprocess(index)
 
             text = ""
 
-            with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}.txt", "r", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/export/{self.fileNameSplit}.txt", "r", encoding="utf-8") as file:
                 text = file.read().strip()
 
                 pilFont = imageProcessor.pilFont(text, width, height, self.fontName)
@@ -105,14 +104,14 @@ class EngineTesseract:
                 "text": text
             })
         
-        pilImage.save(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
+        pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
-        with open(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+        with open(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
             json.dump(resultList, file, ensure_ascii=False, indent=2)
 
     def _createOutputDir(self):
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/layout/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE_OUTPUT}tesseract/{self.uniqueId}/export/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/layout/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/tesseract/{self.uniqueId}/export/", exist_ok=True)
 
     def _execute(self, languageValue, fileNameValue, uniqueIdValue):
         self.language = languageValue
@@ -124,7 +123,7 @@ class EngineTesseract:
 
         self._createOutputDir()
 
-        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE_INPUT}{self.fileName}")
+        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
         
         self._inference(craftDetection.resultMainList, imageOpen)
 
