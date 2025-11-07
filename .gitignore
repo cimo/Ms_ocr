@@ -34,6 +34,7 @@ file/output/*
 log/*
 !log/.gitkeep
 node_modules
+package-lock.json
 public/file/*
 !public/file/.gitkeep
 public/asset/js/*
@@ -41,4 +42,3 @@ public/asset/js/*
 public/asset/style/*
 !public/asset/style/.gitkeep
 public/index.html
-package-lock.json
