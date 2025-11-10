@@ -2,8 +2,8 @@
 
 Microservice OCR.
 
-Depend from Ms_cronjob (use "ms_cronjob-volume" for share the certificate).
-It's possible use personal certificate instead "Ms_cronjob", just put the certificate in ".ms_cronjob-volume" folder before the build.
+Depend from "Ms_cronjob" (use "ms_cronjob-volume" for share the certificate).
+It's possible to use a personal certificate instead of "Ms_cronjob", just add the certificate in the ".ms_cronjob-volume" folders.
 
 ## Info:
 
@@ -13,24 +13,22 @@ It's possible use personal certificate instead "Ms_cronjob", just put the certif
 
 ## Installation
 
-1. For full build with GPU write on terminal:
+1. For build and up with GPU write on terminal:
 
 ```
-docker compose -f docker-compose-gpu.yaml --env-file ./env/local.env build --no-cache \
-&& docker compose -f docker-compose-gpu.yaml --env-file ./env/local.env up --detach --pull "always"
+bash docker/container_execute.sh "local" "build-up" "gpu"
 ```
 
-2. For full build with CPU write on terminal:
+2. For build and up with CPU write on terminal:
 
 ```
-docker compose -f docker-compose-cpu.yaml --env-file ./env/local.env build --no-cache \
-&& docker compose -f docker-compose-cpu.yaml --env-file ./env/local.env up --detach --pull "always"
+bash docker/container_execute.sh "local" "build-up" "cpu"
 ```
 
-3. For light build (just env variable change) remove the container and write on terminal:
+3. Just for up write on terminal:
 
 ```
-docker compose -f docker-compose-xxx.yaml --env-file ./env/local.env up --detach --pull "always"
+bash docker/container_execute.sh "local" "up" "xxx"
 ```
 
 ## GPU

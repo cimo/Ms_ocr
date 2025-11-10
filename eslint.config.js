@@ -5,7 +5,7 @@ const typescriptParser = require("@typescript-eslint/parser");
 const typescriptPlugin = require("@typescript-eslint/eslint-plugin");
 
 const configIgnore = {
-    ignores: ["dist", "node_modules", "public", ".cache", ".config", ".local", ".ms_cronjob-volume", ".npm", ".pki"]
+    ignores: ["dist", "node_modules", "public", ".cache", ".config", ".dbus", ".local", ".npm", ".nv", ".pki"]
 };
 
 const configBase = {

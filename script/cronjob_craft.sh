@@ -2,18 +2,21 @@
 
 pathOutput="${PATH_ROOT}${PATH_FILE}output/craft/*/"
 
-if [ -z "${PATH_ROOT}" ]; then
+if [ -z "${PATH_ROOT}" ]
+then
     exit 1
 fi
 
 currentTime=$(date +%s)
 
 for data in "${pathOutput}"; do
-    if [ -d "${data}" ]; then
+    if [ -d "${data}" ]
+    then
         statData=$(stat -c %Y "${data}")
         time=$((currentTime - statData))
 
-        if [ ${time} -gt 600 ]; then
+        if [ ${time} -gt 600 ]
+        then
             rm -rf "${data}"
 
             echo "Folder '${data}' removed."

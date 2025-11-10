@@ -74,7 +74,7 @@ export const localeFromEnvName = (): string => {
 
 export const LOCALE = localeFromEnvName();
 
-export const localeFormat = (value: number | Date, isTime = true): string | undefined => {
+export const localeFormat = (value: number | Date, isMonth = true, isDay = true, isTime = true): string | undefined => {
     if (typeof value === "number") {
         const formatOption: Intl.NumberFormatOptions = {
             style: "decimal",
@@ -84,23 +84,31 @@ export const localeFormat = (value: number | Date, isTime = true): string | unde
         return new Intl.NumberFormat(localeConfiguration[LOCALE].locale, formatOption).format(value);
     } else if (value instanceof Date) {
         let formatOption: Intl.DateTimeFormatOptions = {
-            year: "numeric",
-            month: "numeric",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
+            year: "numeric"
         };
 
-        if (!isTime) {
-            formatOption = {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric"
-            };
+        if (isMonth) {
+            formatOption.month = "numeric";
         }
 
-        return new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOption).format(value);
+        if (isDay) {
+            formatOption.day = "numeric";
+        }
+
+        if (isTime) {
+            formatOption.hour = "2-digit";
+            formatOption.minute = "2-digit";
+            formatOption.second = "2-digit";
+            formatOption.hour12 = false;
+        }
+
+        let result = new Intl.DateTimeFormat(localeConfiguration[LOCALE].locale, formatOption).format(value);
+
+        if (!isMonth && !isDay && !isTime) {
+            result = parseInt(result).toString();
+        }
+
+        return result;
     }
 
     return undefined;
