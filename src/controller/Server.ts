@@ -135,6 +135,6 @@ const controllerServer = new Server();
 controllerServer.createSetting();
 controllerServer.createServer();
 
-Cc.execute(`${helperSrc.PATH_ROOT}file/cronjob/`);
+Cc.execute(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}cronjob/`);
 
 helperSrc.keepProcess();
