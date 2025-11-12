@@ -108,7 +108,7 @@ CMD python3 -m pip install pip --upgrade \
     # Library
     && python3 ${PATH_ROOT}src/library/main.py \
     # Npm
-    && rm -rf node_modules/ package-lock.json \
+    && rm -rf ${PATH_ROOT}node_modules/ ${PATH_ROOT}package-lock.json \
     && npm install \
     && npm run execute
 
