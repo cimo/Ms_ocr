@@ -84,8 +84,8 @@ export default class Server {
         if (helperSrc.localeFromEnvName() === "jp") {
             creation = Https.createServer(
                 {
-                    key: Fs.readFileSync(`${helperSrc.PATH_ROOT}${helperSrc.PATH_CERTIFICATE_KEY}`),
-                    cert: Fs.readFileSync(`${helperSrc.PATH_ROOT}${helperSrc.PATH_CERTIFICATE_CRT}`)
+                    key: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_KEY),
+                    cert: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_CRT)
                 },
                 this.app
             );

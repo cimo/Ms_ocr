@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pathOutput="${PATH_ROOT}${PATH_FILE}output/paddle/*/"
+pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/paddle/"
 
 if [ -z "${PATH_ROOT}" ]
 then
@@ -9,11 +9,12 @@ fi
 
 currentTime=$(date +%s)
 
-for data in "${pathOutput}"; do
+for data in "${pathOutput}"*/
+do
     if [ -d "${data}" ]
     then
         statData=$(stat -c %Y "${data}")
-        time=$((currentTime - statData))
+        time=$((${currentTime} - ${statData}))
 
         if [ ${time} -gt 600 ]
         then

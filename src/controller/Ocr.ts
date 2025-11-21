@@ -40,23 +40,10 @@ export default class ControllerOcr {
 
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
-
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
-                        helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
-                            if (typeof resultFileRemove !== "boolean") {
-                                helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderRemove(input)",
-                                    resultFileRemove.toString()
-                                );
-
-                                helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
-                            }
-                        });
-
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 

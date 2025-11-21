@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pathInput="${PATH_ROOT}${PATH_FILE}input/*/"
+pathInput="${PATH_ROOT}${MS_O_PATH_FILE}input/"
 
 if [ -z "${PATH_ROOT}" ]
 then
@@ -9,11 +9,12 @@ fi
 
 currentTime=$(date +%s)
 
-for data in "${pathInput}"; do
+for data in "${pathInput}"*/
+do
     if [ -f "${data}" ]
     then
         statData=$(stat -c %Y "${data}")
-        time=$((currentTime - statData))
+        time=$((${currentTime} - ${statData}))
 
         if [ ${time} -gt 600 ]
         then
