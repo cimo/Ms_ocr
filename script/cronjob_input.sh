@@ -9,7 +9,7 @@ fi
 
 currentTime=$(date +%s)
 
-for data in "${pathInput}"*/
+for data in "${pathInput}"*
 do
     if [ -f "${data}" ]
     then
