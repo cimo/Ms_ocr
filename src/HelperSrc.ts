@@ -116,14 +116,16 @@ export const localeFormat = (value: number | Date, isMonth = true, isDay = true,
 
 export const writeLog = (tag: string, value: string | Record<string, unknown> | Error): void => {
     if (IS_DEBUG === "true") {
+        const text = `Time: ${localeFormat(new Date())} - ${tag}: `;
+
         if (typeof process !== "undefined") {
-            Fs.appendFile(`${PATH_ROOT}${PATH_LOG}debug.log`, `${tag}: ${value.toString()}\n`, () => {
+            Fs.appendFile(`${PATH_ROOT}${PATH_LOG}debug.log`, `${text}${value.toString()}\n`, () => {
                 // eslint-disable-next-line no-console
-                console.log(`WriteLog => ${tag}: `, value);
+                console.log(`WriteLog => ${text}`, value);
             });
         } else {
             // eslint-disable-next-line no-console
-            console.log(`WriteLog => ${tag}: `, value);
+            console.log(`WriteLog => ${text}`, value);
         }
     }
 };
