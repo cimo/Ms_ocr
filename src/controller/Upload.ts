@@ -32,8 +32,20 @@ export default class Upload {
                         if (formData.name === "file" && formData.fileName && formData.buffer) {
                             const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${formData.fileName}`;
 
-                            if (isFileExists && Fs.existsSync(input)) {
-                                reject("File exists.");
+                            if (isFileExists) {
+                                Fs.access(input, Fs.constants.F_OK, (error) => {
+                                    if (!error) {
+                                        reject("File exists.");
+                                    } else {
+                                        helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
+                                            if (resultFileWriteStream) {
+                                                resolve(formDataList);
+                                            } else {
+                                                reject(resultFileWriteStream);
+                                            }
+                                        });
+                                    }
+                                });
                             } else {
                                 helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
                                     if (resultFileWriteStream) {

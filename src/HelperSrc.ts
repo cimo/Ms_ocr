@@ -37,30 +37,30 @@ const localeConfiguration: Record<string, { locale: string; currency: string }> 
     nz: { locale: "mi-NZ", currency: "NZD" }
 };
 
-export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env.ENV_NAME as string);
+export const ENV_NAME = Ce.checkVariable("ENV_NAME") || (process.env["ENV_NAME"] as string);
 
 Ce.loadFile(`./env/${ENV_NAME}.env`);
 
-export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env.DOMAIN as string);
-export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env.TIME_ZONE as string);
-export const LANG = Ce.checkVariable("LANG") || (process.env.LANG as string);
-export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env.SERVER_PORT as string);
+export const DOMAIN = Ce.checkVariable("DOMAIN") || (process.env["DOMAIN"] as string);
+export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env["TIME_ZONE"] as string);
+export const LANG = Ce.checkVariable("LANG") || (process.env["LANG"] as string);
+export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env["SERVER_PORT"] as string);
 export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
-export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env.MS_O_NAME as string);
-export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env.MS_O_LABEL as string);
-export const IS_DEBUG = Ce.checkVariable("MS_O_IS_DEBUG") || (process.env.MS_O_IS_DEBUG as string);
-export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env.MS_O_NODE_ENV as string);
-export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env.MS_O_URL_ROOT as string);
-export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env.MS_O_URL_CORS_ORIGIN as string);
+export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env["MS_O_NAME"] as string);
+export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env["MS_O_LABEL"] as string);
+export const IS_DEBUG = Ce.checkVariable("MS_O_IS_DEBUG") || (process.env["MS_O_IS_DEBUG"] as string);
+export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env["MS_O_NODE_ENV"] as string);
+export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env["MS_O_URL_ROOT"] as string);
+export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env["MS_O_URL_CORS_ORIGIN"] as string);
 export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
 export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
 export const PATH_FILE = Ce.checkVariable("MS_O_PATH_FILE");
 export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
 export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
 export const PATH_SCRIPT = Ce.checkVariable("MS_O_PATH_SCRIPT");
-export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env.MS_O_MIME_TYPE as string);
-export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env.MS_O_FILE_SIZE_MB as string);
-export const ENGINE = Ce.checkVariable("MS_O_ENGINE") || (process.env.MS_O_FILE_SIZE_MB as string);
+export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env["MS_O_MIME_TYPE"] as string);
+export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env["MS_O_FILE_SIZE_MB"] as string);
+export const ENGINE = Ce.checkVariable("MS_O_ENGINE") || (process.env["MS_O_FILE_SIZE_MB"] as string);
 
 export const localeFromEnvName = (): string => {
     let result = ENV_NAME.split("_").pop();
@@ -246,34 +246,49 @@ export const generateUniqueId = (): string => {
     return `${timestamp}-${randomPart}`;
 };
 
-export const findFileInDirectoryRecursive = async (path: string, extension: string): Promise<string[]> => {
+export const findFileInDirectoryRecursive = (path: string, extension: string, callback: (resultList: string[]) => void): void => {
     const resultList: string[] = [];
 
-    const directoryExists = await Fs.promises
-        .access(path, Fs.constants.F_OK)
-        .then(() => true)
-        .catch(() => false);
-
-    if (!directoryExists) {
-        return resultList;
-    }
-
-    const dataList = await Fs.promises.readdir(path);
-
-    for (const data of dataList) {
-        const pathData = `${path}${data}`;
-        const statData = await Fs.promises.stat(pathData);
-
-        if (statData.isDirectory()) {
-            const dataSubList = await findFileInDirectoryRecursive(`${pathData}/`, extension);
-
-            for (const dataSub of dataSubList) {
-                resultList.push(dataSub);
-            }
-        } else if (statData.isFile() && data.endsWith(extension)) {
-            resultList.push(pathData);
+    Fs.access(path, Fs.constants.F_OK, (errorAccess) => {
+        if (errorAccess) {
+            return callback(resultList);
         }
-    }
 
-    return resultList;
+        Fs.readdir(path, (errorReadDir, dataList) => {
+            if (errorReadDir) {
+                return callback(resultList);
+            }
+
+            let count = 0;
+
+            const next = () => {
+                if (count >= dataList.length) {
+                    return callback(resultList);
+                }
+
+                const data = dataList[count++];
+                const pathData = `${path}${data}`;
+
+                Fs.stat(pathData, (errorStat, statData) => {
+                    if (!errorStat && statData.isDirectory()) {
+                        findFileInDirectoryRecursive(`${pathData}/`, extension, (dataSubList) => {
+                            for (const dataSub of dataSubList) {
+                                resultList.push(dataSub);
+                            }
+
+                            next();
+                        });
+                    } else if (!errorStat && statData.isFile() && data.endsWith(extension)) {
+                        resultList.push(pathData);
+
+                        next();
+                    } else {
+                        next();
+                    }
+                });
+            };
+
+            next();
+        });
+    });
 };

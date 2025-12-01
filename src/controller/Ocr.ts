@@ -45,7 +45,7 @@ export default class ControllerOcr {
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`];
 
-                    execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, async (_, stdout) => {
+                    execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
                             if (typeof resultFileRemove !== "boolean") {
                                 helperSrc.writeLog(
@@ -60,67 +60,95 @@ export default class ControllerOcr {
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
-                            const dataJsonList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`,
-                                ".json"
-                            );
+                            const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`;
+                            const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`;
 
-                            const dataPdfList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`,
-                                ".pdf"
-                            );
+                            let dataJsonList: string[] | undefined;
+                            let dataPdfList: string[] | undefined;
+                            let dataXlsxList: string[] | undefined;
+                            let dataHtmlList: string[] | undefined;
 
-                            const dataXlsxList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`,
-                                ".xlsx"
-                            );
+                            let isCompleted = false;
 
-                            const dataHtmlList = await helperSrc.findFileInDirectoryRecursive(
-                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`,
-                                ".html"
-                            );
+                            const finalizeResponse = () => {
+                                if (isCompleted) {
+                                    return;
+                                }
 
-                            const jsonList: string[] = [];
+                                const isAllReady =
+                                    Array.isArray(dataJsonList) &&
+                                    Array.isArray(dataPdfList) &&
+                                    Array.isArray(dataXlsxList) &&
+                                    Array.isArray(dataHtmlList);
 
-                            for (const dataJson of dataJsonList) {
-                                jsonList.push(
-                                    dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
-                                );
-                            }
+                                if (!isAllReady) {
+                                    return;
+                                }
 
-                            const pdfList: string[] = [];
+                                const jsonList: string[] = [];
+                                for (const dataJson of dataJsonList!) {
+                                    jsonList.push(
+                                        dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    );
+                                }
 
-                            for (const dataPdf of dataPdfList) {
-                                pdfList.push(
-                                    dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
-                                );
-                            }
+                                const pdfList: string[] = [];
+                                for (const dataPdf of dataPdfList!) {
+                                    pdfList.push(
+                                        dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    );
+                                }
 
-                            const excelList: string[] = [];
+                                const excelList: string[] = [];
+                                for (const dataXlsx of dataXlsxList!) {
+                                    excelList.push(
+                                        dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    );
+                                }
 
-                            for (const dataXlsx of dataXlsxList) {
-                                excelList.push(
-                                    dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
-                                );
-                            }
+                                const htmlList: string[] = [];
+                                for (const dataHtml of dataHtmlList!) {
+                                    htmlList.push(
+                                        dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                    );
+                                }
 
-                            const htmlList: string[] = [];
+                                const responseJson = {
+                                    uniqueId,
+                                    jsonList,
+                                    pdfList,
+                                    excelList,
+                                    htmlList
+                                };
 
-                            for (const dataHtml of dataHtmlList) {
-                                htmlList.push(
-                                    dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
-                                );
-                            }
+                                isCompleted = true;
 
-                            const responseJson = {
-                                uniqueId,
-                                jsonList,
-                                pdfList,
-                                excelList,
-                                htmlList
+                                helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                             };
 
-                            helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
+                            helperSrc.findFileInDirectoryRecursive(baseExport, ".json", (list) => {
+                                dataJsonList = list || [];
+
+                                finalizeResponse();
+                            });
+
+                            helperSrc.findFileInDirectoryRecursive(baseExport, ".pdf", (list) => {
+                                dataPdfList = list || [];
+
+                                finalizeResponse();
+                            });
+
+                            helperSrc.findFileInDirectoryRecursive(baseTable, ".xlsx", (list) => {
+                                dataXlsxList = list || [];
+
+                                finalizeResponse();
+                            });
+
+                            helperSrc.findFileInDirectoryRecursive(baseTable, ".html", (list) => {
+                                dataHtmlList = list || [];
+
+                                finalizeResponse();
+                            });
                         } else {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
@@ -143,7 +171,7 @@ export default class ControllerOcr {
 
             const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/${pathFile}`;
 
-            helperSrc.fileReadStream(path, async (resultFileReadStream) => {
+            helperSrc.fileReadStream(path, (resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {
                     helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
                 } else {
