@@ -17,7 +17,8 @@
         "experimentalDecorators": true,
         "skipLibCheck": true,
         "removeComments": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "noPropertyAccessFromIndexSignature": true
     },
     "include": [
         "eslint.customRule.ts",
