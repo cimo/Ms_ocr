@@ -1,5 +1,4 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { RuleContext } from "@typescript-eslint/utils/dist/ts-eslint";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 export const rules = {
     "no-array-assignment-for-object-type": {
@@ -14,7 +13,7 @@ export const rules = {
             },
             schema: []
         },
-        create(context: RuleContext<"noArrayAssignmentForObjectType", []>) {
+        create(context: TSESLint.RuleContext<"noArrayAssignmentForObjectType", []>) {
             const parserServices = ESLintUtils.getParserServices(context);
 
             return {
