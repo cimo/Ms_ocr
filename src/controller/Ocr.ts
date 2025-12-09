@@ -1,11 +1,11 @@
 import Express, { Request, Response } from "express";
 import { RateLimitRequestHandler } from "express-rate-limit";
 import { execFile } from "child_process";
-import { Ca } from "@cimo/authentication/dist/src/Main";
+import { Ca } from "@cimo/authentication/dist/src/Main.js";
 
 // Source
-import * as helperSrc from "../HelperSrc";
-import ControllerUpload from "./Upload";
+import * as helperSrc from "../HelperSrc.js";
+import ControllerUpload from "./Upload.js";
 
 export default class ControllerOcr {
     // Variable

@@ -1,11 +1,12 @@
-const global = require("globals");
-const prettierPlugin = require("eslint-plugin-prettier");
-const customRule = require("./dist/eslint.customRule");
-const typescriptParser = require("@typescript-eslint/parser");
-const typescriptPlugin = require("@typescript-eslint/eslint-plugin");
+import prettierPlugin from "eslint-plugin-prettier";
+import typescriptParser from "@typescript-eslint/parser";
+import typescriptPlugin from "@typescript-eslint/eslint-plugin";
+
+// Source
+import customRule from "./dist/eslint.customRule.js";
 
 const configIgnore = {
-    ignores: ["dist", "node_modules", "public", ".cache", ".config", ".dbus", ".local", ".npm", ".nv", ".pki"]
+    ignores: ["dist", "node_modules", "public", "src-tauri", ".cache", ".config", ".dbus", ".local", ".npm", ".nv", ".pki"]
 };
 
 const configBase = {
@@ -42,7 +43,7 @@ const configBase = {
 };
 
 const configTypescript = {
-    files: ["eslint.customRule.ts", "global.d.ts", "src/**/*.{ts,tsx}", "file/input/**/*.{ts,tsx}"],
+    files: ["eslint.customRule.ts", "global.d.ts", "vite.config.ts", "src/**/*.{ts,tsx}", "file/input/**/*.{ts,tsx}"],
     languageOptions: {
         ...configBase.languageOptions,
         parser: typescriptParser,
@@ -71,7 +72,7 @@ const configTypescript = {
 };
 
 const configJavascript = {
-    files: ["esbuild.build.js", "eslint.config.cjs", "webpack.build.js", "src/**/*.{js,jsx}", "file/input/**/*.{js,jsx}"],
+    files: ["eslint.config.js", "webpack.build.js", "src/**/*.{js,jsx}", "file/input/**/*.{js,jsx}"],
     languageOptions: {
         ...configBase.languageOptions
     },
@@ -83,4 +84,4 @@ const configJavascript = {
     }
 };
 
-module.exports = [configIgnore, configTypescript, configJavascript];
+export default [configIgnore, configTypescript, configJavascript];

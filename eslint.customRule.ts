@@ -1,6 +1,6 @@
 import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
-export const rules = {
+const rules = {
     "no-array-assignment-for-object-type": {
         meta: {
             type: "problem",
@@ -35,3 +35,5 @@ export const rules = {
         }
     }
 };
+
+export default { rules };

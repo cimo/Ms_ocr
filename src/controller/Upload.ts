@@ -1,9 +1,9 @@
 import { Request } from "express";
 import Fs from "fs";
-import { Cfdp, CfdpModel } from "@cimo/form-data_parser/dist/src/Main";
+import { Cfdp, CfdpModel } from "@cimo/form-data_parser/dist/src/Main.js";
 
 // Source
-import * as helperSrc from "../HelperSrc";
+import * as helperSrc from "../HelperSrc.js";
 
 export default class Upload {
     // Variable
