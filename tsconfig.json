@@ -24,7 +24,6 @@
     "include": [
         "eslint.customRule.ts",
         "global.d.ts",
-        "vite.config.ts",
         "src/**/*.ts",
         "src/**/*.tsx",
         "file/input/**/*.ts",

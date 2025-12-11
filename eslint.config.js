@@ -43,7 +43,7 @@ const configBase = {
 };
 
 const configTypescript = {
-    files: ["eslint.customRule.ts", "global.d.ts", "vite.config.ts", "src/**/*.{ts,tsx}", "file/input/**/*.{ts,tsx}"],
+    files: ["eslint.customRule.ts", "global.d.ts", "src/**/*.{ts,tsx}", "file/input/**/*.{ts,tsx}"],
     languageOptions: {
         ...configBase.languageOptions,
         parser: typescriptParser,
