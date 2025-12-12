@@ -10,7 +10,7 @@
     },
     "type": "module",
     "scripts": {
-        "preinstall": "npx npm-force-resolutions",
+        "preinstall": "npx -y npm-force-resolutions",
         "remove_dist": "node -e \"const fs = require('fs'); try{ fs.rmdirSync('./dist/', { recursive: true }) } catch{}; process.exit(0);\"",
         "check": "eslint --no-cache --config eslint.config.js",
         "build_tsc": "npm run remove_dist && tsc --build tsconfig.tsc.json",
