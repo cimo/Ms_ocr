@@ -10,7 +10,11 @@ then
     then
         echo "Copying from volume..."
 
-        docker run --rm -v cimo_${1}_ms_cronjob-volume:/home/source/:ro -v $(pwd)/.ms_cronjob-volume/:/home/target/ alpine sh -c "cp -r /home/source/* /home/target/"
+        docker run --rm \
+        --user $(id -u):$(id -g) \
+        -v cimo_${1}_ms_cronjob-volume:/home/source/:ro \
+        -v $(pwd)/.ms_cronjob-volume/:/home/target/ \
+        alpine sh -c "cp -r /home/source/* /home/target/"
     fi
 
     echo "Execute container."
