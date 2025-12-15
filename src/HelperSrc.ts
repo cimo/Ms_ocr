@@ -31,6 +31,13 @@ export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.en
 export const ENGINE = Ce.checkVariable("MS_O_ENGINE") || (process.env["MS_O_FILE_SIZE_MB"] as string);
 
 export const localeConfiguration: Record<string, { locale: string; currency: string; dateFormat: string }> = {
+    // Asia
+    jp: { locale: "ja-JP", currency: "JPY", dateFormat: "a" },
+    cn: { locale: "zh-CN", currency: "CNY", dateFormat: "a" },
+    tw: { locale: "zh-TW", currency: "TWD", dateFormat: "a" },
+    kr: { locale: "ko-KR", currency: "KRW", dateFormat: "a" },
+    in: { locale: "hi-IN", currency: "INR", dateFormat: "a" },
+    th: { locale: "th-TH", currency: "THB", dateFormat: "a" },
     // Europe
     it: { locale: "it-IT", currency: "EUR", dateFormat: "b" },
     fr: { locale: "fr-FR", currency: "EUR", dateFormat: "b" },
@@ -41,13 +48,6 @@ export const localeConfiguration: Record<string, { locale: string; currency: str
     ru: { locale: "ru-RU", currency: "RUB", dateFormat: "b" },
     pl: { locale: "pl-PL", currency: "PLN", dateFormat: "b" },
     sv: { locale: "sv-SE", currency: "SEK", dateFormat: "b" },
-    // Asia
-    jp: { locale: "ja-JP", currency: "JPY", dateFormat: "a" },
-    cn: { locale: "zh-CN", currency: "CNY", dateFormat: "a" },
-    tw: { locale: "zh-TW", currency: "TWD", dateFormat: "a" },
-    kr: { locale: "ko-KR", currency: "KRW", dateFormat: "a" },
-    in: { locale: "hi-IN", currency: "INR", dateFormat: "a" },
-    th: { locale: "th-TH", currency: "THB", dateFormat: "a" },
     // America
     us: { locale: "en-US", currency: "USD", dateFormat: "c" },
     mx: { locale: "es-MX", currency: "MXN", dateFormat: "c" },
