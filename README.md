@@ -8,7 +8,7 @@ It's possible to use a personal certificate instead of "Ms_cronjob", just add th
 ## Info:
 
 -   Cross platform (Windows, Linux)
--   X11 for WSL2 (Run linux GUI app directly in windows) with full GPU host support.
+-   X11 for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
 -   Tesseract, Paddle (default).
 
 ## Installation
