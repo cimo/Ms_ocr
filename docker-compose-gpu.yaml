@@ -21,6 +21,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     devices:
       - /dev/dri:/dev/dri
     runtime: "nvidia"
