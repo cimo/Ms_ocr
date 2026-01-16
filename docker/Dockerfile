@@ -108,11 +108,9 @@ RUN python3 -m pip install pip --upgrade \
     && npm install \
     && npm run build
 
-# Nvidia
+# Command
 CMD command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU." \
-    # Vulkan
     && command -v vulkaninfo > /dev/null && vulkaninfo | grep "deviceName" || echo "Host without vulkan support." \
-    # OpenGL
     && command -v glxinfo > /dev/null && glxinfo | grep "OpenGL renderer string" || echo "Host without opengl support." \
     # Engine package
     && bash ${PATH_ROOT}script/engine_package.sh \
