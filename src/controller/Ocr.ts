@@ -37,8 +37,8 @@ export default class ControllerOcr {
                                 : "";
                         } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
                             fileName = resultControllerUpload.fileName;
-                        } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.searchText) {
-                            searchText = resultControllerUpload.searchText;
+                        } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
+                            searchText = resultControllerUpload.buffer.toString();
                         }
                     }
 
