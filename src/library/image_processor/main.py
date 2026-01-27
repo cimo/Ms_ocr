@@ -25,9 +25,14 @@ def _fileArray(file, isFloat=False):
 
     return result
 
-def pilImage(file):
+def pilImage(file, isOriginal=False):
     inputHeight, inputWidth = file.shape[:2]
     imageNew = Image.new("RGB", (inputWidth, inputHeight), (255, 255, 255))
+    
+    if isOriginal:
+        imageFromArray = Image.fromarray(file, mode="RGB")
+        imageNew.paste(imageFromArray, (0, 0))
+
     imageDraw = ImageDraw.Draw(imageNew)
 
     return imageNew, imageDraw
