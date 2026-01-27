@@ -19,7 +19,27 @@ class Vgg16Bn(torchNN.Module):
             elif isinstance(module, torchNN.Linear):
                 module.weight.data.normal_(0, 0.01)
                 module.bias.data.zero_()
-                
+
+    def forward(self, modelInput):
+        scoreMap = self.slice1(modelInput)
+        hRelu2_2 = scoreMap
+
+        scoreMap = self.slice2(scoreMap)
+        hRelu3_2 = scoreMap
+
+        scoreMap = self.slice3(scoreMap)
+        hRelu4_3 = scoreMap
+
+        scoreMap = self.slice4(scoreMap)
+        hRelu5_3 = scoreMap
+
+        scoreMap = self.slice5(scoreMap)
+        hFc7 = scoreMap
+
+        vgg_outputs = collectionNamedTuple("VggOutputs", ["fc7", "relu5_3", "relu4_3", "relu3_2", "relu2_2"])
+
+        return vgg_outputs(hFc7, hRelu5_3, hRelu4_3, hRelu3_2, hRelu2_2)
+
     def __init__(self, pretrained, freeze):
         super(Vgg16Bn, self).__init__()
 
@@ -69,23 +89,3 @@ class Vgg16Bn(torchNN.Module):
         if freeze:
             for parameter in self.slice1.parameters():
                 parameter.requires_grad= False
-
-    def forward(self, modelInput):
-        scoreMap = self.slice1(modelInput)
-        hRelu2_2 = scoreMap
-
-        scoreMap = self.slice2(scoreMap)
-        hRelu3_2 = scoreMap
-
-        scoreMap = self.slice3(scoreMap)
-        hRelu4_3 = scoreMap
-
-        scoreMap = self.slice4(scoreMap)
-        hRelu5_3 = scoreMap
-
-        scoreMap = self.slice5(scoreMap)
-        hFc7 = scoreMap
-
-        vgg_outputs = collectionNamedTuple("VggOutputs", ["fc7", "relu5_3", "relu4_3", "relu3_2", "relu2_2"])
-
-        return vgg_outputs(hFc7, hRelu5_3, hRelu4_3, hRelu3_2, hRelu2_2)

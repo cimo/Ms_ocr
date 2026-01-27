@@ -107,7 +107,7 @@ class EnginePaddle:
             if IS_DEBUG:
                 imageCrop = imageOpen[top:bottom, left:right, :]
 
-                imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", imageCrop)
+                imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/{mode}/crop/{count}_{index}.jpg", "", imageCrop)
             
             resultMergeList.append({
                 "bbox_list": [left, top, right, bottom],
@@ -140,20 +140,20 @@ class EnginePaddle:
                     resultMergeList[index]["text_list"].append(text)
 
         if IS_DEBUG:
-            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/{mode}/{count}_result.jpg", format="JPEG")
 
-            with open(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/{mode}/{count}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
 
-        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx", pilFont)
-        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/{mode}/{count}_result.html", pilFont)
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/{mode}/{count}_result.xlsx", pilFont)
+        DataToTable(resultMergeList, f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/{mode}/{count}_result.html", pilFont)
 
     def _inferenceTableWireless(self, imageOpen, count):
         dataList = self.tableCellDetectionWireless.predict(input=imageOpen, batch_size=1)
 
         for data in dataList:
             if IS_DEBUG:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wireless/{count}.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/{count}.json")
 
             self._processTable("wireless", data, imageOpen, count)
 
@@ -162,7 +162,7 @@ class EnginePaddle:
 
         for data in dataList:
             if IS_DEBUG:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wired/{count}.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wired/{count}.json")
 
             self._processTable("wired", data, imageOpen, count)
 
@@ -176,12 +176,12 @@ class EnginePaddle:
 
             if (resultLabel == "wired_table"):
                 if IS_DEBUG:
-                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wired/{count}.jpg", "", imageOpen)
+                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wired/{count}.jpg", "", imageOpen)
 
                 self._inferenceTableWired(imageOpen, count)
             elif (resultLabel == "wireless_table"):
                 if IS_DEBUG:
-                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", imageOpen)
+                    imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/{count}.jpg", "", imageOpen)
 
                 self._inferenceTableWireless(imageOpen, count)
 
@@ -190,7 +190,7 @@ class EnginePaddle:
 
         for data in dataList:
             if IS_DEBUG:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/classification/{count}.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/classification/{count}.json")
 
             self._extractTableCell(data, imageOpen, count)
 
@@ -225,7 +225,7 @@ class EnginePaddle:
 
         for data in dataList:
             if IS_DEBUG:
-                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/layout/{self.fileNameSplit}.json")
+                data.save_to_json(save_path=f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/layout/{self.fileNameSplit}.json")
 
             self._extractTable(data, imageOpen)
 
@@ -277,21 +277,21 @@ class EnginePaddle:
                 })
 
         if isWriteOutput:
-            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
-            with open(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
         
         return resultMergeList
 
     def _createOutputDir(self):
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/layout/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/classification/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wired/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wired/crop/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wireless/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
-        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/paddle/{self.uniqueId}/export/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/layout/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/classification/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wired/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wired/crop/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/export/", exist_ok=True)
 
     def _execute(self, _, fileNameValue, uniqueIdValue):
         self.fileName = fileNameValue

@@ -1,7 +1,6 @@
 import os
 import logging
 import ast
-import subprocess
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -27,6 +26,10 @@ if ENGINE == "tesseract":
     from engine_tesseract.main import EngineTesseract
 
     engineActive = EngineTesseract()
+elif ENGINE == "realtime":
+    from engine_realtime.main import EngineRealtime
+
+    engineActive = EngineRealtime()
 elif ENGINE == "paddle":
     from engine_paddle.main import EnginePaddle
 
