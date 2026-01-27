@@ -1,6 +1,7 @@
 import os
 import logging
 import ast
+import json
 import cv2
 import numpy
 import unicodedata
@@ -8,6 +9,7 @@ import unicodedata
 # Source
 from .ppocr_detection import PPocrDetection
 from .crnn_recognition import CrnnRecognition
+from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):
     if os.environ.get(varKey) is None:
@@ -51,6 +53,8 @@ class EngineRealtime:
         return text == searchText
 
     def _inference(self, imageRgb, detector, recognizer):
+        resultMatchList = []
+
         if imageRgb.ndim == 2:
             imageRgb = cv2.cvtColor(imageRgb, cv2.COLOR_GRAY2RGB)
 
@@ -66,8 +70,6 @@ class EngineRealtime:
 
         left = cv2.cvtColor(imageBgr, cv2.COLOR_BGR2RGB).copy()
         right = numpy.ones_like(left) * 255
-
-        matchList = []
 
         for boxRaw, text in zip(resultDetector, textList):
             box = numpy.int32([[int(point[0] * scaleWidth), int(point[1] * scaleHeight)] for point in boxRaw])
@@ -91,7 +93,7 @@ class EngineRealtime:
             if self._checkMatch(text):
                 color = (0, 200, 0)
 
-                matchList.append((text, box.copy()))
+                resultMatchList.append((text, box.copy()))
             else:
                 color = (0, 0, 255)
 
@@ -103,9 +105,11 @@ class EngineRealtime:
 
             cv2.putText(right, text, (int(x0), textY), cv2.FONT_HERSHEY_SIMPLEX, fontScale, (0, 0, 0), fontThickness, lineType=cv2.LINE_AA)
 
-        return cv2.hconcat([left, right]), matchList
+        return cv2.hconcat([left, right]), resultMatchList
 
     def _process(self, detector, recognizer):
+        resultList = []
+
         imageRead = cv2.imread(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
 
         if imageRead is None:
@@ -115,25 +119,25 @@ class EngineRealtime:
 
         imageRgb = cv2.cvtColor(imageRead, cv2.COLOR_BGR2RGB)
 
-        output, match = self._inference(imageRgb, detector, recognizer)
+        imageResult, matchList = self._inference(imageRgb, detector, recognizer)
+
+        pilImage, _ = imageProcessor.pilImage(cv2.cvtColor(imageResult, cv2.COLOR_RGB2BGR))
+
+        if IS_DEBUG:
+            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/{self.fileNameSplit}_result.jpg", format="JPEG")
+
+        if IS_DEBUG and self.searchText is not None and matchList:
+            print(f"Match: '{self.searchText}' found {len(matchList)} in {self.fileName}:")
+
+            for a, (text, box) in enumerate(matchList, 1):
+                resultList = [(int(x), int(y)) for x, y in box.tolist()]
+
+                print(f"  {a}. text='{text}'  polygon={resultList}")
         
-        pathOutput = f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/"
-        os.makedirs(pathOutput, exist_ok=True)
+        pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
-        pathOutputResult = os.path.join(pathOutput, self.fileName)
-
-        cv2.imwrite(pathOutputResult, cv2.cvtColor(output, cv2.COLOR_RGB2BGR))
-
-        if self.searchText is not None:
-            if IS_DEBUG and match:
-                print(f"Match: '{self.searchText}' found {len(match)} in {self.fileName}:")
-
-                for a, (text, box) in enumerate(match, 1):
-                    pointList = [(int(x), int(y)) for x, y in box.tolist()]
-
-                    print(f"  {a}. text='{text}'  polygon={pointList}")
-
-        return pathOutputResult
+        with open(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+            json.dump(resultList, file, ensure_ascii=False, indent=2)
 
     def _loadModel(self):
         idBackend = cv2.dnn.DNN_BACKEND_OPENCV
@@ -156,12 +160,17 @@ class EngineRealtime:
         )
         return detector, recognizer
 
+    def _createOutputDir(self):
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/", exist_ok=True)
+
     def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
         self.searchText = searchTextValue
+
+        self._createOutputDir()
         
         detector, recognizer = self._loadModel()
 
@@ -173,7 +182,7 @@ class EngineRealtime:
         self.language = ""
         self.fileName = ""
         self.uniqueId = ""
-        self.text = ""
+        self.searchText = ""
         self.argumentCaseSensitive = False
         self.argumentSelective = False
         self.argumentContain = False

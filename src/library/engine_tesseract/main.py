@@ -119,9 +119,9 @@ class EngineTesseract:
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
         
-        craftDetection = CraftDetection(self.fileName, self.uniqueId)
-
         self._createOutputDir()
+        
+        craftDetection = CraftDetection(self.fileName, self.uniqueId)
 
         imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
         
