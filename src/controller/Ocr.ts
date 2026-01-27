@@ -64,8 +64,8 @@ export default class ControllerOcr {
                         if (stdout.trim() === "ok") {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
-                            const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/export/`;
-                            const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/table/`;
+                            const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
+                            const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
 
                             let dataJsonList: string[] | undefined;
                             let dataPdfList: string[] | undefined;
@@ -92,28 +92,28 @@ export default class ControllerOcr {
                                 const jsonList: string[] = [];
                                 for (const dataJson of dataJsonList!) {
                                     jsonList.push(
-                                        dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                        dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const pdfList: string[] = [];
                                 for (const dataPdf of dataPdfList!) {
                                     pdfList.push(
-                                        dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                        dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const excelList: string[] = [];
                                 for (const dataXlsx of dataXlsxList!) {
                                     excelList.push(
-                                        dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                        dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const htmlList: string[] = [];
                                 for (const dataHtml of dataHtmlList!) {
                                     htmlList.push(
-                                        dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/`, "")
+                                        dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
@@ -173,7 +173,7 @@ export default class ControllerOcr {
             const uniqueId = requestBody.uniqueId;
             const pathFile = requestBody.pathFile;
 
-            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.ENGINE}/${uniqueId}/${pathFile}`;
+            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/${pathFile}`;
 
             helperSrc.fileReadStream(path, (resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {

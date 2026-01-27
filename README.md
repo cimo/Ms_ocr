@@ -92,9 +92,9 @@ form-data
 
 key             value
 ---             ---
-language        "" (Only for "tesseract" need be populated.)
+language        "" (Only for "engine_tesseract" need be populated.)
 file            jp_1.jpg
-searchText      "" (Only for "realtime" need be populated.)
+searchText      "" (Only for "engine_realtime" need be populated.)
 ```
 
 4. Download
