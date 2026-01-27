@@ -3,7 +3,6 @@ import logging
 import ast
 import cv2
 import numpy
-import re
 import unicodedata
 
 # Source
@@ -31,27 +30,25 @@ IS_DEBUG = _checkEnvVariable("MS_O_IS_DEBUG")
 PATH_FILE = _checkEnvVariable("MS_O_PATH_FILE")
 
 class EngineRealtime:
-    def _normalizeText(self, value):
-        if value is None:
-            return ""
+    def _checkMatch(self, value):
+        if not self.searchText or value is None:
+            return False
         
-        value = unicodedata.normalize("NFKC", value).strip()
+        text = unicodedata.normalize("NFKC", value).strip()
+        searchText = unicodedata.normalize("NFKC", self.searchText).strip()
 
-        return value.lower() if self.argumentCaseSensitive else value
+        if not self.argumentCaseSensitive:
+            text = text.casefold()
+            searchText = searchText.casefold()
 
-    def _checkMatch(self, text):
-        textNormalize = self._normalizeText(text)
-        matchNormalize = self._normalizeText(self.matchText)
-
-        if self.argumentRegex:
-            flag = re.IGNORECASE if self.argumentCaseSensitive else 0
-
-            return re.search(self.matchText, text, flag) is not None
+        if not self.argumentSelective:            
+            text = text.replace(" ", "")
+            searchText = searchText.replace(" ", "")
         
         if self.argumentContain:
-            return matchNormalize in textNormalize
-        
-        return textNormalize == matchNormalize
+            return searchText in text
+
+        return text == searchText
 
     def _inference(self, imageRgb, detector, recognizer):
         if imageRgb.ndim == 2:
@@ -69,9 +66,6 @@ class EngineRealtime:
 
         left = cv2.cvtColor(imageBgr, cv2.COLOR_BGR2RGB).copy()
         right = numpy.ones_like(left) * 255
-
-        red = (0, 0, 255)
-        green = (0, 200, 0)
 
         matchList = []
 
@@ -94,12 +88,12 @@ class EngineRealtime:
             fontScale = fontScale * min(1.0, scaleX, scaleY)
             fontThickness = max(1, int(numpy.floor(fontScale)))
 
-            if self.matchText is not None and self._checkMatch(text):
-                color = green
+            if self._checkMatch(text):
+                color = (0, 200, 0)
 
                 matchList.append((text, box.copy()))
             else:
-                color = red
+                color = (0, 0, 255)
 
             cv2.polylines(left, [box], isClosed=True, color=color, thickness=1)
             cv2.polylines(right, [box], isClosed=True, color=color, thickness=1)
@@ -130,9 +124,9 @@ class EngineRealtime:
 
         cv2.imwrite(pathOutputResult, cv2.cvtColor(output, cv2.COLOR_RGB2BGR))
 
-        if self.matchText is not None:
+        if self.searchText is not None:
             if IS_DEBUG and match:
-                print(f"Match: '{self.matchText}' found {len(match)} in {self.fileName}:")
+                print(f"Match: '{self.searchText}' found {len(match)} in {self.fileName}:")
 
                 for a, (text, box) in enumerate(match, 1):
                     pointList = [(int(x), int(y)) for x, y in box.tolist()]
@@ -162,12 +156,12 @@ class EngineRealtime:
         )
         return detector, recognizer
 
-    def _execute(self, languageValue, fileNameValue, uniqueIdValue, matchTextValue):
+    def _execute(self, languageValue, fileNameValue, uniqueIdValue, searchTextValue):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
-        self.matchText = matchTextValue
+        self.searchText = searchTextValue
         
         detector, recognizer = self._loadModel()
 
@@ -179,7 +173,7 @@ class EngineRealtime:
         self.language = ""
         self.fileName = ""
         self.uniqueId = ""
-        self.matchText = ""
+        self.text = ""
+        self.argumentCaseSensitive = False
+        self.argumentSelective = False
         self.argumentContain = False
-        self.argumentRegex = False
-        self.argumentCaseSensitive = True
