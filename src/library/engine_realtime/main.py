@@ -127,12 +127,12 @@ class EngineRealtime:
             pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/{self.fileNameSplit}_result.jpg", format="JPEG")
 
             if self.searchText is not None and matchList:
-                print(f"Match: '{self.searchText}' found {len(matchList)} in {self.fileName}:")
+                #print(f"Match: '{self.searchText}' found {len(matchList)} in {self.fileName}:")
 
                 for a, (text, box) in enumerate(matchList, 1):
                     resultList = [(int(x), int(y)) for x, y in box.tolist()]
 
-                    print(f"  {a}. text='{text}'  polygon={resultList}")
+                    #print(f"  {a}. text='{text}'  polygon={resultList}")
         
         pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
