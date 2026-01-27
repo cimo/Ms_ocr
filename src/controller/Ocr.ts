@@ -6,6 +6,7 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 // Source
 import * as helperSrc from "../HelperSrc.js";
 import ControllerUpload from "./Upload.js";
+import * as modelOcr from "../model/Ocr.js";
 
 export default class ControllerOcr {
     // Variable
@@ -27,14 +28,17 @@ export default class ControllerOcr {
                 .then((resultControllerUploadList) => {
                     let fileName = "";
                     let language = "";
+                    let searchText = "";
 
-                    for (const resultControllerUpload of resultControllerUploadList) {
+                    for (const resultControllerUpload of resultControllerUploadList as modelOcr.Iinput[]) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
-                            language = resultControllerUpload.buffer.toString().match("^(jp|jp_vert|en)$")
+                            language = resultControllerUpload.buffer.toString().match("^(ja|ja_vert|en)$")
                                 ? resultControllerUpload.buffer.toString()
                                 : "";
                         } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
                             fileName = resultControllerUpload.fileName;
+                        } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.searchText) {
+                            searchText = resultControllerUpload.searchText;
                         }
                     }
 
@@ -43,7 +47,7 @@ export default class ControllerOcr {
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`];
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {

@@ -293,7 +293,7 @@ class EnginePaddle:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, _, fileNameValue, uniqueIdValue):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue

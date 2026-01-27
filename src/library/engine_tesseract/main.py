@@ -34,9 +34,9 @@ class EngineTesseract:
 
         if self.language == "en":
             resultLanguage = "eng"
-        elif self.language == "jp":
+        elif self.language == "ja":
             resultLanguage = "jpn"
-        elif self.language == "jp_vert":
+        elif self.language == "ja_vert":
             resultLanguage = "jpn_vert"
             resultPsm = 5
 
@@ -113,7 +113,7 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue, fileNameValue, uniqueIdValue):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])

@@ -156,7 +156,7 @@ class EngineRealtime:
         )
         return detector, recognizer
 
-    def _execute(self, languageValue, fileNameValue, uniqueIdValue, searchTextValue):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])

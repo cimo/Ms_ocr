@@ -9,7 +9,7 @@ It's possible to use a personal certificate instead of "Ms_cronjob", just add th
 
 -   Cross platform (Windows, Linux)
 -   X11 for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
--   Tesseract, Paddle (default).
+-   Tesseract, Paddle, Realtime (default).
 
 ## Installation
 
@@ -55,7 +55,7 @@ OpenGL renderer string: llvmpipe (LLVM 15.0.7, 256 bits) - (OpenGL emulate on CP
 
 ## Tesseract
 
-1. For compile "tesseract" from source with custom setting write on terminal:
+1. For compile "tesseract" from source with custom setting write on terminal (standard version is already deployed):
     
     ```
     cd src/library/engine_tesseract/
@@ -85,21 +85,22 @@ method = GET
 3. Extract
 
 ```
-url = https://localhost:1045/extract
+url = https://localhost:1045/api/extract
 method = POST
 
 form-data
 
 key             value
 ---             ---
-language        (For paddle is empty. For tesseract will be like "en", "jp" or "jp_vert")
+language        "" (Only for "tesseract" need be populated.)
 file            jp_1.jpg
+searchText      "" (Only for "realtime" need be populated.)
 ```
 
 4. Download
 
 ```
-url = https://localhost:1045/download
+url = https://localhost:1045/api/download
 method = POST
 
 json

@@ -26,11 +26,11 @@ if ENGINE == "tesseract":
     from engine_tesseract.main import EngineTesseract
 
     engineActive = EngineTesseract()
-elif ENGINE == "realtime":
-    from engine_realtime.main import EngineRealtime
-
-    engineActive = EngineRealtime()
 elif ENGINE == "paddle":
     from engine_paddle.main import EnginePaddle
 
     engineActive = EnginePaddle()
+elif ENGINE == "realtime":
+    from engine_realtime.main import EngineRealtime
+
+    engineActive = EngineRealtime()
