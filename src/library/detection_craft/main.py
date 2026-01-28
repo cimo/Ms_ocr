@@ -61,7 +61,7 @@ class CraftDetection:
         imageDilate = imageProcessor.dilate(imageEroded, 3, 1)
 
         if IS_DEBUG:
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/detection_craft/{self.uniqueId}/{self.fileName}", "_dilate", (imageDilate * 255).astype(numpy.uint8))
 
         mergeBoxTollerance = 10
         mergeBoxRowTollerance = 8
@@ -180,9 +180,9 @@ class CraftDetection:
             })
 
         if IS_DEBUG:
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/detection_craft/{self.uniqueId}/{self.fileName}", "_result", imageOpen)
 
-            with open(f"{PATH_ROOT}{PATH_FILE}output/craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
+            with open(f"{PATH_ROOT}{PATH_FILE}output/detection_craft/{self.uniqueId}/{self.fileNameSplit}_result.json", "w", encoding="utf-8") as file:
                 json.dump(resultMergeList, file, ensure_ascii=False, indent=2)
         
         return resultMergeList
@@ -244,7 +244,7 @@ class CraftDetection:
         imageColor = imageProcessor.grayToRgb(imageNoiseRemove)
 
         if IS_DEBUG:
-            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/detection_craft/{self.uniqueId}/{self.fileName}", "_preprocess", imageColor)
 
         return imageOpen, resizeMultiple, scaleX, scaleY
 
@@ -306,8 +306,8 @@ class CraftDetection:
             if subprocessRun.returncode == 0 and subprocessRun.stdout.strip():
                 self.device = "gpu"
 
-        self.pathWeightMain = f"{PATH_ROOT}src/library/craft_detection/mlt_25k.pth"
-        self.pathWeightRefine = f"{PATH_ROOT}src/library/craft_detection/refiner_CTW1500.pth"
+        self.pathWeightMain = f"{PATH_ROOT}src/library/detection_craft/mlt_25k.pth"
+        self.pathWeightRefine = f"{PATH_ROOT}src/library/detection_craft/refiner_CTW1500.pth"
         self.textThreshold = 0.1
         #self.linkThreshold = 0.1
         self.isRefine = False

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/craft/"
+pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/detection_craft/"
 
 if [ -z "${PATH_ROOT}" ]
 then

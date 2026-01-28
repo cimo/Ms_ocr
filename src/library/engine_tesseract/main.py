@@ -5,7 +5,7 @@ import json
 import subprocess
 
 # Source
-from craft_detection.main import CraftDetection
+from detection_craft.main import CraftDetection
 from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):

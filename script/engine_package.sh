@@ -7,7 +7,7 @@ else
     isGpu=false
 fi
 
-if [ ${MS_O_RUNTIME} = "engine_tesseract" ]
+if [ ${MS_O_RUNTIME} = "engine_tesseract" ] || [ ${MS_O_RUNTIME} = "engine_realtime" ]
 then
     python3 -m pip uninstall -y paddlepaddle-gpu paddlepaddle >/dev/null 2>&1
 

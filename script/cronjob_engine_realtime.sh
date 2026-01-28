@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/tesseract/"
+pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/engine_realtime/"
 
 if [ -z "${PATH_ROOT}" ]
 then
