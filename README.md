@@ -82,7 +82,7 @@ url = https://localhost:1045/login
 method = GET
 ```
 
-3. Extract
+3. Extract data
 
 ```
 url = https://localhost:1045/api/extract
@@ -95,6 +95,7 @@ key             value
 language        "" (Only for "engine_tesseract" need be populated.)
 file            jp_1.jpg
 searchText      "" (Only for "engine_realtime" need be populated.)
+dataType        "file" (Or "polygon".)
 ```
 
 4. Download

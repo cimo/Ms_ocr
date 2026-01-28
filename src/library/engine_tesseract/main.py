@@ -113,7 +113,7 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue=""):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
@@ -127,7 +127,7 @@ class EngineTesseract:
         
         self._inference(craftDetection.resultMainList, imageOpen)
 
-        print("ok", flush=True)
+        print("file", flush=True)
 
     def __init__(self):
         os.environ["TESSDATA_PREFIX"] = f"{PATH_ROOT}src/library/engine_tesseract/language/"

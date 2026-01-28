@@ -133,6 +133,9 @@ class EngineRealtime:
                     resultList = [(int(x), int(y)) for x, y in box.tolist()]
 
                     #print(f"  {a}. text='{text}'  polygon={resultList}")
+
+        if self.dataType == "polygon":
+            print("polygon", json.dumps(resultList, ensure_ascii=False), flush=True)
         
         pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
@@ -163,12 +166,13 @@ class EngineRealtime:
     def _createOutputDir(self):
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue="file"):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
         self.searchText = searchTextValue
+        self.dataType = dataTypeValue
 
         self._createOutputDir()
         
@@ -176,13 +180,15 @@ class EngineRealtime:
 
         self._process(detector, recognizer)
 
-        print("ok", flush=True)
+        if self.dataType == "file":
+            print(self.dataType, flush=True)
 
     def __init__(self):
         self.language = ""
         self.fileName = ""
         self.uniqueId = ""
         self.searchText = ""
+        self.dataType = ""
         self.argumentCaseSensitive = False
         self.argumentSelective = False
-        self.argumentContain = False
+        self.argumentContain = True

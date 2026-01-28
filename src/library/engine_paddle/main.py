@@ -293,7 +293,7 @@ class EnginePaddle:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/table/wireless/crop/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_paddle/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue=""):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue=""):
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
@@ -306,7 +306,7 @@ class EnginePaddle:
 
         self._inferenceLayout(imageOpen)
 
-        print("ok", flush=True)
+        print("file", flush=True)
 
     def __init__(self):
         self.fileName = ""

@@ -6,7 +6,6 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 // Source
 import * as helperSrc from "../HelperSrc.js";
 import ControllerUpload from "./Upload.js";
-import * as modelOcr from "../model/Ocr.js";
 
 export default class ControllerOcr {
     // Variable
@@ -29,8 +28,9 @@ export default class ControllerOcr {
                     let fileName = "";
                     let language = "";
                     let searchText = "";
+                    let dataType = "";
 
-                    for (const resultControllerUpload of resultControllerUploadList as modelOcr.Iinput[]) {
+                    for (const resultControllerUpload of resultControllerUploadList) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
                             language = resultControllerUpload.buffer.toString().match("^(ja|ja_vert|en)$")
                                 ? resultControllerUpload.buffer.toString()
@@ -39,6 +39,8 @@ export default class ControllerOcr {
                             fileName = resultControllerUpload.fileName;
                         } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
                             searchText = resultControllerUpload.buffer.toString();
+                        } else if (resultControllerUpload.name === "dataType" && resultControllerUpload.buffer) {
+                            dataType = resultControllerUpload.buffer.toString();
                         }
                     }
 
@@ -47,7 +49,7 @@ export default class ControllerOcr {
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`];
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${dataType}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
@@ -61,7 +63,9 @@ export default class ControllerOcr {
                             }
                         });
 
-                        if (stdout.trim() === "ok") {
+                        const output = stdout.trim();
+
+                        if (output.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
                             const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
@@ -153,6 +157,13 @@ export default class ControllerOcr {
 
                                 finalizeResponse();
                             });
+                        } else if (output.startsWith("polygon")) {
+                            const outputSlice = output.slice("polygon".length).trim();
+                            const polygon = JSON.parse(outputSlice);
+
+                            const responseJson = { polygon };
+
+                            helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                         } else {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 
