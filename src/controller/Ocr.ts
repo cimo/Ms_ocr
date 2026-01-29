@@ -20,8 +20,18 @@ export default class ControllerOcr {
         this.controllerUpload = new ControllerUpload();
     }
 
+    header = (request: Request, response: Response): void => {
+        const sessionId = request.headers["x-session-id"] as string;
+        const endpoint = request.headers["x-endpoint"] as string;
+
+        response.setHeader("X-Session-Id", sessionId);
+        response.setHeader("X-Endpoint", endpoint);
+    };
+
     api = (): void => {
         this.app.post("/api/extract", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
+            this.header(request, response);
+
             this.controllerUpload
                 .execute(request, true)
                 .then((resultControllerUploadList) => {
@@ -179,6 +189,8 @@ export default class ControllerOcr {
         });
 
         this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
+            this.header(request, response);
+
             const requestBody = request.body;
 
             const uniqueId = requestBody.uniqueId;
