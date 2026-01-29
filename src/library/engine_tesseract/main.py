@@ -5,7 +5,7 @@ import json
 import subprocess
 
 # Source
-from detection_craft.main import CraftDetection
+from detection_craft.main import DetectionCraft
 from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):
@@ -25,6 +25,7 @@ def _checkEnvVariable(varKey):
 
 ENV_NAME = _checkEnvVariable("ENV_NAME")
 PATH_ROOT = _checkEnvVariable("PATH_ROOT")
+IS_DEBUG = _checkEnvVariable("MS_O_IS_DEBUG")
 PATH_FILE = _checkEnvVariable("MS_O_PATH_FILE")
 
 class EngineTesseract:
@@ -121,11 +122,11 @@ class EngineTesseract:
         
         self._createOutputDir()
         
-        craftDetection = CraftDetection(self.fileName, self.uniqueId)
+        detectionCraft = DetectionCraft(self.fileName, self.uniqueId)
 
         imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
         
-        self._inference(craftDetection.resultMainList, imageOpen)
+        self._inference(detectionCraft.resultMainList, imageOpen)
 
         print("file", flush=True)
 

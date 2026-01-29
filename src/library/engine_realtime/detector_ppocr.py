@@ -1,13 +1,14 @@
 import cv2
 import numpy
 
-class PPocrDetection:
+class DetectorPPocr:
     @property
     def name(self):
         return self.__class__.__name__
 
     def setInputSize(self, input_size):
-        self.inputSize = tuple(input_size)
+        self.inputSize = (int(input_size[0]), int(input_size[1]))
+        self.inputWidth, self.inputHeight = self.inputSize
         self.model.setInputSize(self.inputSize)
         self.model.setInputMean((123.675, 116.28, 103.53))
         self.model.setInputScale(1.0/255.0/numpy.array([0.229, 0.224, 0.225]))
@@ -19,8 +20,8 @@ class PPocrDetection:
         self.model.setPreferableTarget(self.targetId)
 
     def infer(self, image):
-        assert image.shape[0] == self.inputSize[1], '{} (height of input image) != {} (preset height)'.format(image.shape[0], self.inputSize[1])
-        assert image.shape[1] == self.inputSize[0], '{} (width of input image) != {} (preset width)'.format(image.shape[1], self.inputSize[0])
+        assert image.shape[0] == self.inputHeight, '{} (height of input image) != {} (preset height)'.format(image.shape[0], self.inputHeight)
+        assert image.shape[1] == self.inputWidth,  '{} (width of input image) != {} (preset width)'.format(image.shape[1], self.inputWidth)
 
         return self.model.detect(image)
 
@@ -28,9 +29,8 @@ class PPocrDetection:
         self.modelPath = modelPath
         self.model = cv2.dnn_TextDetectionModel_DB(cv2.dnn.readNet(self.modelPath))
 
-        self.inputSize = tuple(inputSize)
-        self.inputHeight = inputSize[0]
-        self.inputWidth = inputSize[1]
+        self.inputSize = (int(inputSize[0]), int(inputSize[1]))
+        self.inputWidth, self.inputHeight = self.inputSize
         self.binaryThreshold = binaryThreshold
         self.polygonThreshold = polygonThreshold
         self.maxCandidates = maxCandidates
@@ -49,3 +49,4 @@ class PPocrDetection:
         self.model.setInputSize(self.inputSize)
         self.model.setInputMean((123.675, 116.28, 103.53))
         self.model.setInputScale(1.0/255.0/numpy.array([0.229, 0.224, 0.225]))
+        self.model.setInputSwapRB(True)

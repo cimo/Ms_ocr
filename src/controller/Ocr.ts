@@ -21,11 +21,11 @@ export default class ControllerOcr {
     }
 
     header = (request: Request, response: Response): void => {
-        const sessionId = request.headers["x-session-id"] as string;
-        const endpoint = request.headers["x-endpoint"] as string;
+        const sessionId = request.headers["x-session-id"] || "";
+        const endpoint = request.headers["x-endpoint"] || "";
 
-        response.setHeader("X-Session-Id", sessionId);
-        response.setHeader("X-Endpoint", endpoint);
+        response.setHeader("x-session-id", sessionId);
+        response.setHeader("x-endpoint", endpoint);
     };
 
     api = (): void => {
@@ -167,13 +167,10 @@ export default class ControllerOcr {
 
                                 finalizeResponse();
                             });
-                        } else if (output.startsWith("polygon")) {
-                            const outputSlice = output.slice("polygon".length).trim();
-                            const polygon = JSON.parse(outputSlice);
+                        } else if (output.startsWith("data")) {
+                            const outputSlice = output.slice("data".length).trim();
 
-                            const responseJson = { polygon };
-
-                            helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
+                            helperSrc.responseBody(outputSlice, "", response, 200);
                         } else {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 

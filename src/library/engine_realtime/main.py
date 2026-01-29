@@ -7,8 +7,8 @@ import numpy
 import unicodedata
 
 # Source
-from .ppocr_detection import PPocrDetection
-from .crnn_recognition import CrnnRecognition
+from .detector_ppocr import DetectorPPocr
+from .recognizer_crnn import RecognizerCrnn
 from image_processor import main as imageProcessor
 
 def _checkEnvVariable(varKey):
@@ -52,90 +52,55 @@ class EngineRealtime:
 
         return text == searchText
 
-    def _inference(self, imageRgb, detector, recognizer):
-        resultMatchList = []
+    def _inference(self, detector, recognizer):
+        resultList = []
+        
+        imageOpen, _, _ = imageProcessor.open(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
 
-        if imageRgb.ndim == 2:
-            imageRgb = cv2.cvtColor(imageRgb, cv2.COLOR_GRAY2RGB)
+        pilImage, pilImageDraw = imageProcessor.pilImage(imageOpen)
 
-        imageBgr = cv2.cvtColor(imageRgb, cv2.COLOR_RGB2BGR)
+        imageBgr = cv2.cvtColor(imageOpen, cv2.COLOR_RGB2BGR)
 
-        originalHeight, originalWidth = imageRgb.shape[:2]
-        imageResize = cv2.resize(imageBgr, (736, 736))
-        scaleWidth = originalWidth / 736.0
-        scaleHeight = originalHeight / 736.0
+        originalHeight, originalWidth = imageOpen.shape[:2]
+        imageResize = cv2.resize(imageBgr, (detector.inputWidth, detector.inputHeight))
+        scaleWidth = originalWidth / float(detector.inputWidth)
+        scaleHeight = originalHeight / float(detector.inputHeight)
 
         resultDetector, _ = detector.infer(imageResize)
         textList = [recognizer.infer(imageResize, box.reshape(8)) for box in resultDetector]
 
-        left = cv2.cvtColor(imageBgr, cv2.COLOR_BGR2RGB).copy()
-        right = numpy.ones_like(left) * 255
+        dataList = []
 
         for boxRaw, text in zip(resultDetector, textList):
             box = numpy.int32([[int(point[0] * scaleWidth), int(point[1] * scaleHeight)] for point in boxRaw])
 
-            xs = box[:, 0]
-            boxWidth = xs.max() - xs.min()
-            height1 = numpy.linalg.norm(box[1] - box[0])
-            hegith2 = numpy.linalg.norm(box[2] - box[3])
-            boxHeight = (height1 + hegith2) / 2.0
+            dataList.append((text, box.copy()))
 
-            (_, textHeight), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1)
-            fontScale = (boxHeight * 0.8) / textHeight if textHeight > 0 else 1.0
-            fontThickness = max(1, int(fontScale))
-            
-            (textWidth, textHeight), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, fontThickness)
-            scaleX = boxWidth / textWidth if textWidth > 0 else 1.0
-            scaleY = (boxHeight * 0.8) / textHeight if textHeight > 0 else 1.0
-            fontScale = fontScale * min(1.0, scaleX, scaleY)
-            fontThickness = max(1, int(numpy.floor(fontScale)))
+            x, y, w, h = imageProcessor.bbox(box)
 
             if self._checkMatch(text):
                 color = (0, 200, 0)
-
-                resultMatchList.append((text, box.copy()))
             else:
-                color = (0, 0, 255)
+                color = (255, 0, 0)
 
-            cv2.polylines(left, [box], isClosed=True, color=color, thickness=1)
-            cv2.polylines(right, [box], isClosed=True, color=color, thickness=1)
+            imageProcessor.rectangle(imageOpen, x, y, w, h, color, 1)
 
-            x0, y0 = box[0]
-            textY = max(0, int(y0 - 5))
-
-            cv2.putText(right, text, (int(x0), textY), cv2.FONT_HERSHEY_SIMPLEX, fontScale, (0, 0, 0), fontThickness, lineType=cv2.LINE_AA)
-
-        return cv2.hconcat([left, right]), resultMatchList
-
-    def _process(self, detector, recognizer):
-        resultList = []
-
-        imageRead = cv2.imread(f"{PATH_ROOT}{PATH_FILE}input/{self.fileName}")
-
-        if imageRead is None:
-            print(f"Error: Cannot read image: {self.fileName}")
-
-            return None
-
-        imageRgb = cv2.cvtColor(imageRead, cv2.COLOR_BGR2RGB)
-
-        imageResult, matchList = self._inference(imageRgb, detector, recognizer)
-
-        pilImage, _ = imageProcessor.pilImage(imageResult, True)
+            pilFont = imageProcessor.pilFont(text, w, h, self.fontName)
+            pilImageDraw.text((x, y), text, font=pilFont, fill=(0, 0, 0))
 
         if IS_DEBUG:
-            pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/{self.fileNameSplit}_result.jpg", format="JPEG")
+            imageProcessor.write(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/layout/{self.fileNameSplit}_result.jpg", "", imageOpen)
 
-            if self.searchText is not None and matchList:
-                #print(f"Match: '{self.searchText}' found {len(matchList)} in {self.fileName}:")
+        for id, (text, box) in enumerate(dataList, 1):
+            resultList.append({
+                "id": id,
+                "polygon": [(int(x), int(y)) for x, y in box.tolist()],
+                "text": text,
+                "match": bool(self.searchText) and self._checkMatch(text)
+            })
 
-                for a, (text, box) in enumerate(matchList, 1):
-                    resultList = [(int(x), int(y)) for x, y in box.tolist()]
-
-                    #print(f"  {a}. text='{text}'  polygon={resultList}")
-
-        if self.dataType == "polygon":
-            print("polygon", json.dumps(resultList, ensure_ascii=False), flush=True)
+        if self.dataType == "data":
+            print(self.dataType, json.dumps(resultList, ensure_ascii=False), flush=True)
         
         pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
@@ -146,7 +111,7 @@ class EngineRealtime:
         idBackend = cv2.dnn.DNN_BACKEND_OPENCV
         idTarget = cv2.dnn.DNN_TARGET_CPU
 
-        detector = PPocrDetection(
+        detector = DetectorPPocr(
             modelPath=f"{PATH_ROOT}src/library/engine_realtime/text_detection_en_ppocrv3_2023may.onnx",
             inputSize=[736, 736],
             binaryThreshold=0.3,
@@ -156,14 +121,17 @@ class EngineRealtime:
             backendId=idBackend,
             targetId=idTarget
         )
-        recognizer = CrnnRecognition(
+
+        recognizer = RecognizerCrnn(
             modelPath=f"{PATH_ROOT}src/library/engine_realtime/text_recognition_CRNN_EN_2021sep.onnx",
             backendId=idBackend,
             targetId=idTarget
         )
+
         return detector, recognizer
 
     def _createOutputDir(self):
+        os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/", exist_ok=True)
 
     def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue="file"):
@@ -178,7 +146,7 @@ class EngineRealtime:
         
         detector, recognizer = self._loadModel()
 
-        self._process(detector, recognizer)
+        self._inference(detector, recognizer)
 
         if self.dataType == "file":
             print(self.dataType, flush=True)
@@ -189,6 +157,7 @@ class EngineRealtime:
         self.uniqueId = ""
         self.searchText = ""
         self.dataType = ""
+        self.fontName = "NotoSansJP-Regular.ttf"
         self.argumentCaseSensitive = False
         self.argumentSelective = False
         self.argumentContain = True

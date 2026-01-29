@@ -2,9 +2,9 @@ import cv2
 import numpy
 
 # Soruce
-from .crnn_charset import CHARSET_EN_36, CHARSET_CH_94, CHARSET_CN_3944
+from .charset_crnn import CHARSET_EN_36, CHARSET_CH_94, CHARSET_CN_3944
 
-class CrnnRecognition:
+class RecognizerCrnn:
     @property
     def name(self):
         return self.__class__.__name__
@@ -16,14 +16,28 @@ class CrnnRecognition:
         vertices = rbbox.reshape((4, 2)).astype(numpy.float32)
 
         rotationMatrix = cv2.getPerspectiveTransform(vertices, self._targetVertices)
-        cropped = cv2.warpPerspective(image, rotationMatrix, self._inputSize)
+        cropped = cv2.warpPerspective(image, rotationMatrix, (self._inputWidth, self._inputHeight))
 
         if 'CN' in self._model_path or 'CH' in self._model_path:
-            pass
+            return cv2.dnn.blobFromImage(
+                cropped,
+                scalefactor=1.0 / 127.5,
+                size=(self._inputWidth, self._inputHeight),
+                mean=127.5,
+                swapRB=True,
+                crop=False
+            )
         else:
             cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-
-        return cv2.dnn.blobFromImage(cropped, size=self._inputSize, mean=127.5, scalefactor=1 / 127.5)
+            
+            return cv2.dnn.blobFromImage(
+                cropped,
+                scalefactor=1.0 / 127.5,
+                size=(self._inputWidth, self._inputHeight),
+                mean=127.5,
+                swapRB=False,
+                crop=False
+            )
 
     def _postprocess(self, outputBlob):
         text = ''
@@ -64,12 +78,13 @@ class CrnnRecognition:
 
             exit()
 
-        self._inputSize = [100, 32]
+        self._inputSize = (100, 32)
+        self._inputWidth, self._inputHeight = self._inputSize
         self._targetVertices = numpy.array([
-            [0, self._inputSize[1] - 1],
+            [0, self._inputHeight - 1],
             [0, 0],
-            [self._inputSize[0] - 1, 0],
-            [self._inputSize[0] - 1, self._inputSize[1] - 1]
+            [self._inputWidth - 1, 0],
+            [self._inputWidth - 1, self._inputHeight - 1]
         ], dtype=numpy.float32)
 
     def setBackendAndTarget(self, backendId, targetId):

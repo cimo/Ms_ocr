@@ -35,7 +35,7 @@ PATH_ROOT = _checkEnvVariable("PATH_ROOT")
 IS_DEBUG = _checkEnvVariable("MS_O_IS_DEBUG")
 PATH_FILE = _checkEnvVariable("MS_O_PATH_FILE")
 
-class CraftDetection:
+class DetectionCraft:
     def _boxCreation(self, scoreText, _, scaleX, scaleY):
         scoreText = numpy.where(scoreText > 0.2, scoreText, 0)
         #scoreLink = numpy.where(scoreLink > 0.2, scoreLink, 0)
