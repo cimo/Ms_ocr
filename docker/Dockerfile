@@ -31,6 +31,9 @@ ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 
 COPY ./.ms_cronjob-volume/certificate/* /usr/local/share/ca-certificates/
 COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
+COPY ./docker/NotoSansSymbols2-Regular.ttf /usr/share/fonts/truetype/noto/
+COPY ./docker/NotoColorEmoji-Regular.ttf /usr/share/fonts/truetype/noto/
+COPY ./docker/font.local.conf /etc/fonts/local.conf
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
