@@ -117,6 +117,8 @@ RUN \
 CMD \
     # Command
     command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
+    # Dbus
+    && bash ${PATH_ROOT}script/dbus.sh \
     # Engine package
     && bash ${PATH_ROOT}script/engine_package.sh \
     # Library
