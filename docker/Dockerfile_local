@@ -23,9 +23,16 @@ ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV WAYLAND_DISPLAY=wayland-0
+ENV XDG_SESSION_TYPE=wayland
+ENV ELECTRON_ENABLE_WAYLAND=1
+ENV ELECTRON_OZONE_PLATFORM_HINT=auto
+ENV OZONE_PLATFORM=wayland
+ENV EGL_PLATFORM=wayland
+ENV ANGLE_DEFAULT_PLATFORM=egl
+ENV PULSE_SERVER=unix:/mnt/wslg/PulseServer
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
-ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 
 COPY ./.ms_cronjob-volume/certificate/* /usr/local/share/ca-certificates/
 COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
@@ -36,13 +43,15 @@ COPY ./docker/font.local.conf /etc/fonts/local.conf
 RUN cd ~ \
     # No root
     && useradd -U node -d ${PATH_ROOT} -s /bin/bash \
-    && mkdir -p ${PATH_ROOT} \
-    && chown -R node:node ${PATH_ROOT} \
+    && uid="$(id -u node)" \
+    && mkdir -p ${PATH_ROOT} "/run/user/${uid}" \
+    && chown -R node:node ${PATH_ROOT} "/run/user/${uid}" \
     && chmod -R 775 ${PATH_ROOT} \
+    && chmod -R 700 "/run/user/${uid}" \
     # Update
     && VERSION_CODENAME=$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2) \
     && chmod -R 0644 /usr/local/share/ca-certificates/ \
-    && apt-get update && apt-get install -y ca-certificates tzdata curl media-types \
+    && apt-get update && apt-get install -y ca-certificates tzdata curl media-types jq \
     && update-ca-certificates \
     && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone \
     && echo "application/typescript ts" >> /etc/mime.types \
@@ -53,33 +62,26 @@ RUN cd ~ \
     # Python
     && apt-get update && apt-get install -y \
     python3-pip \
-    # Dbus
-    && apt-get update && apt-get install -y \
-    dbus \
-    dbus-x11 \
-    # GPU
+    # Wslg
     && apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgtk-3-0 \
+    libcairo2 \
+    libfontconfig1 \
+    libfreetype6 \
     libnss3 \
     libnspr4 \
-    libx11-6 \
-    libxext6 \
-    libxrender1 \
-    libxrandr2 \
-    libfreetype6 \
-    libfontconfig1 \
     libasound2 \
-    libgomp1 \
     libgbm1 \
-    libglu1-mesa \
-    libvulkan1 \
-    mesa-vulkan-drivers \
-    mesa-utils \
+    libegl1 \
+    libegl1-mesa \
+    libgl1-mesa-dri \
+    libdrm2 \
+    libwayland-client0 \
+    libwayland-egl1 \
+    libwayland-cursor0 \
+    libgomp1 \
     xdg-utils \
-    libxcb1 \
-    libx11-xcb1 \
-    libcairo2 \
     # Tesseract
     && apt-get update && apt-get install -y \
     cmake \
@@ -100,13 +102,12 @@ USER node
 
 WORKDIR ${PATH_ROOT}
 
-# Pip
-CMD python3 -m pip install pip --upgrade \
+CMD \
+    # Pip
+    python3 -m pip install pip --upgrade \
     && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Command
-    && command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU." \
-    && command -v vulkaninfo > /dev/null && vulkaninfo | grep "deviceName" || echo "Host without vulkan support." \
-    && command -v glxinfo > /dev/null && glxinfo | grep "OpenGL renderer string" || echo "Host without opengl support." \
+    command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
     # Engine package
     && bash ${PATH_ROOT}script/engine_package.sh \
     # Library

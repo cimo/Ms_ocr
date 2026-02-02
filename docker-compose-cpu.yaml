@@ -15,13 +15,13 @@ services:
         _PATH_ROOT: ${PATH_ROOT}
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./:${PATH_ROOT}
       - ms_cronjob-volume:${PATH_ROOT}.ms_cronjob-volume/:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - /mnt/wslg:/mnt/wslg
 volumes:
   ms_cronjob-volume:

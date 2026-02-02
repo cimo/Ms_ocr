@@ -6,7 +6,24 @@ import typescriptPlugin from "@typescript-eslint/eslint-plugin";
 import customRule from "./dist/eslint.customRule.js";
 
 const configIgnore = {
-    ignores: ["dist", "node_modules", "public", "src-tauri", ".cache", ".config", ".dbus", ".local", ".npm", ".nv", ".pki"]
+    ignores: [
+        ".cache",
+        ".config",
+        ".file_share",
+        ".ipython",
+        ".jupyter",
+        ".lmstudio",
+        ".local",
+        ".ms_cronjob-volume",
+        ".npm",
+        ".nv",
+        ".paddlex",
+        ".pki",
+        "dist",
+        "node_modules",
+        "public",
+        "src-tauri"
+    ]
 };
 
 const configBase = {
