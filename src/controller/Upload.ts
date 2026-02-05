@@ -36,12 +36,18 @@ export default class Upload {
                                 Fs.access(input, Fs.constants.F_OK, (error) => {
                                     if (!error) {
                                         reject("File exists.");
+
+                                        return;
                                     } else {
                                         helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
                                             if (resultFileWriteStream) {
                                                 resolve(formDataList);
+
+                                                return;
                                             } else {
                                                 reject(resultFileWriteStream);
+
+                                                return;
                                             }
                                         });
                                     }
@@ -50,8 +56,12 @@ export default class Upload {
                                 helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
                                     if (resultFileWriteStream) {
                                         resolve(formDataList);
+
+                                        return;
                                     } else {
                                         reject(resultFileWriteStream);
+
+                                        return;
                                     }
                                 });
                             }
@@ -61,11 +71,15 @@ export default class Upload {
                     }
                 } else {
                     reject(resultCheckRequest);
+
+                    return;
                 }
             });
 
             request.on("error", (error: Error) => {
                 reject(error);
+
+                return;
             });
         });
     };
