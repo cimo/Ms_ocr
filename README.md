@@ -2,8 +2,8 @@
 
 Microservice OCR.
 
-Depend from "Ms_cronjob" (use "ms_cronjob-volume" for share the certificate).
-It's possible to use a personal certificate instead of "Ms_cronjob", just add the certificate in the ".ms_cronjob-volume" folders.
+Depend on "Ms_cronjob" (use "ms_cronjob-volume" to share the certificate).
+It's possible to use a personal certificate instead of "Ms_cronjob", just add the certificate to the ".ms_cronjob-volume" folder.
 
 ## Info:
 
@@ -42,7 +42,9 @@ NVIDIA GeForce RTX 3060 - (Host GPU available)
 1. Remove this from the root:
     - .cache
     - .config
+    - .cuda
     - .local
+    - .ms_cronjob-volume/certificate
     - .npm
     - .nv
     - .paddlex

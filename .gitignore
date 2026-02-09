@@ -22,6 +22,8 @@ pnpm-debug.log*
 
 # cimo +
 .cache
+.config
+.cuda
 .local
 .ms_cronjob-volume/**/*
 !.ms_cronjob-volume/**/
@@ -29,6 +31,7 @@ pnpm-debug.log*
 .npm
 .nv
 .paddlex
+.pki
 dist
 file/input/*
 !file/input/.gitkeep

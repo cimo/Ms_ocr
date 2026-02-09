@@ -99,7 +99,7 @@ export default class Server {
             const controllerOcr = new ControllerOcr(this.app, this.limiter);
             controllerOcr.api();
 
-            helperSrc.writeLog("Server.ts - createServer() - listen()", `Port: ${helperSrc.SERVER_PORT}`);
+            helperSrc.writeLog("Server.ts - createServer() - listen() - Port", helperSrc.SERVER_PORT);
 
             this.app.get("/", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
                 controllerOcr.header(request, response);

@@ -1,5 +1,10 @@
 #!/bin/bash
 
-XDG_RUNTIME_DIR="/run/user/$(id -u)" \
-DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" \
-dbus-daemon --session --address="unix:path=/run/user/$(id -u)/bus" --fork
+xdgRuntimeDir=$XDG_RUNTIME_DIR
+userId="/run/user/$(id -u)/"
+
+XDG_RUNTIME_DIR="${userId}" \
+DBUS_SESSION_BUS_ADDRESS="unix:path=${userId}bus" \
+dbus-daemon --session --address="unix:path=${userId}bus" --fork
+
+ln -sf "${userId}bus" "${xdgRuntimeDir}bus"
