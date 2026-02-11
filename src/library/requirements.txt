@@ -1,7 +1,7 @@
 numpy==2.2.6
 # image_processor
 opencv-python-headless==4.12.0.88
-pillow==11.3.0
+pillow==12.1.1
 # data_to_table
 openpyxl==3.1.5
 # engine_paddle
