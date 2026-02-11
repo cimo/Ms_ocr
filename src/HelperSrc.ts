@@ -1,5 +1,5 @@
 import Fs from "fs";
-import { Response } from "express";
+import { Request, Response } from "express";
 import { Ce } from "@cimo/environment/dist/src/Main.js";
 
 // Source
@@ -130,6 +130,14 @@ export const writeLog = (tag: string, value: string | Record<string, unknown> | 
     }
 };
 
+export const keepProcess = (): void => {
+    for (const event of ["uncaughtException", "unhandledRejection"]) {
+        process.on(event, (error: Error) => {
+            writeLog("HelperSrc.ts - keepProcess()", `Event: "${event}" - ${error.toString()}`);
+        });
+    }
+};
+
 export const fileWriteStream = (filePath: string, buffer: Buffer, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
     const writeStream = Fs.createWriteStream(filePath);
 
@@ -215,14 +223,6 @@ export const responseBody = (stdoutValue: string, stderrValue: string | Error, r
     response.status(mode).send(responseBody);
 };
 
-export const keepProcess = (): void => {
-    for (const event of ["uncaughtException", "unhandledRejection"]) {
-        process.on(event, (error: Error) => {
-            writeLog("HelperSrc.ts - keepProcess()", `Event: "${event}" - ${error.toString()}`);
-        });
-    }
-};
-
 export const isJson = (value: string): boolean => {
     try {
         JSON.parse(value);
@@ -291,4 +291,24 @@ export const findFileInDirectoryRecursive = (path: string, extension: string, ca
             next();
         });
     });
+};
+
+export const headerBearerToken = (request: Request): string => {
+    const authorization = request.headers["authorization"];
+
+    return authorization ? authorization.substring(7) : "";
+};
+
+export const readClientIp = (request: Request): string => {
+    let result = "";
+
+    const forwarded = request.headers["x-forwarded-for"];
+
+    if (typeof forwarded === "string") {
+        result = forwarded;
+    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
+        result = forwarded[0];
+    }
+
+    return result.split(",")[0] || request.ip || "";
 };

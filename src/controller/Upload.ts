@@ -22,8 +22,10 @@ export default class Upload {
             });
 
             request.on("end", () => {
+                const contentType = request.headers["content-type"];
+
                 const buffer = Buffer.concat(chunkList);
-                const formDataList = Cfdp.readInput(buffer, request.headers["content-type"]);
+                const formDataList = Cfdp.readInput(buffer, contentType);
 
                 const resultCheckRequest = this.checkRequest(formDataList);
 

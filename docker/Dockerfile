@@ -108,17 +108,17 @@ USER node
 WORKDIR ${PATH_ROOT}
 
 RUN \
-    # Pip
-    python3 -m pip install pip --upgrade \
-    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Npm
-    && rm -rf ${PATH_ROOT}node_modules/ ${PATH_ROOT}package-lock.json \
+    rm -rf ${PATH_ROOT}node_modules/ ${PATH_ROOT}package-lock.json \
     && npm install \
     && npm run build
 
 CMD \
+    # Pip
+    python3 -m pip install pip --upgrade \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Command
-    command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
+    && command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
     # Dbus
     && bash ${PATH_ROOT}script/dbus.sh \
     # Engine package
