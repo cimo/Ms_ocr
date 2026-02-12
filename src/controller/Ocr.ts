@@ -7,7 +7,7 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 import * as helperSrc from "../HelperSrc.js";
 import ControllerUpload from "./Upload.js";
 
-export default class ControllerOcr {
+export default class Ocr {
     // Variable
     private app: Express.Express;
     private limiter: RateLimitRequestHandler;
