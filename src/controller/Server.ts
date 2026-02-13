@@ -75,7 +75,8 @@ export default class Server {
             creation = Https.createServer(
                 {
                     key: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_KEY),
-                    cert: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_CRT)
+                    cert: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_CRT),
+                    ca: Fs.readFileSync(helperSrc.PATH_CERTIFICATE_PEM)
                 },
                 this.app
             );
