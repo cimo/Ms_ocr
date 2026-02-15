@@ -42,7 +42,7 @@ export default class Ocr {
 
                     for (const resultControllerUpload of resultControllerUploadList) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
-                            language = resultControllerUpload.buffer.toString().match("^(ja|ja_vert|en)$")
+                            language = resultControllerUpload.buffer.toString().match("^(-|ja|ja_vert|en)$")
                                 ? resultControllerUpload.buffer.toString()
                                 : "";
                         } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
@@ -60,6 +60,9 @@ export default class Ocr {
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${dataType}"`];
+
+                    // eslint-disable-next-line no-console
+                    console.log("cimo", execArgumentList);
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
