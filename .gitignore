@@ -25,13 +25,13 @@ pnpm-debug.log*
 .config
 .cuda
 .local
-.ms_cronjob-volume/**/*
-!.ms_cronjob-volume/**/
-!.ms_cronjob-volume/**/.gitkeep
 .npm
 .nv
 .paddlex
 .pki
+certificate/**/*
+!certificate/**/
+!certificate/**/.gitkeep
 dist
 file/input/*
 !file/input/.gitkeep

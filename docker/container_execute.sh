@@ -1,43 +1,47 @@
 #!/bin/bash
 
-if [ -n "${1}" ] && [ -n "${2}" ] && [ -n "${3}" ]
+p1=$(printf '%s' "${1}" | xargs)
+p2=$(printf '%s' "${2}" | xargs)
+p3=$(printf '%s' "${3}" | xargs)
+
+if [ -z "${p1}" ] || [ -z "${p2}" ] || [ -z "${p3}" ]
 then
-    source="./.ms_cronjob-volume/"
-    
-    mapfile -d '' -t fileList < <(find "${source}" -type f ! -name ".gitkeep" -print0 2>/dev/null)
+    echo "container_execute.sh - Missing parameter."
 
-    if [ ${#fileList[@]} -eq 0 ]
+    exit 1
+fi
+
+parameter1="${1}"
+parameter2="${2}"
+parameter3="${3}"
+
+echo "Copying from volume..."
+
+docker run --rm \
+-v cimo_${parameter1}_ms_cronjob-volume:/home/source/:ro \
+-v $(pwd)/certificate/:/home/target/ \
+alpine sh -c "cp -r /home/source/* /home/target/"
+
+echo "Execute container."
+
+if [ "${parameter2}" = "build-up" ]
+then
+    if [ "${parameter3}" = "cpu" ]
     then
-        echo "Copying from volume..."
-
-        docker run --rm \
-        --user $(id -u):$(id -g) \
-        -v cimo_${1}_ms_cronjob-volume:/home/source/:ro \
-        -v $(pwd)/.ms_cronjob-volume/:/home/target/ \
-        alpine sh -c "cp -r /home/source/* /home/target/"
+        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env build --no-cache &&
+        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env up --detach --pull always
+    elif [ "${parameter3}" = "gpu" ]
+    then
+        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env build --no-cache &&
+        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env up --detach --pull always
     fi
-
-    echo "Execute container."
-
-    if [ "${2}" = "build-up" ]
+elif [ "${parameter2}" = "up" ]
+then
+    if [ "${parameter3}" = "cpu" ]
     then
-        if [ "${3}" = "cpu" ]
-        then
-            docker compose -f docker-compose-cpu.yaml --env-file ./env/${1}.env build --no-cache &&
-            docker compose -f docker-compose-cpu.yaml --env-file ./env/${1}.env up --detach --pull always
-        elif [ "${3}" = "gpu" ]
-        then
-            docker compose -f docker-compose-gpu.yaml --env-file ./env/${1}.env build --no-cache &&
-            docker compose -f docker-compose-gpu.yaml --env-file ./env/${1}.env up --detach --pull always
-        fi
-    elif [ "${2}" = "up" ]
+        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env up --detach --pull always
+    elif [ "${parameter3}" = "gpu" ]
     then
-        if [ "${3}" = "cpu" ]
-        then
-            docker compose -f docker-compose-cpu.yaml --env-file ./env/${1}.env up --detach --pull always
-        elif [ "${3}" = "gpu" ]
-        then
-            docker compose -f docker-compose-gpu.yaml --env-file ./env/${1}.env up --detach --pull always
-        fi
+        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env up --detach --pull always
     fi
 fi

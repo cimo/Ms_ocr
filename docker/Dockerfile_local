@@ -36,7 +36,7 @@ ENV PULSE_SERVER="unix:/mnt/wslg/PulseServer"
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 
-COPY ./.ms_cronjob-volume/certificate/* /usr/local/share/ca-certificates/
+COPY ./certificate/ /usr/local/share/ca-certificates/
 COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
 COPY ./docker/NotoSansSymbols2-Regular.ttf /usr/share/fonts/truetype/noto/
 COPY ./docker/NotoColorEmoji-Regular.ttf /usr/share/fonts/truetype/noto/

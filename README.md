@@ -45,7 +45,6 @@ NVIDIA GeForce RTX 3060 - (Host GPU available)
     - .config
     - .cuda
     - .local
-    - .ms_cronjob-volume/certificate
     - .npm
     - .nv
     - .paddlex

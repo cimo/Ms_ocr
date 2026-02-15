@@ -2,11 +2,6 @@
 
 pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/detection_craft/"
 
-if [ -z "${PATH_ROOT}" ]
-then
-    exit 1
-fi
-
 currentTime=$(date +%s)
 
 for data in "${pathOutput}"*/
