@@ -18,7 +18,7 @@
         "execute": "nodemon --config nodemon.json"
     },
     "dependencies": {
-        "@cimo/authentication": "1.1.31",
+        "@cimo/authentication": "1.1.32",
         "@cimo/environment": "1.0.23",
         "@cimo/form-data_parser": "1.1.39",
         "@cimo/cronjob": "1.0.10",
