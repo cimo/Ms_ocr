@@ -96,11 +96,11 @@ class EngineRealtime:
                 "id": id,
                 "polygon": [(int(x), int(y)) for x, y in box.tolist()],
                 "text": text,
-                "match": bool(self.searchText) and self._checkMatch(text)
+                "isMatch": bool(self.searchText) and self._checkMatch(text)
             })
 
-        if self.dataType == "data":
-            print(self.dataType, json.dumps(resultList, ensure_ascii=False), flush=True)
+        if self.mode == "data":
+            print(self.mode, json.dumps(resultList, ensure_ascii=False), flush=True)
         
         pilImage.save(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/{self.fileNameSplit}_result.pdf", format="PDF")
 
@@ -134,13 +134,13 @@ class EngineRealtime:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_realtime/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue="file"):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", modeValue="file"):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
         self.uniqueId = uniqueIdValue
         self.searchText = searchTextValue
-        self.dataType = dataTypeValue
+        self.mode = modeValue
 
         self._createOutputDir()
         
@@ -148,15 +148,15 @@ class EngineRealtime:
 
         self._inference(detector, recognizer)
 
-        if self.dataType == "file":
-            print(self.dataType, flush=True)
+        if self.mode == "file":
+            print(self.mode, flush=True)
 
     def __init__(self):
         self.language = ""
         self.fileName = ""
         self.uniqueId = ""
         self.searchText = ""
-        self.dataType = ""
+        self.mode = ""
         self.fontName = "NotoSansJP-Regular.ttf"
         self.argumentCaseSensitive = False
         self.argumentSelective = False

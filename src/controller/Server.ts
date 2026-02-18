@@ -93,8 +93,6 @@ export default class Server {
             helperSrc.writeLog("Server.ts - createServer() - listen() - Port", helperSrc.SERVER_PORT);
 
             this.app.get("/", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                controllerOcr.header(request, response);
-
                 if (request.accepts("html")) {
                     response.sendFile(`${helperSrc.PATH_ROOT}${helperSrc.PATH_PUBLIC}index.html`);
                 } else {
@@ -103,22 +101,16 @@ export default class Server {
             });
 
             this.app.get("/info", (request: modelServer.Irequest, response: Response) => {
-                controllerOcr.header(request, response);
-
                 helperSrc.responseBody(`Client ip: ${request.clientIp || ""}`, "", response, 200);
             });
 
             this.app.get("/login", this.limiter, (request: Request, response: Response) => {
-                controllerOcr.header(request, response);
-
                 Ca.writeCookie(`${helperSrc.LABEL}_authentication`, response);
 
                 helperSrc.responseBody("ok", "", response, 200);
             });
 
             this.app.get("/logout", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                controllerOcr.header(request, response);
-
                 Ca.removeCookie(`${helperSrc.LABEL}_authentication`, request, response);
 
                 helperSrc.responseBody("ok", "", response, 200);

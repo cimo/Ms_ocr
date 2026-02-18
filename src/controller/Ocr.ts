@@ -20,25 +20,15 @@ export default class Ocr {
         this.controllerUpload = new ControllerUpload();
     }
 
-    header = (request: Request, response: Response): void => {
-        const sessionId = request.headers["x-session-id"] || "";
-        const endpoint = request.headers["x-endpoint"] || "";
-
-        response.setHeader("x-session-id", sessionId);
-        response.setHeader("x-endpoint", endpoint);
-    };
-
     api = (): void => {
         this.app.post("/api/extract", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-            this.header(request, response);
-
             this.controllerUpload
                 .execute(request, true)
                 .then((resultControllerUploadList) => {
                     let fileName = "";
                     let language = "";
                     let searchText = "";
-                    let dataType = "";
+                    let mode = "";
 
                     for (const resultControllerUpload of resultControllerUploadList) {
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
@@ -49,8 +39,8 @@ export default class Ocr {
                             fileName = resultControllerUpload.fileName;
                         } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
                             searchText = resultControllerUpload.buffer.toString();
-                        } else if (resultControllerUpload.name === "dataType" && resultControllerUpload.buffer) {
-                            dataType = resultControllerUpload.buffer.toString();
+                        } else if (resultControllerUpload.name === "mode" && resultControllerUpload.buffer) {
+                            mode = resultControllerUpload.buffer.toString();
                         }
                     }
 
@@ -59,10 +49,7 @@ export default class Ocr {
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
 
                     const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${dataType}"`];
-
-                    // eslint-disable-next-line no-console
-                    console.log("cimo", execArgumentList);
+                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${mode}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
@@ -175,22 +162,20 @@ export default class Ocr {
 
                             helperSrc.responseBody(outputSlice, "", response, 200);
                         } else {
-                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
+                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - Error", "Problem with the output.");
 
-                            helperSrc.responseBody("", stdout.toString(), response, 500);
+                            helperSrc.responseBody("", "ko", response, 500);
                         }
                     });
                 })
                 .catch((error: Error) => {
                     helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error);
 
-                    helperSrc.responseBody("", error, response, 500);
+                    helperSrc.responseBody("", "ko", response, 500);
                 });
         });
 
         this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-            this.header(request, response);
-
             const requestBody = request.body;
 
             const uniqueId = requestBody.uniqueId;

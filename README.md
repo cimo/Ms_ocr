@@ -97,7 +97,7 @@ key             value
 language        "-" (Only for "engine_tesseract" need be populated.)
 file            jp_1.jpg
 searchText      "-" (Only for "engine_realtime" need be populated.)
-dataType        "file" (Or "data".)
+mode            "file" (Or "data".)
 ```
 
 4. Download

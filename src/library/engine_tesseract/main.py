@@ -114,7 +114,7 @@ class EngineTesseract:
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/layout/", exist_ok=True)
         os.makedirs(f"{PATH_ROOT}{PATH_FILE}output/engine_tesseract/{self.uniqueId}/export/", exist_ok=True)
 
-    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", dataTypeValue=""):
+    def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", modeValue=""):
         self.language = languageValue
         self.fileName = fileNameValue
         self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
