@@ -9,9 +9,33 @@ export default class Upload {
     // Variable
 
     // Method
-    constructor() {
-        //...
-    }
+    private checkRequest = (formDataList: CfdpModel.Iinput[]): string => {
+        let result = "";
+
+        const parameterList: string[] = [];
+
+        for (const formData of formDataList) {
+            parameterList.push(formData.name);
+
+            if (formData.name === "file") {
+                if (formData.fileName === "" || formData.mimeType === "" || formData.size === "") {
+                    result += "File input empty.";
+                } else if (!helperSrc.fileCheckMimeType(formData.mimeType)) {
+                    result += "Mime type are not allowed.";
+                } else if (!helperSrc.fileCheckSize(parseInt(formData.size))) {
+                    result += "File size exceeds limit.";
+                }
+            }
+        }
+
+        if (!parameterList.includes("file")) {
+            result += "Parameter 'file' is missing.";
+        }
+
+        return result;
+    };
+
+    constructor() {}
 
     execute = (request: Request, isFileExists: boolean): Promise<CfdpModel.Iinput[]> => {
         return new Promise((resolve, reject) => {
@@ -79,36 +103,12 @@ export default class Upload {
             });
 
             request.on("error", (error: Error) => {
+                helperSrc.writeLog("Upload.ts - execute() - request.on() - Error", error.message);
+
                 reject(error);
 
                 return;
             });
         });
-    };
-
-    private checkRequest = (formDataList: CfdpModel.Iinput[]): string => {
-        let result = "";
-
-        const parameterList: string[] = [];
-
-        for (const formData of formDataList) {
-            parameterList.push(formData.name);
-
-            if (formData.name === "file") {
-                if (formData.fileName === "" || formData.mimeType === "" || formData.size === "") {
-                    result += "File input empty.";
-                } else if (!helperSrc.fileCheckMimeType(formData.mimeType)) {
-                    result += "Mime type are not allowed.";
-                } else if (!helperSrc.fileCheckSize(parseInt(formData.size))) {
-                    result += "File size exceeds limit.";
-                }
-            }
-        }
-
-        if (!parameterList.includes("file")) {
-            result += "Parameter 'file' is missing.";
-        }
-
-        return result;
     };
 }

@@ -169,7 +169,7 @@ export default class Ocr {
                     });
                 })
                 .catch((error: Error) => {
-                    helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error);
+                    helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error.message);
 
                     helperSrc.responseBody("", "ko", response, 500);
                 });
