@@ -55,7 +55,7 @@ export default class Ocr {
                         helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
                             if (typeof resultFileRemove !== "boolean") {
                                 helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderRemove(input)",
+                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderRemove()",
                                     resultFileRemove.toString()
                                 );
 
@@ -64,6 +64,9 @@ export default class Ocr {
                         });
 
                         const output = stdout.trim();
+
+                        // eslint-disable-next-line no-console
+                        console.log("cimo", output);
 
                         if (output.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);

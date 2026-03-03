@@ -4,7 +4,7 @@ p1=$(printf '%s' "${1}" | xargs)
 p2=$(printf '%s' "${2}" | xargs)
 p3=$(printf '%s' "${3}" | xargs)
 
-if [ -z "${p1}" ] || [ -z "${p2}" ] || [ -z "${p3}" ]
+if [ "$#" -lt 3 ]
 then
     echo "container_execute.sh - Missing parameter."
 

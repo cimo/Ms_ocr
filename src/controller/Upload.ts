@@ -56,41 +56,40 @@ export default class Upload {
                 if (resultCheckRequest === "") {
                     for (const formData of formDataList) {
                         if (formData.name === "file" && formData.fileName && formData.buffer) {
-                            const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${formData.fileName}`;
+                            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/`;
+                            const pathFile = `${path}${formData.fileName}`;
 
-                            if (isFileExists) {
-                                Fs.access(input, Fs.constants.F_OK, (error) => {
-                                    if (!error) {
-                                        reject(new Error("File exists."));
-
-                                        return;
-                                    } else {
-                                        helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
-                                            if (typeof resultFileWriteStream === "boolean" && resultFileWriteStream) {
-                                                resolve(formDataList);
-
-                                                return;
-                                            } else {
-                                                reject(new Error("File write failed."));
+                            Fs.mkdir(path, { recursive: true }, (error) => {
+                                if (!error) {
+                                    if (isFileExists) {
+                                        Fs.access(pathFile, Fs.constants.F_OK, (error) => {
+                                            if (!error) {
+                                                reject(new Error("File exists."));
 
                                                 return;
                                             }
                                         });
                                     }
-                                });
-                            } else {
-                                helperSrc.fileWriteStream(input, formData.buffer, (resultFileWriteStream) => {
-                                    if (typeof resultFileWriteStream === "boolean" && resultFileWriteStream) {
-                                        resolve(formDataList);
 
-                                        return;
-                                    } else {
-                                        reject(new Error("File write failed."));
+                                    helperSrc.fileWriteStream(pathFile, formData.buffer, (resultFileWriteStream) => {
+                                        if (typeof resultFileWriteStream === "boolean" && resultFileWriteStream) {
+                                            resolve(formDataList);
 
-                                        return;
-                                    }
-                                });
-                            }
+                                            return;
+                                        } else {
+                                            reject(new Error("File write failed."));
+
+                                            return;
+                                        }
+                                    });
+                                } else {
+                                    helperSrc.writeLog("Upload.ts - execute() - request.on() - mkdir() - Error", error.message);
+
+                                    reject(new Error("Directory creation failed."));
+
+                                    return;
+                                }
+                            });
 
                             break;
                         }
@@ -105,7 +104,7 @@ export default class Upload {
             request.on("error", (error: Error) => {
                 helperSrc.writeLog("Upload.ts - execute() - request.on() - Error", error.message);
 
-                reject(error);
+                reject(new Error(error.message));
 
                 return;
             });
