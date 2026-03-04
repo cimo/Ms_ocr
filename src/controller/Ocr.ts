@@ -65,9 +65,6 @@ export default class Ocr {
 
                         const output = stdout.trim();
 
-                        // eslint-disable-next-line no-console
-                        console.log("cimo", output);
-
                         if (output.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - execFile() - stdout", stdout);
 

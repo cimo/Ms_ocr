@@ -142,8 +142,6 @@ class EngineRealtime:
         self.searchText = searchTextValue
         self.mode = modeValue
 
-        print("cimo", self.mode)
-
         self._createOutputDir()
         
         detector, recognizer = self._loadModel()
