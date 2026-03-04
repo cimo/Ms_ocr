@@ -57,7 +57,7 @@ NVIDIA GeForce RTX 3060 - (Host GPU available)
 
 ## Tesseract
 
-1. For compile "tesseract" from source with custom setting write on terminal (standard version is already deployed):
+1. For compile "tesseract" from source with custom setting write on terminal:
     
     ```
     cd src/library/engine_tesseract/

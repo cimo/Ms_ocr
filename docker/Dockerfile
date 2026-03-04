@@ -22,7 +22,7 @@ ENV DEBCONF_NOWARNINGS=yes
 ENV SUDO_FORCE_REMOVE=yes
 ENV NODE_OPTIONS=--use-openssl-ca
 ENV NODE_EXTRA_CA_CERTS="${_PATH_CERTIFICATE_PEM}"
-ENV PATH="${PATH}:${PATH_ROOT}.local/bin/:/root/.local/bin/"
+ENV PATH="${PATH_ROOT}.local/bin/:${PATH}"
 ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -41,20 +41,18 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 
 COPY ./certificate/ /usr/local/share/ca-certificates/
-COPY ./docker/NotoSansJP-Regular.ttf /usr/share/fonts/truetype/noto/
-COPY ./docker/NotoSansSymbols2-Regular.ttf /usr/share/fonts/truetype/noto/
-COPY ./docker/NotoColorEmoji-Regular.ttf /usr/share/fonts/truetype/noto/
-COPY ./docker/font.local.conf /etc/fonts/local.conf
+COPY ./docker/font/ /usr/share/fonts/truetype/noto/
+COPY ./docker/font.conf /etc/fonts/local.conf
 COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
     # No root
     && useradd -U node -d ${PATH_ROOT} -s /bin/bash \
     && uid="$(id -u node)" \
-    && mkdir -p ${PATH_ROOT} "/run/user/${uid}" \
-    && chown -R node:node ${PATH_ROOT} "/run/user/${uid}" \
+    && mkdir -p ${PATH_ROOT} /run/user/${uid} \
+    && chown -R node:node ${PATH_ROOT} /run/user/${uid} \
     && chmod -R 775 ${PATH_ROOT} \
-    && chmod -R 700 "/run/user/${uid}" \
+    && chmod -R 700 /run/user/${uid} \
     # Update
     && VERSION_CODENAME=$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2) \
     && chmod -R 0644 /usr/local/share/ca-certificates/ \
@@ -63,27 +61,42 @@ RUN cd ~ \
     && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone \
     && echo "application/typescript ts" >> /etc/mime.types \
     # NodeJs
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_23.x | bash - \
     && apt-get update && apt-get install -y \
     nodejs \
     # Python
     && apt-get update && apt-get install -y \
     python3-pip \
     # Wslg
+    && groupadd -g 110 render || true \
+    && groupadd -g 44 video || true \
+    && usermod -aG 110 node \
+    && usermod -aG 44 node \
     && apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgtk-3-0 \
     libcairo2 \
+    libatk-bridge2.0-0 \
+    libatspi2.0-0 \
+    libxkbcommon0 \
     libfontconfig1 \
     libfreetype6 \
     libnss3 \
     libnspr4 \
     libasound2 \
-    libgbm1 \
+    libgl1 \
+    libglx-mesa0 \
+    libgl1-mesa-dri \
     libegl1 \
     libegl1-mesa \
-    libgl1-mesa-dri \
+    libgbm1 \
+    mesa-va-drivers \
+    mesa-utils-extra \
     libdrm2 \
+    libxdamage1 \
+    libxfixes3 \
+    libxcomposite1 \
+    libxrandr2 \
     libwayland-client0 \
     libwayland-egl1 \
     libwayland-cursor0 \
@@ -116,15 +129,15 @@ RUN \
     && npm run build
 
 CMD \
-    # Pip
-    python3 -m pip install pip --upgrade \
-    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Command
-    && command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
+    command -v nvidia-smi > /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader || echo "Host without nvidia GPU support." \
     # Dbus
     && bash ${PATH_ROOT}script/dbus.sh \
     # Engine package
     && bash ${PATH_ROOT}script/engine_package.sh \
+    # Pip
+    && python3 -m pip install pip --upgrade \
+    && python3 -m pip install --user --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r ${PATH_ROOT}src/library/requirements.txt \
     # Library
     && python3 ${PATH_ROOT}src/library/main.py \
     # Node
