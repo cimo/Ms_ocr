@@ -1,21 +1,28 @@
 #!/bin/bash
 
-pathInput="${PATH_ROOT}${MS_O_PATH_FILE}input/"
+path="${PATH_ROOT}${MS_O_PATH_FILE}input/"
 
 currentTime=$(date +%s)
 
-for data in "${pathInput}"*
+for data in "${path}"*
 do
-    if [ -f "${data}" ]
+    if [ -e "${data}" ]
     then
         statData=$(stat -c %Y "${data}")
         time=$((${currentTime} - ${statData}))
 
         if [ ${time} -gt 600 ]
         then
-            rm -f "${data}"
+            if [ -d "${data}" ]
+            then
+                rm -rf "${data}"
 
-            echo "File '${data}' removed."
+                echo "Folder '${data}' deleted."
+            else
+                rm -f "${data}"
+                
+                echo "File '${data}' deleted."
+            fi
         fi
     fi
 done

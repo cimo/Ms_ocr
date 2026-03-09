@@ -310,7 +310,7 @@ def noiseRemove(file, modeValue="close", unit=1):
     
     return cv2.morphologyEx(fileArray, mode, kernel)
 
-def addOrRemoveBorder(file, unit=1, color=125):
+def createOrDeleteBorder(file, unit=1, color=125):
     fileArray = _fileArray(file)
 
     if unit > 0:

@@ -52,14 +52,14 @@ export default class Ocr {
                     const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${mode}"`];
 
                     execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
-                        helperSrc.fileOrFolderRemove(input, (resultFileRemove) => {
-                            if (typeof resultFileRemove !== "boolean") {
+                        helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
+                            if (typeof resultFileDelete !== "boolean") {
                                 helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderRemove()",
-                                    resultFileRemove.toString()
+                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderDelete()",
+                                    resultFileDelete.toString()
                                 );
 
-                                helperSrc.responseBody("", resultFileRemove.toString(), response, 500);
+                                helperSrc.responseBody("", resultFileDelete.toString(), response, 500);
                             }
                         });
 

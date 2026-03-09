@@ -248,7 +248,7 @@ class DetectionCraft:
 
         return imageOpen, resizeMultiple, scaleX, scaleY
 
-    def _removeDataParallel(self, stateDict):
+    def _deleteDataParallel(self, stateDict):
         if list(stateDict.keys())[0].startswith("module"):
             indexStart = 1
         else:
@@ -266,13 +266,13 @@ class DetectionCraft:
     def _refineNetEval(self, refineNet):
         if self.isRefine:
             if self.device == "gpu":
-                refineNet.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightRefine)))
+                refineNet.load_state_dict(self._deleteDataParallel(torch.load(self.pathWeightRefine)))
 
                 refineNet = torch.nn.DataParallel(refineNet.cuda())
 
                 torchBackendCudnn.benchmark = False
             else:
-                refineNet.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightRefine, map_location="cpu")))
+                refineNet.load_state_dict(self._deleteDataParallel(torch.load(self.pathWeightRefine, map_location="cpu")))
 
             refineNet.eval()
 
@@ -282,13 +282,13 @@ class DetectionCraft:
 
     def _detectorEval(self, detector):
         if self.device == "gpu":
-            detector.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightMain)))
+            detector.load_state_dict(self._deleteDataParallel(torch.load(self.pathWeightMain)))
 
             detector = torch.nn.DataParallel(detector.cuda())
             
             torchBackendCudnn.benchmark = False
         else:
-            detector.load_state_dict(self._removeDataParallel(torch.load(self.pathWeightMain, map_location="cpu")))
+            detector.load_state_dict(self._deleteDataParallel(torch.load(self.pathWeightMain, map_location="cpu")))
 
         detector.eval()
 

@@ -1,21 +1,28 @@
 #!/bin/bash
 
-pathOutput="${PATH_ROOT}${MS_O_PATH_FILE}output/detection_craft/"
+path="${PATH_ROOT}${MS_O_PATH_FILE}output/detection_craft/"
 
 currentTime=$(date +%s)
 
-for data in "${pathOutput}"*/
+for data in "${path}"*
 do
-    if [ -d "${data}" ]
+    if [ -e "${data}" ]
     then
         statData=$(stat -c %Y "${data}")
         time=$((${currentTime} - ${statData}))
 
         if [ ${time} -gt 600 ]
         then
-            rm -rf "${data}"
+            if [ -d "${data}" ]
+            then
+                rm -rf "${data}"
 
-            echo "Folder '${data}' removed."
+                echo "Folder '${data}' deleted."
+            else
+                rm -f "${data}"
+                
+                echo "File '${data}' deleted."
+            fi
         fi
     fi
 done

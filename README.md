@@ -40,7 +40,7 @@ NVIDIA GeForce RTX 3060 - (Host GPU available)
 
 ## Reset
 
-1. Remove this from the root:
+1. Delete this from the root:
     - .cache
     - .config
     - .cuda
