@@ -26,6 +26,7 @@ pnpm-debug.log*
 .cuda
 .local
 .npm
+.npmrc
 .nv
 .paddlex
 .pki
