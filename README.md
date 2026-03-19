@@ -12,6 +12,10 @@ It's possible to use a custom certificate instead of "Ms_cronjob", just add it t
 -   WSLg for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
 -   Tesseract, Paddle, Realtime (default).
 
+## Secret env
+
+1. Create "local.secret.env" file in "env" folder and add there only the secret variable.
+
 ## Installation
 
 1. For build and up with GPU write on terminal:
