@@ -3,6 +3,7 @@ services:
     container_name: cimo-ms-ocr-gpu
     env_file:
       - ./env/local.env
+      - ./env/local.secret.env
     environment:
       LIBGL_ALWAYS_SOFTWARE: ""
       GALLIUM_DRIVER: "d3d12"
