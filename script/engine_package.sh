@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if command -v nvidia-smi &> /dev/null && nvidia-smi -L &> /dev/null
 then
     isGpu=true
@@ -13,17 +15,17 @@ then
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install --break-system-packages torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cu129
+        python3 -m pip install --break-system-packages --ignore-installed torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cu129
     else
-        python3 -m pip install --break-system-packages torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cpu
+        python3 -m pip install --break-system-packages --ignore-installed torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cpu
     fi
 else
     python3 -m pip uninstall -y torch torchvision >/dev/null 2>&1
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install --break-system-packages paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu129
+        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu129
     else
-        python3 -m pip install --break-system-packages paddlepaddle==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu
+        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu
     fi
 fi

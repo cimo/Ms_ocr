@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 path="${PATH_ROOT}${MS_O_PATH_FILE}output/detection_craft/"
 
 currentTime=$(date +%s)
