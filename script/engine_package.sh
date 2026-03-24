@@ -9,9 +9,9 @@ else
     isGpu=false
 fi
 
-if [ ${MS_O_RUNTIME} = "engine_tesseract" ] || [ ${MS_O_RUNTIME} = "engine_realtime" ]
+if [[ "${MS_O_RUNTIME}" == "engine_tesseract" || "${MS_O_RUNTIME}" == "engine_realtime" ]]
 then
-    python3 -m pip uninstall -y paddlepaddle-gpu paddlepaddle >/dev/null 2>&1
+    python3 -m pip uninstall -y paddlepaddle-gpu paddlepaddle >/dev/null 2>&1 || true
 
     if [ ${isGpu} = true ]
     then
@@ -20,7 +20,7 @@ then
         python3 -m pip install --break-system-packages --ignore-installed torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cpu
     fi
 else
-    python3 -m pip uninstall -y torch torchvision >/dev/null 2>&1
+    python3 -m pip uninstall -y torch torchvision >/dev/null 2>&1 || true
 
     if [ ${isGpu} = true ]
     then
