@@ -24,7 +24,7 @@ else
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle-gpu==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu129
+        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle-gpu==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu130
     else
         python3 -m pip install --break-system-packages --ignore-installed paddlepaddle==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu
     fi
