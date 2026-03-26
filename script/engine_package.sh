@@ -15,17 +15,17 @@ then
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install --break-system-packages --ignore-installed torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+        python3 -m pip install --break-system-packages torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu130
     else
-        python3 -m pip install --break-system-packages --ignore-installed torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        python3 -m pip install --break-system-packages torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
     fi
 else
     python3 -m pip uninstall -y torch torchvision >/dev/null 2>&1 || true
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle-gpu==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu130
+        python3 -m pip install --break-system-packages paddlepaddle-gpu==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu130
     else
-        python3 -m pip install --break-system-packages --ignore-installed paddlepaddle==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu
+        python3 -m pip install --break-system-packages paddlepaddle==3.3.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu
     fi
 fi
