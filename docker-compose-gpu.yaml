@@ -6,8 +6,8 @@ services:
       - ./env/local.secret.env
     environment:
       LIBGL_ALWAYS_SOFTWARE: ""
-      GALLIUM_DRIVER: "d3d12"
-      MESA_LOADER_DRIVER_OVERRIDE: "d3d12"
+      GALLIUM_DRIVER: ""
+      MESA_LOADER_DRIVER_OVERRIDE: ""
     shm_size: "2gb"
     build:
       context: ./
