@@ -8,7 +8,7 @@ p3=$(printf '%s' "${3}" | xargs)
 
 if [ "$#" -lt 3 ]
 then
-    echo "container_execute.sh - Missing parameter."
+    echo -e "\n❌ container_execute.sh - Missing parameter."
 
     exit 1
 fi
@@ -17,14 +17,14 @@ parameter1="${1}"
 parameter2="${2}"
 parameter3="${3}"
 
-echo "Copying from volume..."
+echo -e "\nCopying from volume..."
 
 docker run --rm \
 -v cimo_${parameter1}_ms_cronjob-volume:/home/source/:ro \
 -v $(pwd)/certificate/:/home/target/ \
 alpine sh -c "cp -r /home/source/* /home/target/"
 
-echo "Execute container."
+echo -e "\nExecute container."
 
 if [ "${parameter2}" = "build-up" ]
 then
