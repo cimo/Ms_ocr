@@ -64,7 +64,7 @@ RUN cd ~ \
     && echo 'Acquire::https::No-Cache "true";' >> /etc/apt/apt.conf.d/99no-cache \
     && VERSION_CODENAME=$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2) \
     && chmod -R 0644 /usr/local/share/ca-certificates/ \
-    && apt-get update && apt-get install -y ca-certificates tzdata curl media-types jq \
+    && apt-get update && apt-get install -y ca-certificates tzdata curl media-types jq gettext-base lynx \
     && update-ca-certificates \
     && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone \
     && echo "application/typescript ts" >> /etc/mime.types \
@@ -137,18 +137,6 @@ RUN \
     # Npm
     bash ${PATH_ROOT}script/npm.sh "build"
 
-CMD \
-    # Gpu
-    bash ${PATH_ROOT}script/gpu.sh \
-    # Dbus
-    && bash ${PATH_ROOT}script/dbus.sh \
-    # Engine package
-    && bash ${PATH_ROOT}script/engine_package.sh \
-    # Pip
-    && bash ${PATH_ROOT}script/pip.sh \
-    # Library
-    && bash ${PATH_ROOT}script/library.sh \
-    # NodeJs
-    && bash ${PATH_ROOT}script/nodejs.sh
+CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/engine_package.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/library.sh && bash ${PATH_ROOT}script/nodejs.sh"]
 
 EXPOSE ${SERVER_PORT}
