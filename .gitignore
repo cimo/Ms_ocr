@@ -31,9 +31,10 @@ pnpm-debug.log*
 .nv
 .paddlex
 .pki
-certificate/**/*
-!certificate/**/
-!certificate/**/.gitkeep
+certificate/**
+!certificate/.gitkeep
+!certificate/custom/.gitkeep
+!certificate/proxy/.gitkeep
 dist
 file/input/*
 !file/input/.gitkeep
