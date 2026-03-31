@@ -4,7 +4,8 @@ Microservice OCR.
 
 Depend on "Ms_cronjob" (use "ms_cronjob-volume" to share the certificate).
 
-It's possible to use a custom certificate instead of "Ms_cronjob", just add it to the "certificate" folder before build the container.
+It's possible to use a custom certificate instead of self signed.
+Just add it to the "/certificate/custom/" folder and change the env variable before build the container.
 
 ## Info:
 
