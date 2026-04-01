@@ -48,10 +48,10 @@ export default class Ocr {
 
                     const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
 
-                    const execCommand = `. ${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [`"${language}"`, `"${fileName}"`, `"${uniqueId}"`, `"${searchText}"`, `"${mode}"`];
+                    const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
+                    const execArgumentList = [execCommand, language, fileName, uniqueId, searchText, mode];
 
-                    execFile(execCommand, execArgumentList, { shell: "/bin/bash", encoding: "utf8" }, (_, stdout) => {
+                    execFile("/bin/bash", execArgumentList, { encoding: "utf8" }, (error, stdout) => {
                         helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
                             if (typeof resultFileDelete !== "boolean") {
                                 helperSrc.writeLog(
@@ -62,6 +62,14 @@ export default class Ocr {
                                 helperSrc.responseBody("", resultFileDelete.toString(), response, 500);
                             }
                         });
+
+                        if (error) {
+                            helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - execFile() - error`, error.message);
+
+                            helperSrc.responseBody("", error.message, response, 500);
+
+                            return;
+                        }
 
                         const output = stdout.trim();
 
