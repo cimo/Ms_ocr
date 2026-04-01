@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -euo pipefail
-
 path="${PATH_ROOT}${MS_O_PATH_FILE}output/engine_paddle/"
 
 currentTime=$(date +%s)

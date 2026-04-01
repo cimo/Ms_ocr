@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -euo pipefail
-
 if command -v nvidia-smi &> /dev/null && nvidia-smi -L &> /dev/null
 then
     isGpu=true
