@@ -50,6 +50,7 @@ NVIDIA GeForce RTX 3060 - (Host GPU available)
     - .nv
     - .paddlex
     - .pki
+    - .venv
     - dist
     - node_modules
     - package-lock.json

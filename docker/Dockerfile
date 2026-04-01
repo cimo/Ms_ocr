@@ -25,7 +25,7 @@ ENV HISTFILE="/home/node/.bash_history"
 ENV NODE_OPTIONS=--use-openssl-ca
 ENV NODE_EXTRA_CA_CERTS="${PATH_CERTIFICATE_PEM}"
 ENV NPM_CONFIG_USERCONFIG="/home/node/.npmrc"
-ENV PATH="${PATH_ROOT}.local/bin/:${PATH}"
+ENV PATH="${PATH_ROOT}.venv/bin/:${PATH_ROOT}.local/bin/:${PATH}"
 ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -74,6 +74,7 @@ RUN cd ~ \
     nodejs \
     # Python
     && apt-get update && apt-get install -y \
+    python3-venv \
     python3-pip \
     # Wslg
     && groupadd -g 110 render || true \
@@ -138,6 +139,6 @@ RUN \
     # Npm
     bash ${PATH_ROOT}script/npm.sh "build"
 
-CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/engine_package.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/library.sh && bash ${PATH_ROOT}script/nodejs.sh"]
+CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/engine_package.sh && bash ${PATH_ROOT}script/library.sh && bash ${PATH_ROOT}script/nodejs.sh"]
 
 EXPOSE ${SERVER_PORT}
