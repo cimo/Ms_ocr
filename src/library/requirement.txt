@@ -5,4 +5,4 @@ pillow==12.1.1
 # data_to_table
 openpyxl==3.1.5
 # engine_paddle
-paddleocr[doc-parser]==3.3.1
+paddleocr[all]==3.4.0

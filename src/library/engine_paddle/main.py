@@ -315,18 +315,15 @@ class EnginePaddle:
         
         self.device = "gpu" if shutil.which("nvidia-smi") is not None else "cpu"
 
-        self.modelDetectionName = "PP-OCRv5_mobile_det" if self.device == "cpu" else "PP-OCRv5_server_det"
-        self.modelRecognitionName = "PP-OCRv5_mobile_rec" if self.device == "cpu" else "PP-OCRv5_server_rec"
-
-        pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/{self.modelDetectionName}/"
-        pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/{self.modelRecognitionName}/"
+        pathModelTextDetection = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_det/"
+        pathModelTextRecognition = f"{PATH_ROOT}src/library/engine_paddle/PP-OCRv5_server_rec/"
         pathModelLayout = f"{PATH_ROOT}src/library/engine_paddle/PP-DocLayout_plus-L/"
         pathModelTableClassification = f"{PATH_ROOT}src/library/engine_paddle/PP-LCNet_x1_0_table_cls/"
         pathModelTableWired = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wired_table_cell_det/"
         pathModelTableWireless = f"{PATH_ROOT}src/library/engine_paddle/RT-DETR-L_wireless_table_cell_det/"
 
-        self.textDetection = TextDetection(model_dir=pathModelTextDetection, model_name=self.modelDetectionName, device=self.device)
-        self.textRecognition = TextRecognition(model_dir=pathModelTextRecognition, model_name=self.modelRecognitionName, device=self.device)
+        self.textDetection = TextDetection(model_dir=pathModelTextDetection, model_name="PP-OCRv5_server_det", device=self.device)
+        self.textRecognition = TextRecognition(model_dir=pathModelTextRecognition, model_name="PP-OCRv5_server_rec", device=self.device)
         self.layout = LayoutDetection(model_dir=pathModelLayout, model_name="PP-DocLayout_plus-L", device=self.device)
         self.tableClassification = TableClassification(model_dir=pathModelTableClassification, model_name="PP-LCNet_x1_0_table_cls", device=self.device)
         self.tableCellDetectionWired = TableCellsDetection(model_dir=pathModelTableWired, model_name="RT-DETR-L_wired_table_cell_det", device=self.device)
