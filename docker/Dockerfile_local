@@ -112,15 +112,6 @@ RUN cd ~ \
     libgomp1 \
     libatomic1 \
     xdg-utils \
-    # Tesseract
-    && apt-get update && apt-get install -y \
-    cmake \
-    g++ \
-    pkg-config \
-    libleptonica-dev \
-    libtiff-dev \
-    libgl1 \
-    ccache \
     # Clean
     && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \

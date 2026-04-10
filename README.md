@@ -9,7 +9,7 @@ Just add it to the "/certificate/custom/" folder and change the env variable bef
 ## Info:
 - Cross platform (Windows, Linux)
 - WSLg for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
-- Tesseract, Paddle, Realtime (default).
+- Paddle (default), Tesseract.
 
 ## Installation
 1. For build and up with GPU write on terminal:
@@ -48,17 +48,6 @@ bash docker/container_execute.sh "local" "up" "xxx"
     - package-lock.json
 
 2. Follow the "Installation" instructions.
-
-## Tesseract
-1. For compile "tesseract" from source with custom setting write on terminal:
-```
-cd src/library/engine_tesseract/
-tar -xvzf 5.5.1.tar.gz
-cd tesseract-5.5.1/
-mkdir build && cd build
-cmake .. -DENABLE_NATIVE=OFF -DBUILD_TRAINING_TOOLS=OFF -DHAVE_LIBCURL=OFF -DGRAPHICS_DISABLED=OFF -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-```
 
 ## API (Postman)
 1. Info
