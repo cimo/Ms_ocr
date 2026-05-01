@@ -31,7 +31,7 @@ else
 
     if [ ${isGpu} = true ]
     then
-        python3 -m pip install paddlepaddle-gpu==3.3.1 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu130
+        python3 -m pip install paddlepaddle-gpu==3.3.1 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu129
     else
         python3 -m pip install paddlepaddle==3.2.2 --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu
     fi
