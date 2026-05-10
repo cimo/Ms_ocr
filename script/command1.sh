@@ -10,7 +10,7 @@ p5=$(printf '%s' "${5}" | xargs)
 
 if [ "$#" -lt 5 ]
 then
-    echo "command1.sh - Missing parameter."
+    echo -e "\n❌ command1.sh - Missing parameter."
 
     exit 1
 fi

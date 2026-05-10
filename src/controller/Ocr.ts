@@ -52,17 +52,6 @@ export default class Ocr {
                     const execArgumentList = [execCommand, language, fileName, uniqueId, searchText, mode];
 
                     execFile("/bin/bash", execArgumentList, { encoding: "utf8" }, (error, stdout) => {
-                        helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
-                            if (typeof resultFileDelete !== "boolean") {
-                                helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderDelete()",
-                                    resultFileDelete.toString()
-                                );
-
-                                helperSrc.responseBody("", resultFileDelete.toString(), response, 500);
-                            }
-                        });
-
                         if (error) {
                             helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - execFile() - error`, error.message);
 
@@ -174,6 +163,15 @@ export default class Ocr {
 
                             helperSrc.responseBody("", "ko", response, 500);
                         }
+
+                        helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
+                            if (typeof resultFileDelete !== "boolean") {
+                                helperSrc.writeLog(
+                                    "Ocr.ts - api() - post(/api/extract) - execute() - execFile() - fileOrFolderDelete()",
+                                    resultFileDelete.toString()
+                                );
+                            }
+                        });
                     });
                 })
                 .catch((error: Error) => {
