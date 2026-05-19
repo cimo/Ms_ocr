@@ -35,7 +35,6 @@ bash docker/container_execute.sh "local" "up" "xxx"
 ## Reset
 1. Delete this from the root:
     - .cache
-    - .config
     - .cuda
     - .local
     - .npm
