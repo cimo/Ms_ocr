@@ -67,9 +67,9 @@ export const localeConfiguration: Record<string, { locale: string; currency: str
 };
 
 export const localeFromEnvName = (): string => {
-    let result = ENV_NAME.split("_").pop();
+    let result = ENV_NAME.split("_").pop() as string;
 
-    if (!result || result === "local") {
+    if (result === "" || result === "local") {
         result = "jp";
     }
 
@@ -298,7 +298,7 @@ export const findFileInDirectoryRecursive = (path: string, extension: string, ca
 };
 
 export const headerBearerToken = (request: Request): string => {
-    const authorization = request.headers["authorization"];
+    const authorization = request.headers["authorization"] as string;
 
     return authorization ? authorization.substring(7) : "";
 };
@@ -306,7 +306,7 @@ export const headerBearerToken = (request: Request): string => {
 export const readClientIp = (request: Request): string => {
     let result = "";
 
-    const forwarded = request.headers["x-forwarded-for"];
+    const forwarded = request.headers["x-forwarded-for"] as string | string[];
 
     if (typeof forwarded === "string") {
         result = forwarded;

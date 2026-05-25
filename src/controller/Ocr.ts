@@ -23,7 +23,7 @@ export default class Ocr {
     api = (): void => {
         this.app.post("/api/extract", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
             this.controllerUpload
-                .execute(request, true)
+                .execute(request, true, false, `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/`)
                 .then((resultControllerUploadList) => {
                     let fileName = "";
                     let language = "";
