@@ -400,6 +400,37 @@ export const filterMimeType = (fileName: string): string => {
     return result;
 };
 
+export const fileDetail = (pathFile: string): Promise<modelHelperSrc.IfileDetail> => {
+    return new Promise<modelHelperSrc.IfileDetail>((resolve) => {
+        Fs.stat(pathFile, (error, stat) => {
+            if (error) {
+                resolve({ fileName: "", dateModified: "", size: "" });
+            } else {
+                const kb = 1024;
+                const mb = kb * 1024;
+                const gb = mb * 1024;
+
+                const byte = stat.size;
+                let size = `${byte} B`;
+
+                if (byte < mb) {
+                    size = `${Math.round(byte / kb)} KB`;
+                } else if (byte < gb) {
+                    size = `${Math.round(byte / mb)} MB`;
+                } else if (byte >= gb) {
+                    size = `${Math.round(byte / gb)} GB`;
+                }
+
+                resolve({
+                    fileName: pathFile.split("/").pop() || pathFile,
+                    dateModified: localeFormat(stat.mtime) || stat.mtime.toLocaleString(),
+                    size
+                });
+            }
+        });
+    });
+};
+
 export const readClientIp = (request: Request): string => {
     let result = "";
 
