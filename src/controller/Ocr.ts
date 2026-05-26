@@ -46,10 +46,11 @@ export default class Ocr {
 
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileName}`;
+                    const baseFileName = helperSrc.baseFileName(fileName);
+                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${baseFileName}/`;
 
                     const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [execCommand, language, fileName, uniqueId, searchText, mode];
+                    const execArgumentList = [execCommand, language, `${baseFileName}/${fileName}`, uniqueId, searchText, mode];
 
                     execFile("/bin/bash", execArgumentList, { encoding: "utf8" }, (error, stdout) => {
                         if (error) {

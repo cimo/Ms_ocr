@@ -57,7 +57,8 @@ export default class Upload {
                     for (const formData of formDataList) {
                         if (formData.name === "file" && formData.fileName && formData.buffer) {
                             const fileName = isDecode ? decodeURIComponent(formData.fileName) : formData.fileName;
-                            const path = pathValue;
+                            const baseFileName = helperSrc.baseFileName(fileName);
+                            const path = `${pathValue}${baseFileName}/`;
                             const pathFile = `${path}${fileName}`;
 
                             Fs.mkdir(path, { recursive: true }, (error) => {

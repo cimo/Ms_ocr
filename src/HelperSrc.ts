@@ -1,4 +1,5 @@
 import Fs from "fs";
+import { exec, ExecException } from "child_process";
 import { Request, Response } from "express";
 import { Ce } from "@cimo/environment/dist/src/Main.js";
 
@@ -29,8 +30,11 @@ export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
 export const PATH_SCRIPT = Ce.checkVariable("MS_O_PATH_SCRIPT");
 export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env["MS_O_MIME_TYPE"] as string);
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env["MS_O_FILE_SIZE_MB"] as string);
+
+// Custom
 export const PERSISTENCE_SECOND = Ce.checkVariable("MS_O_PERSISTENCE_SECOND") || (process.env["MS_O_PERSISTENCE_SECOND"] as string);
 export const RUNTIME = Ce.checkVariable("MS_O_RUNTIME") || (process.env["MS_O_RUNTIME"] as string);
+// Custom
 
 Ce.loadFile(`./env/${ENV_NAME}.secret.env`);
 
@@ -221,12 +225,6 @@ export const fileCheckSize = (byte: number): boolean => {
     return true;
 };
 
-export const responseBody = (stdoutValue: string, stderrValue: string | Error, response: Response, mode: number): void => {
-    const responseBody: modelHelperSrc.IresponseBody = { response: { stdout: stdoutValue, stderr: stderrValue } };
-
-    response.status(mode).send(responseBody);
-};
-
 export const isJson = (value: string): boolean => {
     try {
         JSON.parse(value);
@@ -297,26 +295,6 @@ export const findFileInDirectoryRecursive = (path: string, extension: string, ca
     });
 };
 
-export const headerBearerToken = (request: Request): string => {
-    const authorization = request.headers["authorization"] as string;
-
-    return authorization.substring(7);
-};
-
-export const readClientIp = (request: Request): string => {
-    let result = "";
-
-    const forwarded = request.headers["x-forwarded-for"] as string | string[];
-
-    if (typeof forwarded === "string") {
-        result = forwarded;
-    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
-        result = forwarded[0];
-    }
-
-    return result.split(",")[0] || request.ip || "";
-};
-
 export const readMimeType = (byteList: Uint8Array): modelHelperSrc.ImimeType => {
     const toHex = (byteList: Uint8Array) => {
         let out = "";
@@ -372,3 +350,81 @@ export const readMimeType = (byteList: Uint8Array): modelHelperSrc.ImimeType => 
 
     return { content: "", extension: "" };
 };
+
+export const baseFileName = (fileName: string): string => {
+    const nameList = fileName.split("/");
+    const nameWithExtension = nameList[nameList.length - 1];
+    const baseName = nameWithExtension.trim().replace(/.[^/.]+$/, "");
+
+    return baseName;
+};
+
+export const terminalExecution = async (command: string): Promise<string | ExecException> => {
+    return await new Promise<string | ExecException>((resolve) => {
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                resolve(error);
+            } else if (stderr) {
+                resolve(stderr);
+            } else {
+                resolve(stdout);
+            }
+        });
+    });
+};
+
+export const filterMimeType = (fileName: string): string => {
+    let result = "";
+
+    const extension = fileName.toLowerCase().trim().split(".").pop() as string;
+    const mimeTypeList = JSON.parse(MIME_TYPE) as string[];
+
+    for (const mimeType of mimeTypeList) {
+        const [left, rightRaw] = mimeType.toLowerCase().split("/", 2);
+
+        let right = rightRaw;
+
+        if (right === "vnd.openxmlformats-officedocument.wordprocessingml.document") {
+            right = "docx";
+        } else if (right === "vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+            right = "xlsx";
+        } else if (right === "vnd.openxmlformats-officedocument.presentationml.presentation") {
+            right = "pptx";
+        }
+
+        if (extension === right) {
+            result = left;
+        }
+    }
+
+    return result;
+};
+
+export const readClientIp = (request: Request): string => {
+    let result = "";
+
+    const forwarded = request.headers["x-forwarded-for"] as string | string[];
+
+    if (typeof forwarded === "string") {
+        result = forwarded;
+    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
+        result = forwarded[0];
+    }
+
+    return result.split(",")[0] || request.ip || "";
+};
+
+export const headerBearerToken = (request: Request): string => {
+    const authorization = request.headers["authorization"] as string;
+
+    return authorization.substring(7);
+};
+
+export const responseBody = (stdoutValue: string, stderrValue: string | Error, response: Response, mode: number): void => {
+    const responseBody: modelHelperSrc.IresponseBody = { response: { stdout: stdoutValue, stderr: stderrValue } };
+
+    response.status(mode).send(responseBody);
+};
+
+// Custom
+// Custom

@@ -137,7 +137,7 @@ class EngineRealtime:
     def _execute(self, languageValue="", fileNameValue="", uniqueIdValue="", searchTextValue="", modeValue="file"):
         self.language = languageValue
         self.fileName = fileNameValue
-        self.fileNameSplit = ".".join(self.fileName.split(".")[:-1])
+        self.fileNameSplit = ".".join(os.path.basename(self.fileName).split(".")[:-1])
         self.uniqueId = uniqueIdValue
         self.searchText = searchTextValue
         self.mode = modeValue
