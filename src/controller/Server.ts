@@ -34,7 +34,7 @@ export default class Server {
             standardHeaders: true,
             legacyHeaders: false,
             keyGenerator: (request: Request) => {
-                return helperSrc.readClientIp(request).split(":").pop() as string;
+                return helperSrc.headerClientIp(request).split(":").pop() as string;
             }
         });
 
@@ -60,7 +60,7 @@ export default class Server {
 
             const remoteAddress = request.socket.remoteAddress ? request.socket.remoteAddress : "";
 
-            request.clientIp = helperSrc.readClientIp(request) || remoteAddress;
+            request.clientIp = helperSrc.headerClientIp(request) || remoteAddress;
 
             next();
         });

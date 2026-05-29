@@ -30,7 +30,9 @@ export default class Ocr {
                     let searchText = "";
                     let mode = "";
 
-                    for (const resultControllerUpload of resultControllerUploadList) {
+                    for (let a = 0; a < resultControllerUploadList.length; a++) {
+                        const resultControllerUpload = resultControllerUploadList[a];
+
                         if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
                             language = resultControllerUpload.buffer.toString().match("^(-|ja|ja_vert|en)$")
                                 ? resultControllerUpload.buffer.toString()
@@ -44,13 +46,14 @@ export default class Ocr {
                         }
                     }
 
+                    const fileDetail = helperSrc.fileDetail(fileName);
+
+                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
+
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const baseFileName = helperSrc.baseFileName(fileName);
-                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${baseFileName}/`;
-
                     const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [execCommand, language, `${baseFileName}/${fileName}`, uniqueId, searchText, mode];
+                    const execArgumentList = [execCommand, language, `${fileDetail.baseName}/${fileDetail.fileName}`, uniqueId, searchText, mode];
 
                     execFile("/bin/bash", execArgumentList, { encoding: "utf8" }, (error, stdout) => {
                         if (error) {
@@ -92,28 +95,36 @@ export default class Ocr {
                                 }
 
                                 const jsonList: string[] = [];
-                                for (const dataJson of dataJsonList!) {
+                                for (let a = 0; a < dataJsonList!.length; a++) {
+                                    const dataJson = dataJsonList![a];
+
                                     jsonList.push(
                                         dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const pdfList: string[] = [];
-                                for (const dataPdf of dataPdfList!) {
+                                for (let a = 0; a < dataPdfList!.length; a++) {
+                                    const dataPdf = dataPdfList![a];
+
                                     pdfList.push(
                                         dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const excelList: string[] = [];
-                                for (const dataXlsx of dataXlsxList!) {
+                                for (let a = 0; a < dataXlsxList!.length; a++) {
+                                    const dataXlsx = dataXlsxList![a];
+
                                     excelList.push(
                                         dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
 
                                 const htmlList: string[] = [];
-                                for (const dataHtml of dataHtmlList!) {
+                                for (let a = 0; a < dataHtmlList!.length; a++) {
+                                    const dataHtml = dataHtmlList![a];
+
                                     htmlList.push(
                                         dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
@@ -132,25 +143,25 @@ export default class Ocr {
                                 helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                             };
 
-                            helperSrc.findFileInDirectoryRecursive(baseExport, ".json", (list) => {
+                            helperSrc.findInDirectoryRecursive(baseExport, ".json", (list) => {
                                 dataJsonList = list || [];
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findFileInDirectoryRecursive(baseExport, ".pdf", (list) => {
+                            helperSrc.findInDirectoryRecursive(baseExport, ".pdf", (list) => {
                                 dataPdfList = list || [];
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findFileInDirectoryRecursive(baseTable, ".xlsx", (list) => {
+                            helperSrc.findInDirectoryRecursive(baseTable, ".xlsx", (list) => {
                                 dataXlsxList = list || [];
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findFileInDirectoryRecursive(baseTable, ".html", (list) => {
+                            helperSrc.findInDirectoryRecursive(baseTable, ".html", (list) => {
                                 dataHtmlList = list || [];
 
                                 finalizeResponse();
