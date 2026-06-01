@@ -412,7 +412,13 @@ export const fileCheckMimeType = (value: string): boolean => {
 };
 
 export const fileCheckSize = (byte: number): boolean => {
-    const maxSizeByte = parseInt(FILE_SIZE_MB) * 1024 * 1024;
+    const fileSizeMb = parseInt(FILE_SIZE_MB);
+
+    if (isNaN(fileSizeMb)) {
+        return false;
+    }
+
+    const maxSizeByte = fileSizeMb * 1024 * 1024;
 
     if (byte > maxSizeByte) {
         return false;
@@ -586,7 +592,7 @@ export const headerClientIp = (request: Request): string => {
 export const headerBearerToken = (request: Request): string => {
     const authorization = request.headers["authorization"];
 
-    return authorization ? authorization.substring(7) : "";
+    return authorization && authorization.startsWith("Bearer ") ? authorization.substring(7) : "";
 };
 
 export const responseBody = (stdoutValue: string, stderrValue: string | Error, response: Response, mode: number): void => {
