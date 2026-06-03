@@ -54,153 +54,139 @@ export default class Ocr {
                     const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [execCommand, language, `${fileDetail.baseName}/${fileDetail.fileName}`, uniqueId, searchText, mode];
 
-                    helperSrc
-                        .executionFile(execArgumentList)
-                        .then((result) => {
-                            if (result.error) {
-                                helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
+                    helperSrc.executionFile(execArgumentList).then((result) => {
+                        if (result.error) {
+                            helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
 
-                                helperSrc.responseBody("", result.error.message, response, 500);
+                            helperSrc.responseBody("", result.error.message, response, 500);
 
-                                return;
-                            }
+                            return;
+                        }
 
-                            const output = result.stdout.trim();
+                        const output = result.stdout.trim();
 
-                            if (output.startsWith("file")) {
-                                helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
+                        if (output.startsWith("file")) {
+                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
 
-                                const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
-                                const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
+                            const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
+                            const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
 
-                                let dataJsonList: string[] | undefined;
-                                let dataPdfList: string[] | undefined;
-                                let dataXlsxList: string[] | undefined;
-                                let dataHtmlList: string[] | undefined;
+                            let dataJsonList: string[] | undefined;
+                            let dataPdfList: string[] | undefined;
+                            let dataXlsxList: string[] | undefined;
+                            let dataHtmlList: string[] | undefined;
 
-                                let isCompleted = false;
+                            let isCompleted = false;
 
-                                const finalizeResponse = () => {
-                                    if (isCompleted) {
-                                        return;
-                                    }
+                            const finalizeResponse = () => {
+                                if (isCompleted) {
+                                    return;
+                                }
 
-                                    const isAllReady =
-                                        Array.isArray(dataJsonList) &&
-                                        Array.isArray(dataPdfList) &&
-                                        Array.isArray(dataXlsxList) &&
-                                        Array.isArray(dataHtmlList);
+                                const isAllReady =
+                                    Array.isArray(dataJsonList) &&
+                                    Array.isArray(dataPdfList) &&
+                                    Array.isArray(dataXlsxList) &&
+                                    Array.isArray(dataHtmlList);
 
-                                    if (!isAllReady) {
-                                        return;
-                                    }
+                                if (!isAllReady) {
+                                    return;
+                                }
 
-                                    const jsonList: string[] = [];
-                                    for (let a = 0; a < dataJsonList!.length; a++) {
-                                        const dataJson = dataJsonList![a];
+                                const jsonList: string[] = [];
+                                for (let a = 0; a < dataJsonList!.length; a++) {
+                                    const dataJson = dataJsonList![a];
 
-                                        jsonList.push(
-                                            dataJson.replace(
-                                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`,
-                                                ""
-                                            )
-                                        );
-                                    }
-
-                                    const pdfList: string[] = [];
-                                    for (let a = 0; a < dataPdfList!.length; a++) {
-                                        const dataPdf = dataPdfList![a];
-
-                                        pdfList.push(
-                                            dataPdf.replace(
-                                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`,
-                                                ""
-                                            )
-                                        );
-                                    }
-
-                                    const excelList: string[] = [];
-                                    for (let a = 0; a < dataXlsxList!.length; a++) {
-                                        const dataXlsx = dataXlsxList![a];
-
-                                        excelList.push(
-                                            dataXlsx.replace(
-                                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`,
-                                                ""
-                                            )
-                                        );
-                                    }
-
-                                    const htmlList: string[] = [];
-                                    for (let a = 0; a < dataHtmlList!.length; a++) {
-                                        const dataHtml = dataHtmlList![a];
-
-                                        htmlList.push(
-                                            dataHtml.replace(
-                                                `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`,
-                                                ""
-                                            )
-                                        );
-                                    }
-
-                                    const responseJson = {
-                                        uniqueId,
-                                        jsonList,
-                                        pdfList,
-                                        excelList,
-                                        htmlList
-                                    };
-
-                                    isCompleted = true;
-
-                                    helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
-                                };
-
-                                helperSrc.findInDirectoryRecursive(baseExport, ".json", (list) => {
-                                    dataJsonList = list || [];
-
-                                    finalizeResponse();
-                                });
-
-                                helperSrc.findInDirectoryRecursive(baseExport, ".pdf", (list) => {
-                                    dataPdfList = list || [];
-
-                                    finalizeResponse();
-                                });
-
-                                helperSrc.findInDirectoryRecursive(baseTable, ".xlsx", (list) => {
-                                    dataXlsxList = list || [];
-
-                                    finalizeResponse();
-                                });
-
-                                helperSrc.findInDirectoryRecursive(baseTable, ".html", (list) => {
-                                    dataHtmlList = list || [];
-
-                                    finalizeResponse();
-                                });
-                            } else if (output.startsWith("data")) {
-                                const outputSlice = output.slice("data".length).trim();
-
-                                helperSrc.responseBody(outputSlice, "", response, 200);
-                            } else {
-                                helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - Error",
-                                    "Problem with the output."
-                                );
-
-                                helperSrc.responseBody("", "ko", response, 500);
-                            }
-
-                            helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
-                                if (typeof resultFileDelete !== "boolean") {
-                                    helperSrc.writeLog(
-                                        "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - fileOrFolderDelete()",
-                                        resultFileDelete.toString()
+                                    jsonList.push(
+                                        dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
                                     );
                                 }
+
+                                const pdfList: string[] = [];
+                                for (let a = 0; a < dataPdfList!.length; a++) {
+                                    const dataPdf = dataPdfList![a];
+
+                                    pdfList.push(
+                                        dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
+                                    );
+                                }
+
+                                const excelList: string[] = [];
+                                for (let a = 0; a < dataXlsxList!.length; a++) {
+                                    const dataXlsx = dataXlsxList![a];
+
+                                    excelList.push(
+                                        dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
+                                    );
+                                }
+
+                                const htmlList: string[] = [];
+                                for (let a = 0; a < dataHtmlList!.length; a++) {
+                                    const dataHtml = dataHtmlList![a];
+
+                                    htmlList.push(
+                                        dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
+                                    );
+                                }
+
+                                const responseJson = {
+                                    uniqueId,
+                                    jsonList,
+                                    pdfList,
+                                    excelList,
+                                    htmlList
+                                };
+
+                                isCompleted = true;
+
+                                helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
+                            };
+
+                            helperSrc.findInDirectoryRecursive(baseExport, ".json", (list) => {
+                                dataJsonList = list || [];
+
+                                finalizeResponse();
                             });
+
+                            helperSrc.findInDirectoryRecursive(baseExport, ".pdf", (list) => {
+                                dataPdfList = list || [];
+
+                                finalizeResponse();
+                            });
+
+                            helperSrc.findInDirectoryRecursive(baseTable, ".xlsx", (list) => {
+                                dataXlsxList = list || [];
+
+                                finalizeResponse();
+                            });
+
+                            helperSrc.findInDirectoryRecursive(baseTable, ".html", (list) => {
+                                dataHtmlList = list || [];
+
+                                finalizeResponse();
+                            });
+                        } else if (output.startsWith("data")) {
+                            const outputSlice = output.slice("data".length).trim();
+
+                            helperSrc.responseBody(outputSlice, "", response, 200);
+                        } else {
+                            helperSrc.writeLog(
+                                "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - Error",
+                                "Problem with the output."
+                            );
+
+                            helperSrc.responseBody("", "ko", response, 500);
+                        }
+
+                        helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
+                            if (typeof resultFileDelete !== "boolean") {
+                                helperSrc.writeLog(
+                                    "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - fileOrFolderDelete()",
+                                    resultFileDelete.toString()
+                                );
+                            }
                         });
+                    });
                 })
                 .catch((error: Error) => {
                     helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error.message);
