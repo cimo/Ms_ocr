@@ -54,18 +54,14 @@ export default class Ocr {
                     const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
                     const execArgumentList = [execCommand, language, `${fileDetail.baseName}/${fileDetail.fileName}`, uniqueId, searchText, mode];
 
-                    helperSrc.executionFile(execArgumentList).then((result) => {
+                    helperSrc.executionFile(execArgumentList).then(async (result) => {
+                        const output = result.stdout.trim();
+
                         if (result.error) {
                             helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
 
                             helperSrc.responseBody("", result.error.message, response, 500);
-
-                            return;
-                        }
-
-                        const output = result.stdout.trim();
-
-                        if (output.startsWith("file")) {
+                        } else if (output.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
 
                             const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
@@ -142,26 +138,26 @@ export default class Ocr {
                                 helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                             };
 
-                            helperSrc.findInDirectoryRecursive(baseExport, ".json", (list) => {
-                                dataJsonList = list || [];
+                            helperSrc.findInDirectoryRecursive(baseExport, ".json").then((list) => {
+                                dataJsonList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseExport, ".pdf", (list) => {
-                                dataPdfList = list || [];
+                            helperSrc.findInDirectoryRecursive(baseExport, ".pdf").then((list) => {
+                                dataPdfList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseTable, ".xlsx", (list) => {
-                                dataXlsxList = list || [];
+                            helperSrc.findInDirectoryRecursive(baseTable, ".xlsx").then((list) => {
+                                dataXlsxList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseTable, ".html", (list) => {
-                                dataHtmlList = list || [];
+                            helperSrc.findInDirectoryRecursive(baseTable, ".html").then((list) => {
+                                dataHtmlList = list;
 
                                 finalizeResponse();
                             });
@@ -178,14 +174,14 @@ export default class Ocr {
                             helperSrc.responseBody("", "ko", response, 500);
                         }
 
-                        helperSrc.fileOrFolderDelete(input, (resultFileDelete) => {
-                            if (typeof resultFileDelete !== "boolean") {
-                                helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - fileOrFolderDelete()",
-                                    resultFileDelete.toString()
-                                );
-                            }
-                        });
+                        const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(input);
+
+                        if (typeof fileOrFolderDelete !== "boolean") {
+                            helperSrc.writeLog(
+                                "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - fileOrFolderDelete()",
+                                fileOrFolderDelete.toString()
+                            );
+                        }
                     });
                 })
                 .catch((error: Error) => {
@@ -203,7 +199,7 @@ export default class Ocr {
 
             const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/${pathFile}`;
 
-            helperSrc.fileReadStream(path, (resultFileReadStream) => {
+            helperSrc.fileReadStream(path).then((resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {
                     helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
                 } else {

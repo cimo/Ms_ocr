@@ -404,11 +404,11 @@ export const fileDetail = (value: string, buffer?: Uint8Array, isOnlyByte = true
 };
 
 export const fileCheckMimeType = (value: string): boolean => {
-    if (MIME_TYPE && MIME_TYPE.includes(value)) {
-        return true;
+    if (!MIME_TYPE.includes(value)) {
+        return false;
     }
 
-    return false;
+    return true;
 };
 
 export const fileCheckSize = (byte: number): boolean => {
@@ -427,64 +427,76 @@ export const fileCheckSize = (byte: number): boolean => {
     return true;
 };
 
-export const fileWriteStream = (filePath: string, buffer: Buffer, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
-    const writeStream = Fs.createWriteStream(filePath);
+export const fileWriteStream = (filePath: string, buffer: Buffer): Promise<boolean | NodeJS.ErrnoException> => {
+    return new Promise((resolve) => {
+        const writeStream = Fs.createWriteStream(filePath);
 
-    writeStream.on("open", () => {
-        writeStream.write(buffer);
-        writeStream.end();
-    });
+        writeStream.on("open", () => {
+            writeStream.write(buffer);
+            writeStream.end();
+        });
 
-    writeStream.on("finish", () => {
-        callback(true);
-    });
+        writeStream.on("finish", () => {
+            resolve(true);
+        });
 
-    writeStream.on("error", (error: Error) => {
-        callback(error);
-    });
-};
-
-export const fileReadStream = (filePath: string, callback: (result: NodeJS.ErrnoException | Buffer) => void): void => {
-    const chunkList: Buffer[] = [];
-
-    const readStream = Fs.createReadStream(filePath);
-
-    readStream.on("data", (chunk: Buffer) => {
-        chunkList.push(chunk);
-    });
-
-    readStream.on("end", () => {
-        callback(Buffer.concat(chunkList));
-    });
-
-    readStream.on("error", (error: Error) => {
-        callback(error);
+        writeStream.on("error", (error: Error) => {
+            resolve(error);
+        });
     });
 };
 
-export const fileOrFolderDelete = (path: string, callback: (result: NodeJS.ErrnoException | boolean) => void): void => {
-    Fs.stat(path, (error, stats) => {
-        if (error) {
-            return callback(error);
-        }
+export const fileReadStream = (filePath: string): Promise<Buffer | NodeJS.ErrnoException> => {
+    return new Promise((resolve) => {
+        const chunkList: Buffer[] = [];
 
-        if (stats.isDirectory()) {
-            Fs.rm(path, { recursive: true, force: true }, (error) => {
-                if (error) {
-                    return callback(error);
-                }
+        const readStream = Fs.createReadStream(filePath);
 
-                callback(true);
-            });
-        } else {
-            Fs.unlink(path, (error) => {
-                if (error) {
-                    return callback(error);
-                }
+        readStream.on("data", (chunk: Buffer) => {
+            chunkList.push(chunk);
+        });
 
-                callback(true);
-            });
-        }
+        readStream.on("end", () => {
+            resolve(Buffer.concat(chunkList));
+        });
+
+        readStream.on("error", (error: Error) => {
+            resolve(error);
+        });
+    });
+};
+
+export const fileOrFolderDelete = (path: string): Promise<boolean | NodeJS.ErrnoException> => {
+    return new Promise((resolve) => {
+        Fs.stat(path, (error, stats) => {
+            if (error) {
+                resolve(error);
+
+                return;
+            }
+
+            if (stats.isDirectory()) {
+                Fs.rm(path, { recursive: true, force: true }, (error) => {
+                    if (error) {
+                        resolve(error);
+
+                        return;
+                    }
+
+                    resolve(true);
+                });
+            } else {
+                Fs.unlink(path, (error) => {
+                    if (error) {
+                        resolve(error);
+
+                        return;
+                    }
+
+                    resolve(true);
+                });
+            }
+        });
     });
 };
 
@@ -506,51 +518,59 @@ export const ansiEscapeDelete = (text: string): string => {
     return text.replace(regex, "");
 };
 
-export const findInDirectoryRecursive = (path: string, extension: string, callback: (resultList: string[]) => void): void => {
-    const resultList: string[] = [];
+export const findInDirectoryRecursive = (path: string, extension: string): Promise<string[]> => {
+    return new Promise((resolve) => {
+        const resultList: string[] = [];
 
-    Fs.access(path, Fs.constants.F_OK, (errorAccess) => {
-        if (errorAccess) {
-            return callback(resultList);
-        }
+        Fs.access(path, Fs.constants.F_OK, (errorAccess) => {
+            if (errorAccess) {
+                resolve(resultList);
 
-        Fs.readdir(path, (errorReadDir, dataList) => {
-            if (errorReadDir) {
-                return callback(resultList);
+                return;
             }
 
-            let count = 0;
+            Fs.readdir(path, (errorReadDir, dataList) => {
+                if (errorReadDir) {
+                    resolve(resultList);
 
-            const next = () => {
-                if (count >= dataList.length) {
-                    return callback(resultList);
+                    return;
                 }
 
-                const data = dataList[count++];
-                const pathData = `${path}${data}`;
+                let count = 0;
 
-                Fs.stat(pathData, (errorStat, statData) => {
-                    if (!errorStat && statData.isDirectory()) {
-                        findInDirectoryRecursive(`${pathData}/`, extension, (dataSubList) => {
-                            for (let a = 0; a < dataSubList.length; a++) {
-                                const dataSub = dataSubList[a];
+                const next = () => {
+                    if (count >= dataList.length) {
+                        resolve(resultList);
 
-                                resultList.push(dataSub);
-                            }
+                        return;
+                    }
+
+                    const data = dataList[count++];
+                    const pathData = `${path}${data}`;
+
+                    Fs.stat(pathData, (errorStat, statData) => {
+                        if (!errorStat && statData.isDirectory()) {
+                            findInDirectoryRecursive(`${pathData}/`, extension).then((dataSubList) => {
+                                for (let a = 0; a < dataSubList.length; a++) {
+                                    const dataSub = dataSubList[a];
+
+                                    resultList.push(dataSub);
+                                }
+
+                                next();
+                            });
+                        } else if (!errorStat && statData.isFile() && (data.endsWith(extension) || extension === ".*")) {
+                            resultList.push(pathData);
 
                             next();
-                        });
-                    } else if (!errorStat && statData.isFile() && (data.endsWith(extension) || extension === ".*")) {
-                        resultList.push(pathData);
+                        } else {
+                            next();
+                        }
+                    });
+                };
 
-                        next();
-                    } else {
-                        next();
-                    }
-                });
-            };
-
-            next();
+                next();
+            });
         });
     });
 };
