@@ -60,7 +60,7 @@ export default class Ocr {
                         if (result.error) {
                             helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
 
-                            helperSrc.responseBody("", result.error.message, response, 500);
+                            helperSrc.responseBody("", "ko", response, 500);
                         } else if (output.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
 
@@ -205,7 +205,7 @@ export default class Ocr {
                 } else {
                     helperSrc.writeLog("Ocr.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
 
-                    helperSrc.responseBody("", resultFileReadStream.toString(), response, 500);
+                    helperSrc.responseBody("", "ko", response, 500);
                 }
             });
         });
