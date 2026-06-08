@@ -55,13 +55,13 @@ export default class Ocr {
                     const execArgumentList = [execCommand, language, `${fileDetail.baseName}/${fileDetail.fileName}`, uniqueId, searchText, mode];
 
                     helperSrc.executionFile(execArgumentList).then(async (result) => {
-                        const output = result.stdout.trim();
+                        const stdoutTrim = result.stdout.trim();
 
                         if (result.error) {
                             helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
 
                             helperSrc.responseBody("", "ko", response, 500);
-                        } else if (output.startsWith("file")) {
+                        } else if (stdoutTrim.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
 
                             const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
@@ -161,8 +161,8 @@ export default class Ocr {
 
                                 finalizeResponse();
                             });
-                        } else if (output.startsWith("data")) {
-                            const outputSlice = output.slice("data".length).trim();
+                        } else if (stdoutTrim.startsWith("data")) {
+                            const outputSlice = stdoutTrim.slice("data".length).trim();
 
                             helperSrc.responseBody(outputSlice, "", response, 200);
                         } else {
