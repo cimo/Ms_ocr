@@ -4,6 +4,7 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 
 // Source
 import * as helperSrc from "../HelperSrc.js";
+import * as modelOcr from "../model/Ocr.js";
 import ControllerUpload from "./Upload.js";
 
 export default class Ocr {
@@ -192,7 +193,7 @@ export default class Ocr {
         });
 
         this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-            const body = request.body;
+            const body = request.body as modelOcr.IapiDownloadBody;
 
             const uniqueId = body.uniqueId;
             const pathFile = body.pathFile;
