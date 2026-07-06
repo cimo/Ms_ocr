@@ -48,14 +48,21 @@ export default class Ocr {
 
                     const fileDetail = helperSrc.fileDetail(fileName);
 
-                    const input = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
+                    const pathInput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
 
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const execCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const execArgumentList = [execCommand, language, `${fileDetail.baseName}/${fileDetail.fileName}`, uniqueId, searchText, mode];
+                    const pathExecutionCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
+                    const executionArgumentList = [
+                        pathExecutionCommand,
+                        language,
+                        `${fileDetail.baseName}/${fileDetail.fileName}`,
+                        uniqueId,
+                        searchText,
+                        mode
+                    ];
 
-                    helperSrc.executionFile(execArgumentList).then(async (result) => {
+                    helperSrc.executionFile(executionArgumentList).then(async (result) => {
                         const stdoutTrim = result.stdout.trim();
 
                         if (result.error) {
@@ -65,8 +72,8 @@ export default class Ocr {
                         } else if (stdoutTrim.startsWith("file")) {
                             helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
 
-                            const baseExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
-                            const baseTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
+                            const pathExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
+                            const pathTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
 
                             let dataJsonList: string[] | undefined;
                             let dataPdfList: string[] | undefined;
@@ -139,25 +146,25 @@ export default class Ocr {
                                 helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
                             };
 
-                            helperSrc.findInDirectoryRecursive(baseExport, ".json").then((list) => {
+                            helperSrc.findInDirectoryRecursive(pathExport, ".json").then((list) => {
                                 dataJsonList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseExport, ".pdf").then((list) => {
+                            helperSrc.findInDirectoryRecursive(pathExport, ".pdf").then((list) => {
                                 dataPdfList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseTable, ".xlsx").then((list) => {
+                            helperSrc.findInDirectoryRecursive(pathTable, ".xlsx").then((list) => {
                                 dataXlsxList = list;
 
                                 finalizeResponse();
                             });
 
-                            helperSrc.findInDirectoryRecursive(baseTable, ".html").then((list) => {
+                            helperSrc.findInDirectoryRecursive(pathTable, ".html").then((list) => {
                                 dataHtmlList = list;
 
                                 finalizeResponse();
@@ -175,7 +182,7 @@ export default class Ocr {
                             helperSrc.responseBody("", "ko", response, 500);
                         }
 
-                        const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(input);
+                        const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(pathInput);
 
                         if (typeof fileOrFolderDelete !== "boolean") {
                             helperSrc.writeLog(
