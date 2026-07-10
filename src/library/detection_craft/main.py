@@ -330,5 +330,5 @@ class DetectionCraft:
 
         self.resultMainList = self._result(scoreText, scoreLink, scaleX, scaleY, imageOpen)
     
-    def getResultMainList(self):
+    def resultMainCollect(self):
         return self.resultMainList

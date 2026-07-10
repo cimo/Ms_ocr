@@ -172,7 +172,7 @@ export const generateUniqueId = (): string => {
     return `${timestamp}-${randomPart}`;
 };
 
-export const isJson = (value: string): boolean => {
+export const jsonCheck = (value: string): boolean => {
     try {
         JSON.parse(value);
 

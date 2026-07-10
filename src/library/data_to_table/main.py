@@ -6,7 +6,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, Border, Side
 
 class DataToTable:
-    def _isCellInMergedRange(self, cellRow, cellColumn, cellMergeList):
+    def _cellMergedRangeCheck(self, cellRow, cellColumn, cellMergeList):
         isMerge = False
         isMergeHorizontal = False
 
@@ -124,7 +124,7 @@ class DataToTable:
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 cell.border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
 
-                isMerge, _ = self._isCellInMergedRange(cell.row, cell.column, cellMergeList)
+                isMerge, _ = self._cellMergedRangeCheck(cell.row, cell.column, cellMergeList)
 
                 if not isMerge:
                     if isinstance(cell.value, str) and "\n" in cell.value:
@@ -152,7 +152,7 @@ class DataToTable:
             textWidthMax = 0
 
             for cell in cellList:
-                _, isMergeHorizontal = self._isCellInMergedRange(cell.row, cell.column, cellMergeList)
+                _, isMergeHorizontal = self._cellMergedRangeCheck(cell.row, cell.column, cellMergeList)
 
                 if isMergeHorizontal:
                     continue
