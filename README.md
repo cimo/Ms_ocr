@@ -9,7 +9,7 @@ Just add it to the "/certificate/custom/" folder and change the env variable bef
 ## Info:
 - Cross platform (Windows, Linux)
 - WSLg for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
-- Paddle (default), Tesseract.
+- Onnx: Paddle (PP-DocLayout_plus-L, PP-OCRv6_medium_det, PP-OCRv6_medium_rec).
 
 ## Installation
 1. For build and up with GPU write on terminal:
@@ -71,8 +71,7 @@ form-data
 key             value
 ---             ---
 file            jp_1.jpg
-searchText      "" (Only for "engine_realtime" need be populated.)
-mode            "file" (Or "data".)
+searchText      ""
 ```
 
 4. Download
@@ -85,7 +84,7 @@ json
 key             value
 ---             ---
 "uniqueId":     "abc123",
-"pathFile":     "export/jp_1_result.pdf"
+"pathFile":     "result.json"
 ```
 
 5. Logout

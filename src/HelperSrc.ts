@@ -22,6 +22,7 @@ export const IS_DEBUG = Ce.checkVariable("MS_O_IS_DEBUG") || (process.env["MS_O_
 export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env["MS_O_NODE_ENV"] as string);
 export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env["MS_O_URL_ROOT"] as string);
 export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env["MS_O_URL_CORS_ORIGIN"] as string);
+export const URL_API_ONNX_DS = Ce.checkVariable("MS_O_URL_API_ONNX_DS") || (process.env["MS_O_URL_API_ONNX_DS"] as string);
 export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
 export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
 export const PATH_CERTIFICATE_PEM = Ce.checkVariable("MS_O_PATH_CERTIFICATE_PEM");
@@ -34,7 +35,6 @@ export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.en
 
 // Custom
 export const PERSISTENCE_SECOND = Ce.checkVariable("MS_O_PERSISTENCE_SECOND") || (process.env["MS_O_PERSISTENCE_SECOND"] as string);
-export const RUNTIME = Ce.checkVariable("MS_O_RUNTIME") || (process.env["MS_O_RUNTIME"] as string);
 // Custom
 
 const fileSize = (value: Uint8Array | number, isOnlyByte = true): string => {

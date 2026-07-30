@@ -1,6 +1,6 @@
 #!/bin/bash
 
-path="${PATH_ROOT}${MS_O_PATH_FILE}output/document_scanner/"
+path="${PATH_ROOT}${MS_O_PATH_FILE}output/"
 
 currentTime=$(date +%s)
 

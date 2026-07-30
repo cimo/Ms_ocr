@@ -1,0 +1,4 @@
+numpy==2.4.3
+# document_scanner
+opencv-python-headless==4.13.0.92
+pyclipper==1.3.0.post6

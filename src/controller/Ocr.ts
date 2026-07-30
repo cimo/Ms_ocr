@@ -4,6 +4,7 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 
 // Source
 import * as helperSrc from "../HelperSrc.js";
+import * as instance from "../Instance.js";
 import * as modelOcr from "../model/Ocr.js";
 import ControllerUpload from "./Upload.js";
 
@@ -26,171 +27,60 @@ export default class Ocr {
                 .execute(request, true, false, `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/`)
                 .then((resultControllerUploadList) => {
                     let fileName = "";
-                    let language = "";
                     let searchText = "";
-                    let mode = "";
 
                     for (let a = 0; a < resultControllerUploadList.length; a++) {
                         const resultControllerUpload = resultControllerUploadList[a];
 
-                        if (resultControllerUpload.name === "language" && resultControllerUpload.buffer) {
-                            language = resultControllerUpload.buffer.toString().match("^(-|ja|ja_vert|en)$")
-                                ? resultControllerUpload.buffer.toString()
-                                : "";
-                        } else if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
+                        if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
                             fileName = resultControllerUpload.fileName;
                         } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
                             searchText = resultControllerUpload.buffer.toString();
-                        } else if (resultControllerUpload.name === "mode" && resultControllerUpload.buffer) {
-                            mode = resultControllerUpload.buffer.toString();
                         }
                     }
 
                     const fileDetail = helperSrc.fileDetail(fileName);
 
-                    const pathInput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
-
                     const uniqueId = helperSrc.generateUniqueId();
 
-                    const pathExecutionCommand = `${helperSrc.PATH_ROOT}${helperSrc.PATH_SCRIPT}command1.sh`;
-                    const executionArgumentList = [
-                        pathExecutionCommand,
-                        language,
-                        `${fileDetail.baseName}/${fileDetail.fileName}`,
-                        uniqueId,
-                        searchText,
-                        mode
-                    ];
+                    const pathInput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/${fileDetail.fileName}`;
+                    const pathInputBasename = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
+                    const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
-                    helperSrc.executionFile(executionArgumentList).then(async (result) => {
-                        const stdoutTrim = result.stdout.trim();
-
-                        if (result.error) {
-                            helperSrc.writeLog(`Ocr.ts - api() - post(/api/extract) - executionFile() - error`, result.error.message);
-
-                            helperSrc.responseBody("", "ko", response, 500);
-                        } else if (stdoutTrim.startsWith("file")) {
-                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - stdout", result.stdout);
-
-                            const pathExport = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/export/`;
-                            const pathTable = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/table/`;
-
-                            let dataJsonList: string[] | undefined;
-                            let dataPdfList: string[] | undefined;
-                            let dataXlsxList: string[] | undefined;
-                            let dataHtmlList: string[] | undefined;
-
-                            let isCompleted = false;
-
-                            const finalizeResponse = () => {
-                                if (isCompleted) {
-                                    return;
+                    instance.api
+                        .post<modelOcr.IapiOnnxResponse>(
+                            "/scanner",
+                            {
+                                headers: {
+                                    "Content-Type": "application/json"
                                 }
+                            },
+                            { pathInput, pathOutput, searchText }
+                        )
+                        .then(async (resultApi) => {
+                            const data = resultApi.data;
 
-                                const isAllReady =
-                                    Array.isArray(dataJsonList) &&
-                                    Array.isArray(dataPdfList) &&
-                                    Array.isArray(dataXlsxList) &&
-                                    Array.isArray(dataHtmlList);
-
-                                if (!isAllReady) {
-                                    return;
-                                }
-
-                                const jsonList: string[] = [];
-                                for (let a = 0; a < dataJsonList!.length; a++) {
-                                    const dataJson = dataJsonList![a];
-
-                                    jsonList.push(
-                                        dataJson.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
-                                    );
-                                }
-
-                                const pdfList: string[] = [];
-                                for (let a = 0; a < dataPdfList!.length; a++) {
-                                    const dataPdf = dataPdfList![a];
-
-                                    pdfList.push(
-                                        dataPdf.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
-                                    );
-                                }
-
-                                const excelList: string[] = [];
-                                for (let a = 0; a < dataXlsxList!.length; a++) {
-                                    const dataXlsx = dataXlsxList![a];
-
-                                    excelList.push(
-                                        dataXlsx.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
-                                    );
-                                }
-
-                                const htmlList: string[] = [];
-                                for (let a = 0; a < dataHtmlList!.length; a++) {
-                                    const dataHtml = dataHtmlList![a];
-
-                                    htmlList.push(
-                                        dataHtml.replace(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/`, "")
-                                    );
-                                }
-
-                                const responseJson = {
-                                    uniqueId,
-                                    jsonList,
-                                    pdfList,
-                                    excelList,
-                                    htmlList
-                                };
-
-                                isCompleted = true;
-
-                                helperSrc.responseBody(JSON.stringify(responseJson), "", response, 200);
-                            };
-
-                            helperSrc.findInDirectoryRecursive(pathExport, ".json").then((list) => {
-                                dataJsonList = list;
-
-                                finalizeResponse();
-                            });
-
-                            helperSrc.findInDirectoryRecursive(pathExport, ".pdf").then((list) => {
-                                dataPdfList = list;
-
-                                finalizeResponse();
-                            });
-
-                            helperSrc.findInDirectoryRecursive(pathTable, ".xlsx").then((list) => {
-                                dataXlsxList = list;
-
-                                finalizeResponse();
-                            });
-
-                            helperSrc.findInDirectoryRecursive(pathTable, ".html").then((list) => {
-                                dataHtmlList = list;
-
-                                finalizeResponse();
-                            });
-                        } else if (stdoutTrim.startsWith("data")) {
-                            const outputSlice = stdoutTrim.slice("data".length).trim();
-
-                            helperSrc.responseBody(outputSlice, "", response, 200);
-                        } else {
-                            helperSrc.writeLog(
-                                "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - Error",
-                                "Problem with the output."
+                            helperSrc.responseBody(
+                                JSON.stringify({ uniqueId, layoutList: data.layoutList, itemList: data.itemList }),
+                                "",
+                                response,
+                                200
                             );
 
+                            const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(pathInputBasename);
+
+                            if (typeof fileOrFolderDelete !== "boolean") {
+                                helperSrc.writeLog(
+                                    "Ocr.ts - api() - post(/api/extract) - post(/scanner) - fileOrFolderDelete()",
+                                    fileOrFolderDelete.toString()
+                                );
+                            }
+                        })
+                        .catch((error: Error) => {
+                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - post(/scanner) - catch()", error.message);
+
                             helperSrc.responseBody("", "ko", response, 500);
-                        }
-
-                        const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(pathInput);
-
-                        if (typeof fileOrFolderDelete !== "boolean") {
-                            helperSrc.writeLog(
-                                "Ocr.ts - api() - post(/api/extract) - execute() - executionFile() - fileOrFolderDelete()",
-                                fileOrFolderDelete.toString()
-                            );
-                        }
-                    });
+                        });
                 })
                 .catch((error: Error) => {
                     helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error.message);
@@ -205,7 +95,7 @@ export default class Ocr {
             const uniqueId = body.uniqueId;
             const pathFile = body.pathFile;
 
-            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${helperSrc.RUNTIME}/${uniqueId}/${pathFile}`;
+            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/${pathFile}`;
 
             helperSrc.fileReadStream(path).then((resultFileReadStream) => {
                 if (Buffer.isBuffer(resultFileReadStream)) {

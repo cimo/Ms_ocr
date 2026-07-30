@@ -130,6 +130,6 @@ RUN \
     # Npm
     bash ${PATH_ROOT}script/npm.sh "build"
 
-CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/library.sh && bash ${PATH_ROOT}script/nodejs.sh"]
+CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/nodejs.sh"]
 
 EXPOSE ${SERVER_PORT}

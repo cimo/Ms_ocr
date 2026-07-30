@@ -123,6 +123,6 @@ USER node
 
 WORKDIR ${PATH_ROOT}
 
-CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/library.sh && bash ${PATH_ROOT}script/npm.sh 'execute'"]
+CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/npm.sh 'execute'"]
 
 EXPOSE ${SERVER_PORT}
