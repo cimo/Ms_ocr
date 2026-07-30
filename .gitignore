@@ -30,7 +30,6 @@ pnpm-debug.log*
 .npm
 .npmrc
 .nv
-.paddlex
 .pki
 .venv
 certificate/**

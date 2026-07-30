@@ -24,7 +24,7 @@ class Engine:
 
         return textSearch in text
 
-    def _debugDraw(self, image, layoutList, itemList, fileName):
+    def _debugDrawLayout(self, image, layoutList, fileName):
         imageCopy = image.copy()
 
         for a in range(len(layoutList)):
@@ -42,6 +42,11 @@ class Engine:
                 1,
                 cv2.LINE_AA
             )
+
+        cv2.imwrite(f"{self.pathDebug}{fileName}", imageCopy)
+
+    def _debugDrawItem(self, image, itemList, fileName):
+        imageCopy = image.copy()
 
         for a in range(len(itemList)):
             color = (0, 200, 0) if itemList[a]["isMatch"] else (0, 0, 255)
@@ -89,7 +94,8 @@ class Engine:
             json.dump({"layoutList": layoutList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
 
         if self.isDebug:
-            self._debugDraw(image, layoutList, itemList, f"result.jpg")
+            self._debugDrawLayout(image, layoutList, "layout.jpg")
+            self._debugDrawItem(image, itemList, "item.jpg")
 
         timeEnd = time.perf_counter() - timeStart
 

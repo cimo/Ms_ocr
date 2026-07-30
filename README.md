@@ -9,7 +9,7 @@ Just add it to the "/certificate/custom/" folder and change the env variable bef
 ## Info:
 - Cross platform (Windows, Linux)
 - WSLg for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
-- Onnx: Paddle (PP-DocLayout_plus-L, PP-OCRv6_medium_det, PP-OCRv6_medium_rec).
+- Onnx: (PP-DocLayout_plus-L, PP-OCRv6_medium_det, PP-OCRv6_medium_rec).
 
 ## Installation
 1. For build and up with GPU write on terminal:
@@ -39,7 +39,6 @@ bash docker/container_execute.sh "local" "up" "xxx"
     - .local
     - .npm
     - .nv
-    - .paddlex
     - .pki
     - .venv
     - dist

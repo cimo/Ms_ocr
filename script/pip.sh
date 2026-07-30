@@ -41,11 +41,11 @@ do
 
     if [ ! -f "${pathModel}${fileName}" ]
     then
-        echo "Download document_scanner paddle: ${fileName}"
+        echo "Download document_scanner: ${fileName}"
 
         if ! curl -fsSL "${urlModel}${model}" -o "${pathModel}${fileName}"
         then
-            echo "Skip document_scanner paddle - ${fileName}: download failed."
+            echo "Skip document_scanner - ${fileName}: download failed."
 
             rm -f "${pathModel}${fileName}"
         fi
