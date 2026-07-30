@@ -20,7 +20,7 @@ do
                 echo -e "\nFolder '${data}' deleted."
             else
                 rm -f "${data}"
-                
+
                 echo -e "\nFile '${data}' deleted."
             fi
         fi

@@ -1,13 +1,15 @@
 #!/bin/bash
 
-if [ -z "${1}" ]
+p1=$(printf '%s' "${1}" | xargs)
+
+if [ -z "${p1}" ]
 then
-    echo -e "\n❌ entrypoint_onnx.sh - Missing parameter."
-  
+    echo -e "\n❌ pip.sh - Missing parameter."
+
     exit 1
 fi
 
-parameter1="${1}"
+parameter1="${p1}"
 
 pathEnv="${PATH_ROOT}.venv/"
 

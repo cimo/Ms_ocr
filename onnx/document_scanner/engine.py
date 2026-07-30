@@ -37,7 +37,7 @@ class Engine:
 
         return textSearch in text
 
-    def _debugDrawLayout(self, image, layoutList, fileName):
+    def _debugDrawLayout(self, image, layoutList, fileName, pathDebug):
         imageCopy = image.copy()
 
         for a in range(len(layoutList)):
@@ -56,9 +56,9 @@ class Engine:
                 cv2.LINE_AA
             )
 
-        cv2.imwrite(f"{self.pathDebug}{fileName}", imageCopy)
+        cv2.imwrite(f"{pathDebug}{fileName}", imageCopy)
 
-    def _debugDrawItem(self, image, detectionList, resultItemList, fileName):
+    def _debugDrawItem(self, image, detectionList, resultItemList, fileName, pathDebug):
         imageCopy = image.copy()
 
         for a in range(len(detectionList)):
@@ -66,18 +66,18 @@ class Engine:
 
             cv2.polylines(imageCopy, [numpy.array(detectionList[a]["coordinate"], dtype=numpy.int32)], True, color, 1)
 
-        cv2.imwrite(f"{self.pathDebug}{fileName}", imageCopy)
+        cv2.imwrite(f"{pathDebug}{fileName}", imageCopy)
 
     def execute(self, pathInput, pathOutput, fileName, searchText):
         timeStart = time.perf_counter()
 
-        self.pathDebug = f"{pathOutput}debug/"
+        pathDebug = f"{pathOutput}debug/"
 
-        if os.path.isdir(self.pathDebug):
-            shutil.rmtree(self.pathDebug)
+        if os.path.isdir(pathDebug):
+            shutil.rmtree(pathDebug)
 
         if self.isDebug:
-            os.makedirs(self.pathDebug, exist_ok=True)
+            os.makedirs(pathDebug, exist_ok=True)
 
         image = cv2.imread(pathInput)
 
@@ -118,8 +118,8 @@ class Engine:
             json.dump({"layoutList": resultLayoutList, "itemList": resultItemList}, file, ensure_ascii=False, indent=2)
 
         if self.isDebug:
-            self._debugDrawLayout(image, layoutList, "layout.jpg")
-            self._debugDrawItem(image, detectionList, resultItemList, "item.jpg")
+            self._debugDrawLayout(image, layoutList, "layout.jpg", pathDebug)
+            self._debugDrawItem(image, detectionList, resultItemList, "item.jpg", pathDebug)
 
         timeEnd = time.perf_counter() - timeStart
 
@@ -128,8 +128,6 @@ class Engine:
         return {"layoutList": resultLayoutList, "itemList": resultItemList}
 
     def __init__(self):
-        self.pathDebug = ""
-
         self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
 
         self.layout = Layout()

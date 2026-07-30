@@ -11,9 +11,9 @@ then
     exit 1
 fi
 
-parameter1="${1}"
-parameter2="${2}"
-parameter3="${3}"
+parameter1="${p1}"
+parameter2="${p2}"
+parameter3="${p3}"
 
 echo -e "\nCopying from volume..."
 
