@@ -7,6 +7,7 @@ ARG _LANG
 ARG _SERVER_PORT
 ARG _PATH_ROOT
 ARG _PATH_CERTIFICATE_PEM
+ARG _DEVICE
 ARG _VERSION_TAG
 
 ENV ENV_NAME=${_ENV_NAME}
@@ -16,6 +17,7 @@ ENV LANG=${_LANG}
 ENV SERVER_PORT=${_SERVER_PORT}
 ENV PATH_ROOT=${_PATH_ROOT}
 ENV PATH_CERTIFICATE_PEM=${_PATH_CERTIFICATE_PEM}
+ENV DEVICE=${_DEVICE}
 ENV VERSION_TAG=${_VERSION_TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -130,6 +132,6 @@ RUN \
     # Npm
     bash ${PATH_ROOT}script/npm.sh "build"
 
-CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh && bash ${PATH_ROOT}script/nodejs.sh"]
+CMD ["sh", "-c", "bash ${PATH_ROOT}script/gpu.sh && bash ${PATH_ROOT}script/dbus.sh && bash ${PATH_ROOT}script/pip.sh \"${DEVICE}\" && bash ${PATH_ROOT}script/nodejs.sh"]
 
 EXPOSE ${SERVER_PORT}

@@ -20,6 +20,7 @@ services:
         _SERVER_PORT: ${SERVER_PORT}
         _PATH_ROOT: ${PATH_ROOT}
         _PATH_CERTIFICATE_PEM: ${MS_O_PATH_CERTIFICATE_PEM}
+        _DEVICE: "gpu"
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}
     extra_hosts:
