@@ -9,7 +9,6 @@ fi
 
 parameter1="${1}"
 
-# Python
 pathEnv="${PATH_ROOT}.venv/"
 
 if [ ! -d "${pathEnv}" ]

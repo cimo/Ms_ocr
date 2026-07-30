@@ -117,6 +117,12 @@ RUN cd ~ \
     libgomp1 \
     libatomic1 \
     xdg-utils \
+    # Cuda
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && apt-get update && apt-get install -y \
+    cuda-runtime-12-9 \
+    libcudnn9-cuda-12 \
     # Clean
     && apt-get remove --purge -y sudo \
     && rm -rf /var/lib/apt/lists/* \
