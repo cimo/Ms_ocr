@@ -1,14 +1,20 @@
-interface IonnxItem {
-    id: number;
-    polygon: number[][];
-    text: string;
-    isMatch: boolean;
-}
-
-interface IonnxLayout {
+interface Ilayout {
     label: string;
     score: number;
-    coordinate: number[];
+    centerPoint: {
+        x: number;
+        y: number;
+    };
+}
+
+interface Iitem {
+    id: number;
+    text: string;
+    centerPoint: {
+        x: number;
+        y: number;
+    };
+    isMatch: boolean;
 }
 
 export interface IapiDownloadBody {
@@ -16,7 +22,7 @@ export interface IapiDownloadBody {
     pathFile: string;
 }
 
-export interface IapiOnnxResponse {
-    layoutList: IonnxLayout[];
-    itemList: IonnxItem[];
+export interface IapiScannerResponse {
+    layoutList: Ilayout[];
+    itemList: Iitem[];
 }

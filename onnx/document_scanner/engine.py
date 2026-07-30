@@ -15,6 +15,19 @@ from detection import Detection
 from recognition import Recognition
 
 class Engine:
+    def _centerPointCalculate(self, pointList):
+        xList = []
+        yList = []
+
+        for a in range(len(pointList)):
+            xList.append(pointList[a][0])
+            yList.append(pointList[a][1])
+
+        return {
+            "x": int(round((min(xList) + max(xList)) / 2)),
+            "y": int(round((min(yList) + max(yList)) / 2))
+        }
+
     def _matchCheck(self, value, searchText):
         if searchText == "" or value == "":
             return False
@@ -45,13 +58,13 @@ class Engine:
 
         cv2.imwrite(f"{self.pathDebug}{fileName}", imageCopy)
 
-    def _debugDrawItem(self, image, itemList, fileName):
+    def _debugDrawItem(self, image, detectionList, resultItemList, fileName):
         imageCopy = image.copy()
 
-        for a in range(len(itemList)):
-            color = (0, 200, 0) if itemList[a]["isMatch"] else (0, 0, 255)
+        for a in range(len(detectionList)):
+            color = (0, 200, 0) if resultItemList[a]["isMatch"] else (0, 0, 255)
 
-            cv2.polylines(imageCopy, [numpy.array(itemList[a]["polygon"], dtype=numpy.int32)], True, color, 1)
+            cv2.polylines(imageCopy, [numpy.array(detectionList[a]["coordinate"], dtype=numpy.int32)], True, color, 1)
 
         cv2.imwrite(f"{self.pathDebug}{fileName}", imageCopy)
 
@@ -74,34 +87,45 @@ class Engine:
         imageRgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         layoutList = self.layout.execute(imageRgb)
-        boxList = self.detection.execute(image)
+        detectionList = self.detection.execute(image)
 
-        itemList = []
+        resultLayoutList = []
 
-        for a in range(len(boxList)):
-            itemObject = self.recognition.execute(image, boxList[a]["coordinate"])
+        for a in range(len(layoutList)):
+            coordinateList = layoutList[a]["coordinate"]
 
-            itemList.append({
+            resultLayoutList.append({
+                "label": layoutList[a]["label"],
+                "score": layoutList[a]["score"],
+                "centerPoint": self._centerPointCalculate([[coordinateList[0], coordinateList[1]], [coordinateList[2], coordinateList[3]]])
+            })
+
+        resultItemList = []
+
+        for a in range(len(detectionList)):
+            recognitionObject = self.recognition.execute(image, detectionList[a]["coordinate"])
+
+            resultItemList.append({
                 "id": a + 1,
-                "polygon": boxList[a]["coordinate"],
-                "text": itemObject["text"],
-                "isMatch": self._matchCheck(itemObject["text"], searchText)
+                "centerPoint": self._centerPointCalculate(detectionList[a]["coordinate"]),
+                "text": recognitionObject["text"],
+                "isMatch": self._matchCheck(recognitionObject["text"], searchText)
             })
 
         os.makedirs(pathOutput, exist_ok=True)
 
         with open(f"{pathOutput}result.json", "w", encoding="utf-8") as file:
-            json.dump({"layoutList": layoutList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
+            json.dump({"layoutList": resultLayoutList, "itemList": resultItemList}, file, ensure_ascii=False, indent=2)
 
         if self.isDebug:
             self._debugDrawLayout(image, layoutList, "layout.jpg")
-            self._debugDrawItem(image, itemList, "item.jpg")
+            self._debugDrawItem(image, detectionList, resultItemList, "item.jpg")
 
         timeEnd = time.perf_counter() - timeStart
 
         print(f"\nEngine.py - Time: {round(timeEnd, 3)} - {fileName}")
 
-        return {"layoutList": layoutList, "itemList": itemList}
+        return {"layoutList": resultLayoutList, "itemList": resultItemList}
 
     def __init__(self):
         self.pathDebug = ""

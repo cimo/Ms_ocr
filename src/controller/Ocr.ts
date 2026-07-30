@@ -48,8 +48,8 @@ export default class Ocr {
                     const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
                     instance.api
-                        .post<modelOcr.IapiOnnxResponse>(
-                            "/scanner",
+                        .post<modelOcr.IapiScannerResponse>(
+                            "/engine",
                             {
                                 headers: {
                                     "Content-Type": "application/json"
@@ -71,13 +71,13 @@ export default class Ocr {
 
                             if (typeof fileOrFolderDelete !== "boolean") {
                                 helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - post(/scanner) - fileOrFolderDelete()",
+                                    "Ocr.ts - api() - post(/api/extract) - post(/engine) - fileOrFolderDelete()",
                                     fileOrFolderDelete.toString()
                                 );
                             }
                         })
                         .catch((error: Error) => {
-                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - post(/scanner) - catch()", error.message);
+                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - post(/engine) - catch()", error.message);
 
                             helperSrc.responseBody("", "ko", response, 500);
                         });

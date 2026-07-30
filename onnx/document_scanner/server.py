@@ -33,7 +33,7 @@ class HandlerHttpRequest(BaseHTTPRequestHandler):
 
         result = {}
 
-        if self.path == "/scanner":
+        if self.path == "/engine":
             result = self._routeEngine(text)
 
         body = json.dumps(result, ensure_ascii=False).encode("utf-8")
