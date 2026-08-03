@@ -53,4 +53,3 @@ public/asset/js/*
 public/asset/style/*
 !public/asset/style/.gitkeep
 public/index.html
-package-lock.json

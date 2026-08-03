@@ -43,7 +43,6 @@ bash docker/container_execute.sh "local" "up" "xxx"
     - .venv
     - dist
     - node_modules
-    - package-lock.json
 
 2. Follow the "Installation" instructions.
 
