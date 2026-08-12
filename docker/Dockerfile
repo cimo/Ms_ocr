@@ -27,22 +27,22 @@ ENV HISTFILE="/home/node/.bash_history"
 ENV NODE_OPTIONS=--use-openssl-ca
 ENV NODE_EXTRA_CA_CERTS="${PATH_CERTIFICATE_PEM}"
 ENV NPM_CONFIG_USERCONFIG="/home/node/.npmrc"
-ENV PATH="${PATH_ROOT}.venv/bin/:${PATH_ROOT}.local/bin/:${PATH}"
+ENV PATH="${PATH_ROOT}.venv/bin:${PATH_ROOT}.local/bin:${PATH}"
 ENV PYTHONPATH="${PATH_ROOT}"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV WAYLAND_DISPLAY=wayland-0
 ENV XDG_SESSION_TYPE=wayland
-ENV XDG_RUNTIME_DIR="/mnt/wslg/runtime-dir/"
+ENV XDG_RUNTIME_DIR="/mnt/wslg/runtime-dir"
 ENV ELECTRON_ENABLE_WAYLAND=1
 ENV ELECTRON_OZONE_PLATFORM_HINT=auto
 ENV OZONE_PLATFORM=wayland
 ENV EGL_PLATFORM=wayland
 ENV ANGLE_DEFAULT_PLATFORM=egl
-ENV DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}bus"
+ENV DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
 ENV PULSE_SERVER="unix:/mnt/wslg/PulseServer"
-ENV LD_LIBRARY_PATH="/usr/lib/wsl/lib/:/usr/local/cuda/lib64/:/usr/local/cuda-12.9/lib64/"
+ENV LD_LIBRARY_PATH="/usr/lib/wsl/lib:/usr/local/cuda/lib64:/usr/local/cuda-12.9/lib64:${LD_LIBRARY_PATH}"
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 
@@ -53,9 +53,10 @@ COPY ./ ${PATH_ROOT}
 
 RUN cd ~ \
     # No root
-    && userdel -r ubuntu \
+    && userdel ubuntu \
+    && rm -rf /home/ubuntu/ \
     && groupadd -g 1000 node \
-    && useradd -m -u 1000 -g 1000 -d ${PATH_ROOT} -s /bin/bash node \
+    && useradd -M -u 1000 -g 1000 -d ${PATH_ROOT} -s /bin/bash node \
     && uid="$(id -u node)" \
     && mkdir -p ${PATH_ROOT} /home/node/ /run/user/${uid} /usr/lib/node_modules/npm/ \
     && chown -R node:node ${PATH_ROOT} /home/node/ /run/user/${uid} /usr/lib/node_modules/npm/ \
@@ -66,7 +67,8 @@ RUN cd ~ \
     && echo 'Acquire::http::No-Cache "true";' > /etc/apt/apt.conf.d/99no-cache \
     && echo 'Acquire::https::No-Cache "true";' >> /etc/apt/apt.conf.d/99no-cache \
     && VERSION_CODENAME=$(grep VERSION_CODENAME= /etc/os-release | cut -d= -f2) \
-    && chmod -R 0644 /usr/local/share/ca-certificates/ \
+    && find /usr/local/share/ca-certificates/ -type d -exec chmod 755 {} + \
+    && find /usr/local/share/ca-certificates/ -type f -exec chmod 644 {} + \
     && apt-get update && apt-get install -y ca-certificates tzdata curl media-types jq gettext-base \
     && update-ca-certificates \
     && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone \
@@ -87,11 +89,9 @@ RUN cd ~ \
     python3-venv \
     python3-pip \
     # Wslg
-    && groupadd -g 110 render || true \
-    && groupadd -g 44 video || true \
-    && usermod -aG 110 node \
-    && usermod -aG 44 node \
-    && echo "<driconf></driconf>" > /etc/drirc \
+    && (getent group render >/dev/null || groupadd -g 110 render) \
+    && (getent group video >/dev/null || groupadd -g 44 video) \
+    && usermod -aG render,video node \
     && apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgtk-3-0 \
@@ -126,6 +126,7 @@ RUN cd ~ \
     libatomic1 \
     xdg-utils \
     # Cuda
+    && echo "<driconf></driconf>" > /etc/drirc \
     && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring_1.1-1_all.deb \
     && dpkg -i cuda-keyring_1.1-1_all.deb \
     && apt-get update && apt-get install -y \
