@@ -5,10 +5,10 @@ import { Ca } from "@cimo/authentication/dist/src/Main.js";
 // Source
 import * as helperSrc from "../HelperSrc.js";
 import * as instance from "../Instance.js";
-import * as modelOcr from "../model/Ocr.js";
+import * as modelService from "../model/Service.js";
 import ControllerUpload from "./Upload.js";
 
-export default class Ocr {
+export default class Service {
     // Variable
     private app: Express.Express;
     private limiter: RateLimitRequestHandler;
@@ -48,7 +48,7 @@ export default class Ocr {
                     const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
                     instance.api
-                        .post<modelOcr.IapiScannerResponse>(
+                        .post<modelService.IapiScannerResponse>(
                             "/engine",
                             {
                                 headers: {
@@ -71,26 +71,26 @@ export default class Ocr {
 
                             if (typeof fileOrFolderDelete !== "boolean") {
                                 helperSrc.writeLog(
-                                    "Ocr.ts - api() - post(/api/extract) - post(/engine) - fileOrFolderDelete()",
+                                    "Service.ts - api() - post(/api/extract) - post(/engine) - fileOrFolderDelete()",
                                     fileOrFolderDelete.toString()
                                 );
                             }
                         })
                         .catch((error: Error) => {
-                            helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - post(/engine) - catch()", error.message);
+                            helperSrc.writeLog("Service.ts - api() - post(/api/extract) - post(/engine) - catch()", error.message);
 
                             helperSrc.responseBody("", "ko", response, 500);
                         });
                 })
                 .catch((error: Error) => {
-                    helperSrc.writeLog("Ocr.ts - api() - post(/api/extract) - execute() - catch()", error.message);
+                    helperSrc.writeLog("Service.ts - api() - post(/api/extract) - execute() - catch()", error.message);
 
                     helperSrc.responseBody("", "ko", response, 500);
                 });
         });
 
         this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-            const body = request.body as modelOcr.IapiDownloadBody;
+            const body = request.body as modelService.IapiDownloadBody;
 
             const uniqueId = body.uniqueId;
             const pathFile = body.pathFile;
@@ -98,12 +98,12 @@ export default class Ocr {
             const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/${pathFile}`;
 
             helperSrc.fileReadStream(path).then((resultFileReadStream) => {
-                if (Buffer.isBuffer(resultFileReadStream)) {
-                    helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
-                } else {
-                    helperSrc.writeLog("Ocr.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
+                if (!Buffer.isBuffer(resultFileReadStream)) {
+                    helperSrc.writeLog("Service.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
 
                     helperSrc.responseBody("", "ko", response, 500);
+                } else {
+                    helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
                 }
             });
         });

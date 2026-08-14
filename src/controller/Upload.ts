@@ -74,7 +74,13 @@ export default class Upload {
                             const pathFile = `${path}${fileDetail.fileName}`;
 
                             Fs.mkdir(path, { recursive: true }, (error) => {
-                                if (!error) {
+                                if (error) {
+                                    helperSrc.writeLog("Upload.ts - execute() - request.on() - mkdir() - Error", error.message);
+
+                                    reject(new Error(error.message));
+
+                                    return;
+                                } else {
                                     Fs.access(pathFile, Fs.constants.F_OK, (errorAccess) => {
                                         if (isFileExists && !errorAccess) {
                                             resolve([]);
@@ -94,12 +100,6 @@ export default class Upload {
                                             }
                                         });
                                     });
-                                } else {
-                                    helperSrc.writeLog("Upload.ts - execute() - request.on() - mkdir() - Error", error.message);
-
-                                    reject(new Error(error.message));
-
-                                    return;
                                 }
                             });
 
