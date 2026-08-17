@@ -12,25 +12,20 @@ Just add it to the "/certificate/custom/" folder and change the env variable bef
 - Onnx: (PP-DocLayout_plus-L, PP-OCRv6_medium_det, PP-OCRv6_medium_rec).
 
 ## Installation
-1. For build and up with GPU write on terminal:
+1. For build and up with GPU write on host terminal:
 ```
 bash docker/container_execute.sh "local" "build-up" "gpu"
 ```
 
-2. For build and up with CPU write on terminal:
+2. For build and up with CPU write on host terminal:
 ```
 bash docker/container_execute.sh "local" "build-up" "cpu"
 ```
 
-3. Just for up write on terminal:
+3. Just for up write on host terminal:
 ```
 bash docker/container_execute.sh "local" "up" "xxx"
 ```
-
-## GPU
-1. When the container start, a message appears that indicates the GPU status:
-
-    NVIDIA GeForce RTX 3060 - (Host GPU available)
 
 ## Reset
 1. Delete this from the root:
@@ -47,7 +42,7 @@ bash docker/container_execute.sh "local" "up" "xxx"
 
 2. Follow the "Installation" instructions.
 
-## API (Postman)
+## Api
 1. Info
 ```
 url = https://localhost:1045/info

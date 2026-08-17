@@ -27,21 +27,21 @@ python3 -m pip install -r "${PATH_ROOT}requirement.txt"
 # Onnx
 if [ "${parameter1}" = "gpu" ]
 then
-    if command -v nvidia-smi >/dev/null 2>&1 || [ -c "/dev/nvidiactl" ] || [ -d "/proc/driver/nvidia" ]
+    if command -v nvidia-smi > "/dev/null" 2>&1 || [ -c "/dev/nvidiactl" ] || [ -d "/proc/driver/nvidia" ]
     then
         python3 -m pip install onnxruntime-gpu==1.24.4
-    elif command -v rocminfo >/dev/null 2>&1 || [ -e "/dev/kfd" ] || [ -d "/sys/module/amdgpu" ]
+    elif command -v rocminfo > "/dev/null" 2>&1 || [ -e "/dev/kfd" ] || [ -d "/sys/module/amdgpu" ]
     then
         python3 -m pip install onnxruntime-rocm==1.24.4
     fi
 elif [ "${parameter1}" = "cpu" ]
 then
-    cpuVendor=$(awk -F: '/vendor_id/{gsub(/^[ \t]+/,"",$2); print $2; exit}' /proc/cpuinfo)
+    cpuVendor=$(awk -F: '/vendor_id/{gsub(/^[ \t]+/,"",$2); print $2; exit}' "/proc/cpuinfo")
 
     if [ "${cpuVendor}" = "AuthenticAMD" ]
     then
         python3 -m pip install onnxruntime==1.24.4
-    elif [ "$cpuVendor" = "GenuineIntel" ]
+    elif [ "${cpuVendor}" = "GenuineIntel" ]
     then
         python3 -m pip install onnxruntime-openvino==1.24.1
     fi

@@ -20,9 +20,9 @@ echo -e "\nCopying from volume..."
 docker run --rm \
 -e HOST_UID="$(id -u)" \
 -e HOST_GID="$(id -g)" \
--v cimo_${parameter1}_ms_cronjob-volume:/home/source/:ro \
--v $(pwd)/certificate/:/home/target/ \
-alpine sh -c 'cp -r /home/source/* /home/target/ && chown -R "$HOST_UID:$HOST_GID" /home/target/ && chmod -R u+rwX,go+rX /home/target/'
+-v "cimo_${parameter1}_ms_cronjob-volume:/home/source/:ro" \
+-v "$(pwd)/certificate/:/home/target/" \
+alpine sh -c 'cp -r "/home/source/"* "/home/target/" && chown -R "$HOST_UID:$HOST_GID" "/home/target/" && chmod -R u+rwX,go+rX "/home/target/"'
 
 echo -e "\nExecute container."
 
@@ -30,20 +30,20 @@ if [ "${parameter2}" = "build-up" ]
 then
     if [ "${parameter3}" = "cpu" ]
     then
-        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env build --no-cache &&
-        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env up --detach --pull always
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" build --no-cache &&
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     elif [ "${parameter3}" = "gpu" ]
     then
-        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env build --no-cache &&
-        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env up --detach --pull always
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" build --no-cache &&
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     fi
 elif [ "${parameter2}" = "up" ]
 then
     if [ "${parameter3}" = "cpu" ]
     then
-        docker compose -f docker-compose-cpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env up --detach --pull always
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     elif [ "${parameter3}" = "gpu" ]
     then
-        docker compose -f docker-compose-gpu.yaml --env-file ./env/${parameter1}.env --env-file ./env/${parameter1}.secret.env up --detach --pull always
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     fi
 fi
