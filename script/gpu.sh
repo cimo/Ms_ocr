@@ -8,3 +8,5 @@ echo ""
 
 # Cuda
 ls "/usr/local/" | grep cuda
+
+echo ""
