@@ -24,7 +24,7 @@ docker run --rm \
 -e HOST_GID="$(id -g)" \
 -v "${projectName}_${parameter1}_ms_cronjob-volume:/home/source/:ro" \
 -v "$(pwd)/certificate/:/home/target/" \
-alpine sh -c 'cp -r "/home/source/"* "/home/target/" && chown -R "$HOST_UID:$HOST_GID" "/home/target/" && chmod -R u+rwX,go+rX "/home/target/"'
+alpine sh -c 'cp -r "/home/source/"* "/home/target/" && chown -R "${HOST_UID}:${HOST_GID}" "/home/target/" && chmod -R u+rwX,go+rX "/home/target/"'
 
 echo -e "\nExecute container."
 
@@ -43,13 +43,9 @@ elif [ "${parameter2}" = "up" ]
 then
     if [ "${parameter3}" = "cpu" ]
     then
-        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --wait &&
-        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" exec -u root -T "${projectName}_ms_ocr_cpu" sh -c 'cp -a "${PATH_ROOT}certificate/." "/usr/local/share/ca-certificates/"' &&
-        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" exec -u root -T "${projectName}_ms_ocr_cpu" update-ca-certificates
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     elif [ "${parameter3}" = "gpu" ]
     then
-        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --wait &&
-        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" exec -u root -T "${projectName}_ms_ocr_gpu" sh -c 'cp -a "${PATH_ROOT}certificate/." "/usr/local/share/ca-certificates/"' &&
-        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" exec -u root -T "${projectName}_ms_ocr_gpu" update-ca-certificates
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
     fi
 fi
