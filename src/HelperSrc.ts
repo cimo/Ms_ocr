@@ -188,6 +188,30 @@ export const jsonCheck = (value: string): boolean => {
     }
 };
 
+export const fileCheckMimeType = (value: string): boolean => {
+    if (!MIME_TYPE.includes(value)) {
+        return false;
+    }
+
+    return true;
+};
+
+export const fileCheckSize = (byte: number): boolean => {
+    const fileSizeMb = parseInt(FILE_SIZE_MB);
+
+    if (isNaN(fileSizeMb)) {
+        return false;
+    }
+
+    const maxSizeByte = fileSizeMb * 1024 * 1024;
+
+    if (byte > maxSizeByte) {
+        return false;
+    }
+
+    return true;
+};
+
 export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte = true): Promise<modelHelperSrc.IfileDetail> => {
     let resultObject = {} as modelHelperSrc.IfileDetail;
 
@@ -386,7 +410,7 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
             if (isMatched) {
                 resultObject = {
                     ...resultObject,
-                    fileName: fileNameWithExtension,
+                    name: fileNameWithExtension,
                     baseName,
                     mimeType: signatureList[a].mimeType,
                     extension: signatureList[a].extension,
@@ -405,7 +429,7 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
             if (signatureList[a].extension === extension) {
                 resultObject = {
                     ...resultObject,
-                    fileName: fileNameWithExtension,
+                    name: fileNameWithExtension,
                     baseName,
                     mimeType: signatureList[a].mimeType,
                     extension: signatureList[a].extension,
@@ -418,30 +442,6 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
     }
 
     return resultObject;
-};
-
-export const fileCheckMimeType = (value: string): boolean => {
-    if (!MIME_TYPE.includes(value)) {
-        return false;
-    }
-
-    return true;
-};
-
-export const fileCheckSize = (byte: number): boolean => {
-    const fileSizeMb = parseInt(FILE_SIZE_MB);
-
-    if (isNaN(fileSizeMb)) {
-        return false;
-    }
-
-    const maxSizeByte = fileSizeMb * 1024 * 1024;
-
-    if (byte > maxSizeByte) {
-        return false;
-    }
-
-    return true;
 };
 
 export const fileWriteStream = (pathFile: string, buffer: Buffer): Promise<boolean | NodeJS.ErrnoException> => {
@@ -533,6 +533,37 @@ export const fileOrFolderMove = (pathCurrent: string, pathTarget: string): Promi
             }
 
             resolve(true);
+        });
+    });
+};
+
+export const fileOrFolderRename = (
+    pathOld: string,
+    pathNew: string,
+    fileNameOld?: string,
+    fileNameNew?: string
+): Promise<boolean | NodeJS.ErrnoException> => {
+    return new Promise((resolve) => {
+        Fs.rename(pathOld, pathNew, (error) => {
+            if (error) {
+                resolve(error);
+
+                return;
+            }
+
+            if (fileNameOld === undefined || fileNameNew === undefined) {
+                resolve(true);
+            } else {
+                Fs.rename(`${pathNew}${fileNameOld}`, `${pathNew}${fileNameNew}`, (error) => {
+                    if (error) {
+                        resolve(error);
+
+                        return;
+                    }
+
+                    resolve(true);
+                });
+            }
         });
     });
 };
@@ -665,7 +696,7 @@ export const readFirstLevelRecursive = (path: string, extension: string, pathPre
                     Fs.stat(pathData, (errorStat, statData) => {
                         if (!errorStat && statData.isDirectory()) {
                             if (!pathPrevious) {
-                                resultList.push(pathData);
+                                resultList.push(`${pathData}/`);
 
                                 readFirstLevelRecursive(`${pathData}/`, extension, path).then((dataSubList) => {
                                     for (let a = 0; a < dataSubList.length; a++) {
