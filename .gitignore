@@ -52,4 +52,3 @@ public/asset/js/*
 !public/asset/js/.gitkeep
 public/asset/style/*
 !public/asset/style/.gitkeep
-public/index.html
