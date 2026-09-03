@@ -41,8 +41,5 @@ export interface IactionOperation {
 }
 
 export interface IapiResponse {
-    response: {
-        stdout: string;
-        stderr: string | Error;
-    };
+    response: IactionOperation;
 }

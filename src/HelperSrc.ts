@@ -801,8 +801,8 @@ export const headerBearerToken = (request: Request): string => {
     return authorization && authorization.startsWith("Bearer ") ? authorization.substring(7) : "";
 };
 
-export const responseBody = (stdoutValue: string, stderrValue: string | Error, response: Response, mode: number): void => {
-    const responseBody: modelHelperSrc.IapiResponse = { response: { stdout: stdoutValue, stderr: stderrValue } };
+export const responseBody = (actionOperation: modelHelperSrc.IactionOperation, response: Response, mode: number): void => {
+    const responseBody: modelHelperSrc.IapiResponse = { response: actionOperation };
 
     response.status(mode).send(responseBody);
 };
