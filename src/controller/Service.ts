@@ -61,8 +61,11 @@ export default class Service {
                             const data = resultApi.data;
 
                             helperSrc.responseBody(
-                                JSON.stringify({ uniqueId, layoutList: data.layoutList, itemList: data.itemList }),
-                                "",
+                                {
+                                    state: "ok",
+                                    message: "",
+                                    data: JSON.stringify({ uniqueId, layoutList: data.layoutList, itemList: data.itemList })
+                                },
                                 response,
                                 200
                             );
@@ -79,13 +82,13 @@ export default class Service {
                         .catch((error: Error) => {
                             helperSrc.writeLog("Service.ts - api() - post(/api/extract) - post(/engine) - catch()", error.message);
 
-                            helperSrc.responseBody("", "ko", response, 500);
+                            helperSrc.responseBody({ state: "ko", message: error.message }, response, 500);
                         });
                 })
                 .catch((error: Error) => {
                     helperSrc.writeLog("Service.ts - api() - post(/api/extract) - execute() - catch()", error.message);
 
-                    helperSrc.responseBody("", "ko", response, 500);
+                    helperSrc.responseBody({ state: "ko", message: error.message }, response, 500);
                 });
         });
 
@@ -101,9 +104,9 @@ export default class Service {
                 if (!Buffer.isBuffer(resultFileReadStream)) {
                     helperSrc.writeLog("Service.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
 
-                    helperSrc.responseBody("", "ko", response, 500);
+                    helperSrc.responseBody({ state: "ko", message: resultFileReadStream.toString() }, response, 500);
                 } else {
-                    helperSrc.responseBody(resultFileReadStream.toString("base64"), "", response, 200);
+                    helperSrc.responseBody({ state: "ok", message: "", data: resultFileReadStream.toString("base64") }, response, 200);
                 }
             });
         });
