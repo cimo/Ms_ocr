@@ -40,15 +40,41 @@ class Engine:
     def _debugDrawLayout(self, image, layoutList, fileName, pathDebug):
         imageCopy = image.copy()
 
+        labelDrawnList = []
+
         for a in range(len(layoutList)):
             coordinateList = layoutList[a]["coordinate"]
 
             cv2.rectangle(imageCopy, (coordinateList[0], coordinateList[1]), (coordinateList[2], coordinateList[3]), (255, 0, 0), 1)
 
+            text = f"{layoutList[a]['label']} {layoutList[a]['score']:.2f}"
+
+            textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
+
+            x = coordinateList[0]
+            y = coordinateList[1] - 4
+
+            isOverlap = True
+
+            while isOverlap:
+                isOverlap = False
+
+                for b in range(len(labelDrawnList)):
+                    isSameRow = abs(y - labelDrawnList[b]["y"]) < textHeight + 4
+                    isSameColumn = x < labelDrawnList[b]["x"] + labelDrawnList[b]["width"] and labelDrawnList[b]["x"] < x + textWidth
+
+                    if isSameRow and isSameColumn:
+                        isOverlap = True
+                        y = labelDrawnList[b]["y"] - textHeight - 4
+
+                        break
+
+            labelDrawnList.append({"x": x, "y": y, "width": textWidth})
+
             cv2.putText(
                 imageCopy,
-                f"{layoutList[a]['label']} {layoutList[a]['score']:.2f}",
-                (coordinateList[0], max(0, coordinateList[1] - 4)),
+                text,
+                (x, y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.4,
                 (255, 0, 0),
