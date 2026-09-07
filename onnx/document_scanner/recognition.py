@@ -11,7 +11,7 @@ sys.path.append(f"{os.path.dirname(__file__)}/..")
 from helper import onnxSessionBuild
 
 class Recognition:
-    def _imageCrop(self, image, coordinateList):
+    def _imageCrop(self, coordinateList, image):
         pointList = numpy.array(coordinateList, dtype=numpy.float32)
 
         widthCrop = int(max(numpy.linalg.norm(pointList[0] - pointList[1]), numpy.linalg.norm(pointList[2] - pointList[3])))
@@ -68,8 +68,8 @@ class Recognition:
 
         return numpy.expand_dims(tensorPadded, axis=0)
 
-    def execute(self, image, coordinateList):
-        imageCrop = self._imageCrop(image, coordinateList)
+    def execute(self, coordinateList, image):
+        imageCrop = self._imageCrop(coordinateList, image)
 
         if imageCrop is None:
             return {"text": "", "score": 0.0}

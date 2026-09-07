@@ -23,7 +23,7 @@ class Page:
     def _titleSizeKey(self, elementList):
         return math.floor(self._medianFontSize(elementList) + 0.5)
 
-    def _titleSizeRank(self, pageObject, astPageList):
+    def _titleSizeRank(self, astPageList, pageObject):
         resultList = []
 
         for a in range(len(astPageList)):
@@ -39,7 +39,7 @@ class Page:
                     item = astPage["itemMainList"][b]
 
                     if item["label"] == "paragraph_title":
-                        elementList = self._elementBoxCollect(page, item["coordinate"], scaleX, scaleY)
+                        elementList = self._elementBoxCollect(scaleX, scaleY, item["coordinate"], page)
 
                         if len(elementList) > 0:
                             key = self._titleSizeKey(elementList)
@@ -51,7 +51,7 @@ class Page:
 
         return resultList
 
-    def _headingHash(self, titleSizeRankList, key):
+    def _headingHash(self, key, titleSizeRankList):
         level = self.levelHeadingBase
 
         if key in titleSizeRankList:
@@ -122,7 +122,7 @@ class Page:
 
         return result
 
-    def _elementBoxCollect(self, page, coordinate, scaleX, scaleY):
+    def _elementBoxCollect(self, scaleX, scaleY, coordinate, page):
         resultList = []
 
         x1 = coordinate[0] * scaleX
@@ -142,7 +142,7 @@ class Page:
 
         return resultList
 
-    def _elementAssign(self, page, itemList, scaleX, scaleY):
+    def _elementAssign(self, itemList, page, scaleX, scaleY):
         resultList = []
 
         for a in range(len(itemList)):
@@ -234,7 +234,7 @@ class Page:
 
         return result
 
-    def execute(self, pageList, astPageList):
+    def execute(self, astPageList, pageList):
         result = ""
 
         pageObject = {}
@@ -242,7 +242,7 @@ class Page:
         for a in range(len(pageList)):
             pageObject[pageList[a]["number"]] = pageList[a]
 
-        titleSizeRankList = self._titleSizeRank(pageObject, astPageList)
+        titleSizeRankList = self._titleSizeRank(astPageList, pageObject)
 
         for a in range(len(astPageList)):
             astPage = astPageList[a]
@@ -258,7 +258,7 @@ class Page:
                 for b in range(len(astPage["itemMainList"])):
                     referenceX1 = max(referenceX1, astPage["itemMainList"][b]["coordinate"][2] * scaleX)
 
-                elementAssignList = self._elementAssign(page, astPage["itemMainList"], scaleX, scaleY)
+                elementAssignList = self._elementAssign(astPage["itemMainList"], page, scaleX, scaleY)
 
                 for b in range(len(astPage["itemMainList"])):
                     item = astPage["itemMainList"][b]
@@ -269,7 +269,7 @@ class Page:
                         if item["label"] == "doc_title":
                             result += f"# {self._itemText(elementList, True, item['coordinate'][0] * scaleX, referenceX1)}\n\n"
                         elif item["label"] == "paragraph_title":
-                            hashText = self._headingHash(titleSizeRankList, self._titleSizeKey(elementList))
+                            hashText = self._headingHash(self._titleSizeKey(elementList), titleSizeRankList)
 
                             result += f"{hashText} {self._itemText(elementList, True, item['coordinate'][0] * scaleX, referenceX1)}\n\n"
                         else:
@@ -294,7 +294,7 @@ class Page:
                     itemText = ""
 
                     if item["label"] != "table":
-                        elementList = self._elementBoxCollect(page, item["coordinate"], scaleX, scaleY)
+                        elementList = self._elementBoxCollect(scaleX, scaleY, item["coordinate"], page)
 
                         if len(elementList) > 0:
                             itemText = self._itemText(elementList, True, item["coordinate"][0] * scaleX, item["coordinate"][2] * scaleX)

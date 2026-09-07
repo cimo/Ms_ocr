@@ -11,6 +11,7 @@ import subprocess
 import unicodedata
 
 # Source
+import layout
 import image
 import pdf
 import markdown
@@ -35,7 +36,7 @@ class Processor:
             "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
         }
 
-    def _matchCheck(self, value, searchText):
+    def _matchCheck(self, searchText, value):
         if searchText == "" or value == "":
             return False
 
@@ -60,7 +61,7 @@ class Processor:
 
         return resultList
 
-    def _scaleCalculate(self, pageList, astPageList):
+    def _scaleCalculate(self, astPageList, pageList):
         resultObject = {}
 
         astPageObject = {}
@@ -81,10 +82,10 @@ class Processor:
 
         return resultObject
 
-    def _itemBuild(self, pageList, astPageList, searchText):
+    def _itemBuild(self, astPageList, pageList, searchText):
         resultList = []
 
-        scaleObject = self._scaleCalculate(pageList, astPageList)
+        scaleObject = self._scaleCalculate(astPageList, pageList)
 
         for a in range(len(pageList)):
             page = pageList[a]
@@ -109,7 +110,7 @@ class Processor:
                     "page": page["number"],
                     "centerPoint": self._centerPointCalculate(coordinateList),
                     "text": elementList[b]["text"],
-                    "isMatch": self._matchCheck(elementList[b]["text"], searchText)
+                    "isMatch": self._matchCheck(searchText, elementList[b]["text"])
                 })
 
         return resultList
@@ -127,13 +128,13 @@ class Processor:
                         "page": astPageList[a]["number"],
                         "centerPoint": None,
                         "text": itemList[b]["text"],
-                        "isMatch": self._matchCheck(itemList[b]["text"], searchText)
+                        "isMatch": self._matchCheck(searchText, itemList[b]["text"])
                     })
 
         return resultList
 
-    def _debugDrawItem(self, pathPage, pathDebug, pageList, astPageList, searchText):
-        scaleObject = self._scaleCalculate(pageList, astPageList)
+    def _debugDrawItem(self, astPageList, pageList, pathOutput, searchText):
+        scaleObject = self._scaleCalculate(astPageList, pageList)
 
         for a in range(len(pageList)):
             page = pageList[a]
@@ -143,12 +144,12 @@ class Processor:
 
             scale = scaleObject[page["number"]]
 
-            imageDebug = cv2.imread(f"{pathPage}{page['number']}.jpg")
+            imageDebug = cv2.imread(f"{pathOutput}page/{page['number']}.jpg")
 
             elementList = page["elementList"]
 
             for b in range(len(elementList)):
-                color = (0, 200, 0) if self._matchCheck(elementList[b]["text"], searchText) else (0, 0, 255)
+                color = (0, 200, 0) if self._matchCheck(searchText, elementList[b]["text"]) else (0, 0, 255)
 
                 cv2.rectangle(
                     imageDebug,
@@ -158,9 +159,9 @@ class Processor:
                     1
                 )
 
-            cv2.imwrite(f"{pathDebug}{page['number']}-item.jpg", imageDebug)
+            cv2.imwrite(f"{pathOutput}debug/engine/{page['number']}.jpg", imageDebug)
 
-    def pageImageGenerate(self, mode, pathInput, pathOutput):
+    def pageImageGenerate(self, mode, pathOutput, pathInput):
         pathPage = f"{pathOutput}page/"
 
         if os.path.isdir(pathPage):
@@ -180,20 +181,32 @@ class Processor:
 
                 os.rename(fileNameList[a], f"{pathPage}{pageNumber}.jpg")
 
-    def execute(self, pathInput, pathOutput, fileName, searchText):
+    def _astBuild(self, extension, pathOutput, pathInput, fileName):
+        resultObject = {"pageList": []}
+
+        if extension in self.extensionImageList:
+            self.pageImageGenerate("single", pathOutput, pathInput)
+
+            resultObject = self.layoutImage.execute(pathOutput, fileName, f"{pathOutput}page/")
+        elif extension == ".pdf":
+            self.pageImageGenerate("multiple", pathOutput, pathInput)
+
+            resultObject = self.layoutImage.execute(pathOutput, fileName, f"{pathOutput}page/")
+        elif extension == ".docx":
+            resultObject = self.layoutOfficeDocx.execute(pathInput, pathOutput, fileName)
+        elif extension == ".xlsx":
+            resultObject = self.layoutOfficeXlsx.execute(pathInput, pathOutput, fileName)
+        elif extension == ".pptx":
+            resultObject = self.layoutOfficePptx.execute(pathInput, pathOutput, fileName)
+
+        return resultObject["pageList"]
+
+    def execute(self, pathOutput, searchText, pathInput, fileName):
         timeStart = time.perf_counter()
 
-        astPageList = []
-
-        pathAst = f"{pathOutput}{self.astFileName}"
-
-        if os.path.isfile(pathAst):
-            with open(pathAst, "r", encoding="utf-8") as file:
-                astObject = json.load(file)
-
-                astPageList = astObject["pageList"]
-
         extension = os.path.splitext(pathInput)[1].lower()
+
+        astPageList = self._astBuild(extension, pathOutput, pathInput, fileName)
 
         markdownText = ""
         pageCount = 0
@@ -208,7 +221,7 @@ class Processor:
             pageList = self.imageReader.execute(f"{pathOutput}page/")
 
             markdownPage = markdown.Page()
-            markdownText = markdownPage.execute(pageList, astPageList)
+            markdownText = markdownPage.execute(astPageList, pageList)
 
             pageCount = len(pageList)
         elif extension == ".pdf":
@@ -218,7 +231,7 @@ class Processor:
             pageList = pdfReader.execute(pathInput)
 
             markdownPage = markdown.Page()
-            markdownText = markdownPage.execute(pageList, astPageList)
+            markdownText = markdownPage.execute(astPageList, pageList)
 
             pageCount = len(pageList)
         elif extension == ".docx":
@@ -242,7 +255,7 @@ class Processor:
 
         if isLayoutImage:
             layoutList = self._layoutBuild(astPageList)
-            itemList = self._itemBuild(pageList, astPageList, searchText)
+            itemList = self._itemBuild(astPageList, pageList, searchText)
         else:
             itemList = self._itemAstBuild(astPageList, searchText)
 
@@ -254,12 +267,13 @@ class Processor:
         with open(f"{pathOutput}{self.resultFileName}", "w", encoding="utf-8") as file:
             json.dump({"layoutList": layoutList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
 
-        if self.isDebug and isLayoutImage:
-            pathDebug = f"{pathOutput}debug/"
+        if self.isDebug:
+            if os.path.isdir(f"{pathOutput}debug/engine/"):
+                shutil.rmtree(f"{pathOutput}debug/engine/")
 
-            os.makedirs(pathDebug, exist_ok=True)
+            os.makedirs(f"{pathOutput}debug/engine/", exist_ok=True)
 
-            self._debugDrawItem(f"{pathOutput}page/", pathDebug, pageList, astPageList, searchText)
+            self._debugDrawItem(astPageList, pageList, pathOutput, searchText)
 
         timeEnd = time.perf_counter() - timeStart
 
@@ -272,7 +286,11 @@ class Processor:
     def __init__(self):
         self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
 
-        self.astFileName = "ast.json"
+        self.layoutImage = layout.Image()
+        self.layoutOfficeDocx = layout.Office.Docx()
+        self.layoutOfficeXlsx = layout.Office.Xlsx()
+        self.layoutOfficePptx = layout.Office.Pptx()
+
         self.resultFileName = "result.json"
         self.markdownFileName = "result.md"
 

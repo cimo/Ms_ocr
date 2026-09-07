@@ -37,7 +37,7 @@ class Reader:
             elementList = []
 
             for b in range(len(detectionList)):
-                recognitionObject = self.recognition.execute(image, detectionList[b]["coordinate"])
+                recognitionObject = self.recognition.execute(detectionList[b]["coordinate"], image)
 
                 if len(recognitionObject["text"].strip()) > 0:
                     coordinateList = self._coordinateCalculate(detectionList[b]["coordinate"])

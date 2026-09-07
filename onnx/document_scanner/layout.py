@@ -201,7 +201,7 @@ class Image:
 
         return result
 
-    def _flowLateral(self, itemList, referenceList, imageWidth, marginLeft):
+    def _flowLateral(self, imageWidth, itemList, marginLeft, referenceList):
         resultList = []
 
         overlapGap = imageWidth * self.levelLateralOverlap
@@ -303,7 +303,7 @@ class Image:
 
         return resultList
 
-    def _orderWidestGap(self, itemList, isColumn):
+    def _orderWidestGap(self, isColumn, itemList):
         resultObject = {"gap": 0, "position": 0}
 
         rangeList = []
@@ -335,7 +335,7 @@ class Image:
 
         return resultObject
 
-    def _orderSplit(self, itemList, position, isColumn):
+    def _orderSplit(self, itemList, isColumn, position):
         lowList = []
         highList = []
 
@@ -351,7 +351,7 @@ class Image:
 
         return [lowList, highList]
 
-    def _orderArrange(self, itemList, imageWidth, imageHeight, depth):
+    def _orderArrange(self, depth, itemList, imageWidth, imageHeight):
         resultList = []
 
         if len(itemList) <= 1 or depth >= 24:
@@ -359,24 +359,24 @@ class Image:
         else:
             isSplit = False
 
-            columnGapObject = self._orderWidestGap(itemList, True)
+            columnGapObject = self._orderWidestGap(True, itemList)
 
             if columnGapObject["gap"] >= imageWidth * self.levelGapColumn:
-                columnSplit = self._orderSplit(itemList, columnGapObject["position"], True)
+                columnSplit = self._orderSplit(itemList, True, columnGapObject["position"])
 
                 if len(columnSplit[0]) > 0 and len(columnSplit[1]) > 0:
-                    resultList = self._orderArrange(columnSplit[0], imageWidth, imageHeight, depth + 1) + self._orderArrange(columnSplit[1], imageWidth, imageHeight, depth + 1)
+                    resultList = self._orderArrange(depth + 1, columnSplit[0], imageWidth, imageHeight) + self._orderArrange(depth + 1, columnSplit[1], imageWidth, imageHeight)
 
                     isSplit = True
 
             if isSplit == False:
-                rowGapObject = self._orderWidestGap(itemList, False)
+                rowGapObject = self._orderWidestGap(False, itemList)
 
                 if rowGapObject["gap"] >= imageHeight * self.levelGapRow:
-                    rowSplit = self._orderSplit(itemList, rowGapObject["position"], False)
+                    rowSplit = self._orderSplit(itemList, False, rowGapObject["position"])
 
                     if len(rowSplit[0]) > 0 and len(rowSplit[1]) > 0:
-                        resultList = self._orderArrange(rowSplit[0], imageWidth, imageHeight, depth + 1) + self._orderArrange(rowSplit[1], imageWidth, imageHeight, depth + 1)
+                        resultList = self._orderArrange(depth + 1, rowSplit[0], imageWidth, imageHeight) + self._orderArrange(depth + 1, rowSplit[1], imageWidth, imageHeight)
 
                         isSplit = True
 
@@ -385,7 +385,7 @@ class Image:
 
         return resultList
 
-    def _debugDraw(self, pageNumber, image, itemMainList, itemSecondaryList, pathDebug):
+    def _debugDraw(self, itemMainList, itemSecondaryList, image, pathOutput, pageNumber):
         imageCopy = image.copy()
 
         itemList = itemMainList + itemSecondaryList
@@ -442,7 +442,7 @@ class Image:
                 cv2.LINE_AA
             )
 
-        cv2.imwrite(f"{pathDebug}{pageNumber}.jpg", imageCopy)
+        cv2.imwrite(f"{pathOutput}debug/layout/{pageNumber}.jpg", imageCopy)
 
     def _inference(self, imageRgb):
         imageHeight, imageWidth = imageRgb.shape[0:2]
@@ -477,16 +477,14 @@ class Image:
 
         return itemList
 
-    def execute(self, pathInput, pathOutput, fileName):
+    def execute(self, pathOutput, fileName, pathInput):
         timeStart = time.perf_counter()
 
-        pathDebug = f"{pathOutput}debug/"
-
-        if os.path.isdir(pathDebug):
-            shutil.rmtree(pathDebug)
-
         if self.isDebug:
-            os.makedirs(pathDebug, exist_ok=True)
+            if os.path.isdir(f"{pathOutput}debug/layout/"):
+                shutil.rmtree(f"{pathOutput}debug/layout/")
+
+            os.makedirs(f"{pathOutput}debug/layout/", exist_ok=True)
 
         fileNameList = sorted(glob.glob(f"{pathInput}*.jpg"), key=lambda path: int(os.path.splitext(os.path.basename(path))[0]))
 
@@ -529,7 +527,7 @@ class Image:
                 isLateralList.append(False)
 
             if flowObject["isSingleColumn"]:
-                isLateralList = self._flowLateral(itemCandidateList, referenceList, pageList[a]["imageWidth"], flowObject["marginLeft"])
+                isLateralList = self._flowLateral(pageList[a]["imageWidth"], itemCandidateList, flowObject["marginLeft"], referenceList)
 
             pageList[a]["itemCandidateList"] = itemCandidateList
 
@@ -563,7 +561,7 @@ class Image:
                 else:
                     itemMainList.append(itemCandidateList[b])
 
-            itemMainList = self._orderArrange(itemMainList, imageWidth, imageHeight, 0)
+            itemMainList = self._orderArrange(0, itemMainList, imageWidth, imageHeight)
             itemSecondaryList = self._orderSort(itemSecondaryList)
 
             for b in range(len(itemMainList)):
@@ -575,7 +573,7 @@ class Image:
                 itemSecondaryList[b]["order"] = b + 1
 
             if self.isDebug:
-                self._debugDraw(pageList[a]["number"], pageList[a]["image"], itemMainList, itemSecondaryList, pathDebug)
+                self._debugDraw(itemMainList, itemSecondaryList, pageList[a]["image"], pathOutput, pageList[a]["number"])
 
             del pageList[a]["image"]
             del pageList[a]["itemList"]
@@ -586,10 +584,11 @@ class Image:
 
         resultObject = {"pageList": pageList}
 
-        os.makedirs(pathOutput, exist_ok=True)
+        if self.isDebug:
+            os.makedirs(f"{pathOutput}debug/layout/", exist_ok=True)
 
-        with open(f"{pathOutput}ast.json", "w", encoding="utf-8") as file:
-            json.dump(resultObject, file, ensure_ascii=False, indent=4)
+            with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+                json.dump(resultObject, file, ensure_ascii=False, indent=4)
 
         timeEnd = time.perf_counter() - timeStart
 
@@ -708,7 +707,7 @@ class Office:
     def _nodeValue(self, node):
         return node.attrib.get(f"{{{self.namespace}}}val", "")
 
-    def _rootBuild(self, zipFile, pathFile):
+    def _rootBuild(self, pathFile, zipFile):
         result = None
 
         if pathFile in zipFile.namelist():
@@ -819,7 +818,7 @@ class Office:
         def _paragraphText(self, paragraphNode):
             return self._textCollect(paragraphNode).strip()
 
-        def _paragraphSize(self, paragraphNode, sizeDocument):
+        def _paragraphSize(self, sizeDocument, paragraphNode):
             sizeDefault = sizeDocument
 
             sizeDefaultNode = paragraphNode.find(f"{{{self.namespaceW}}}pPr/{{{self.namespaceW}}}rPr/{{{self.namespaceW}}}sz")
@@ -930,7 +929,7 @@ class Office:
 
             return resultList
 
-        def _blockParagraph(self, paragraphNode, isWrapped, styleObject, sizeDocument):
+        def _blockParagraph(self, paragraphNode, styleObject, isWrapped, sizeDocument):
             resultList = []
 
             text = self._paragraphText(paragraphNode)
@@ -947,7 +946,7 @@ class Office:
                 resultList.append({
                     "kind": "paragraph",
                     "text": text,
-                    "size": self._paragraphSize(paragraphNode, sizeDocument),
+                    "size": self._paragraphSize(sizeDocument, paragraphNode),
                     "style": style,
                     "styleName": styleDetailObject["name"],
                     "outlineLevel": outlineLevel,
@@ -980,7 +979,7 @@ class Office:
                 childList = []
 
                 if tag == "p":
-                    childList = self._blockParagraph(node, True, styleObject, sizeDocument)
+                    childList = self._blockParagraph(node, styleObject, True, sizeDocument)
                 elif tag == "tbl":
                     childList = self._blockTable(node, styleObject, sizeDocument)
 
@@ -1088,7 +1087,7 @@ class Office:
                 blockList = []
 
                 if tag == "p":
-                    blockList = self._blockParagraph(node, False, styleObject, sizeDocument)
+                    blockList = self._blockParagraph(node, styleObject, False, sizeDocument)
                 elif tag == "tbl":
                     blockList = self._blockTable(node, styleObject, sizeDocument)
                 elif tag != "sectPr":
@@ -1099,7 +1098,7 @@ class Office:
 
             return resultList
 
-        def _asideRunFlush(self, blockList, runIndexList):
+        def _asideRunFlush(self, runIndexList, blockList):
             if len(runIndexList) >= self.levelAsideCount:
                 for a in range(len(runIndexList)):
                     blockList[runIndexList[a]]["isAside"] = True
@@ -1132,7 +1131,7 @@ class Office:
 
             return result
 
-        def _previousParagraph(self, blockList, index):
+        def _previousParagraph(self, index, blockList):
             result = None
 
             for a in range(index - 1, -1, -1):
@@ -1148,7 +1147,7 @@ class Office:
 
             return result
 
-        def _previousBlock(self, blockList, index):
+        def _previousBlock(self, index, blockList):
             result = None
 
             for a in range(index - 1, -1, -1):
@@ -1172,7 +1171,7 @@ class Office:
                     isChained = False
 
                     if block["isWrapped"]:
-                        previousBlock = self._previousBlock(blockList, a)
+                        previousBlock = self._previousBlock(a, blockList)
 
                         if previousBlock is not None and previousBlock["isAside"] and previousBlock["size"] == block["size"]:
                             if self._sentenceEndCheck(previousBlock["text"]) == False:
@@ -1181,7 +1180,7 @@ class Office:
                                 isChained = True
 
                     if isChained == False and (len(block["text"]) <= self.levelAsideLength or block["text"][0:1].islower()):
-                        previous = self._previousParagraph(blockList, a)
+                        previous = self._previousParagraph(a, blockList)
 
                         if self._continuationCheck(previous, block):
                             block["isContinuation"] = True
@@ -1210,11 +1209,11 @@ class Office:
                             isBreak = False
 
                 if isBreak:
-                    self._asideRunFlush(blockList, runIndexList)
+                    self._asideRunFlush(runIndexList, blockList)
 
                     runIndexList = []
 
-            self._asideRunFlush(blockList, runIndexList)
+            self._asideRunFlush(runIndexList, blockList)
 
             return blockList
 
@@ -1283,12 +1282,12 @@ class Office:
 
             zipFile = zipfile.ZipFile(pathInput)
 
-            rootNode = self.office._rootBuild(zipFile, "word/document.xml")
+            rootNode = self.office._rootBuild("word/document.xml", zipFile)
 
             sizeDocument = 22.0
             styleObject = {}
 
-            styleRootNode = self.office._rootBuild(zipFile, "word/styles.xml")
+            styleRootNode = self.office._rootBuild("word/styles.xml", zipFile)
 
             if styleRootNode is not None:
                 styleObject = self._styleBuild(styleRootNode)
@@ -1300,7 +1299,7 @@ class Office:
                 if sizeNode is not None and self.office._nodeValue(sizeNode) != "":
                     sizeDocument = float(self.office._nodeValue(sizeNode))
 
-            relationshipRootNode = self.office._rootBuild(zipFile, "word/_rels/document.xml.rels")
+            relationshipRootNode = self.office._rootBuild("word/_rels/document.xml.rels", zipFile)
 
             pathObject = {}
 
@@ -1344,7 +1343,7 @@ class Office:
                     if block["isChart"]:
                         item["label"] = "chart"
 
-                        chartRootNode = self.office._rootBuild(zipFile, pathTarget)
+                        chartRootNode = self.office._rootBuild(pathTarget, zipFile)
 
                         if chartRootNode is not None:
                             item["text"] = self.office._chartText(chartRootNode)
@@ -1401,10 +1400,11 @@ class Office:
                 ]
             }
 
-            os.makedirs(pathOutput, exist_ok=True)
+            if self.isDebug:
+                os.makedirs(f"{pathOutput}debug/layout/", exist_ok=True)
 
-            with open(f"{pathOutput}ast.json", "w", encoding="utf-8") as file:
-                json.dump(resultObject, file, ensure_ascii=False, indent=4)
+                with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+                    json.dump(resultObject, file, ensure_ascii=False, indent=4)
 
             timeEnd = time.perf_counter() - timeStart
 
@@ -1413,6 +1413,8 @@ class Office:
             return resultObject
 
         def __init__(self):
+            self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
             self.namespaceW = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             self.namespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/main"
             self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
@@ -1558,7 +1560,7 @@ class Office:
         def _pivotRangeCollect(self, zipFile, sheetPath):
             resultList = []
 
-            relationshipRootNode = self.office._rootBuild(zipFile, f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels")
+            relationshipRootNode = self.office._rootBuild(f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels", zipFile)
 
             if relationshipRootNode is not None:
                 for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
@@ -1566,7 +1568,7 @@ class Office:
                         target = node.attrib.get("Target", "")
                         pathPivot = target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(sheetPath)}/{target}")
 
-                        pivotRootNode = self.office._rootBuild(zipFile, pathPivot)
+                        pivotRootNode = self.office._rootBuild(pathPivot, zipFile)
 
                         if pivotRootNode is not None:
                             locationNode = pivotRootNode.find(f"{{{self.namespaceMain}}}location")
@@ -1587,7 +1589,7 @@ class Office:
         def _drawingCollect(self, zipFile, sheetPath, pathOutput):
             resultList = []
 
-            relationshipRootNode = self.office._rootBuild(zipFile, f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels")
+            relationshipRootNode = self.office._rootBuild(f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels", zipFile)
 
             if relationshipRootNode is not None:
                 for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
@@ -1595,8 +1597,8 @@ class Office:
                         target = node.attrib.get("Target", "")
                         pathDrawing = target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(sheetPath)}/{target}")
 
-                        drawingRootNode = self.office._rootBuild(zipFile, pathDrawing)
-                        drawingRelationshipRootNode = self.office._rootBuild(zipFile, f"{os.path.dirname(pathDrawing)}/_rels/{os.path.basename(pathDrawing)}.rels")
+                        drawingRootNode = self.office._rootBuild(pathDrawing, zipFile)
+                        drawingRelationshipRootNode = self.office._rootBuild(f"{os.path.dirname(pathDrawing)}/_rels/{os.path.basename(pathDrawing)}.rels", zipFile)
 
                         pathObject = {}
 
@@ -1621,7 +1623,7 @@ class Office:
                                         relationshipId = chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
                                         pathChart = pathObject[relationshipId] if relationshipId in pathObject else ""
 
-                                        chartRootNode = self.office._rootBuild(zipFile, pathChart)
+                                        chartRootNode = self.office._rootBuild(pathChart, zipFile)
 
                                         if chartRootNode is not None:
                                             item["text"] = self.office._chartText(chartRootNode)
@@ -1648,7 +1650,7 @@ class Office:
 
             return resultList
 
-        def _rowCollect(self, sheetRootNode, pivotRangeList, sharedStringList, dateStyleList):
+        def _rowCollect(self, sheetRootNode, sharedStringList, dateStyleList, pivotRangeList):
             rowObjectList = []
 
             rowNumberNext = 1
@@ -1731,8 +1733,8 @@ class Office:
         def _sheetBuild(self, zipFile):
             resultList = []
 
-            workbookRootNode = self.office._rootBuild(zipFile, "xl/workbook.xml")
-            relationshipRootNode = self.office._rootBuild(zipFile, "xl/_rels/workbook.xml.rels")
+            workbookRootNode = self.office._rootBuild("xl/workbook.xml", zipFile)
+            relationshipRootNode = self.office._rootBuild("xl/_rels/workbook.xml.rels", zipFile)
 
             pathObject = {}
 
@@ -1759,12 +1761,12 @@ class Office:
             sharedStringList = []
             dateStyleList = []
 
-            sharedStringRootNode = self.office._rootBuild(zipFile, "xl/sharedStrings.xml")
+            sharedStringRootNode = self.office._rootBuild("xl/sharedStrings.xml", zipFile)
 
             if sharedStringRootNode is not None:
                 sharedStringList = self._sharedStringBuild(sharedStringRootNode)
 
-            styleRootNode = self.office._rootBuild(zipFile, "xl/styles.xml")
+            styleRootNode = self.office._rootBuild("xl/styles.xml", zipFile)
 
             if styleRootNode is not None:
                 dateStyleList = self._dateStyleBuild(styleRootNode)
@@ -1775,11 +1777,11 @@ class Office:
             rowCount = 0
 
             for a in range(len(sheetList)):
-                sheetRootNode = self.office._rootBuild(zipFile, sheetList[a]["path"])
+                sheetRootNode = self.office._rootBuild(sheetList[a]["path"], zipFile)
 
                 pivotRangeList = self._pivotRangeCollect(zipFile, sheetList[a]["path"])
 
-                rowList = self._rowCollect(sheetRootNode, pivotRangeList, sharedStringList, dateStyleList) if sheetRootNode is not None else []
+                rowList = self._rowCollect(sheetRootNode, sharedStringList, dateStyleList, pivotRangeList) if sheetRootNode is not None else []
                 mergeList = self._mergeCollect(sheetRootNode) if sheetRootNode is not None else []
 
                 itemMainList = [{"label": "sheetName", "text": sheetList[a]["name"]}]
@@ -1805,10 +1807,11 @@ class Office:
 
             resultObject = {"pageList": pageList}
 
-            os.makedirs(pathOutput, exist_ok=True)
+            if self.isDebug:
+                os.makedirs(f"{pathOutput}debug/layout/", exist_ok=True)
 
-            with open(f"{pathOutput}ast.json", "w", encoding="utf-8") as file:
-                json.dump(resultObject, file, ensure_ascii=False, indent=4)
+                with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+                    json.dump(resultObject, file, ensure_ascii=False, indent=4)
 
             timeEnd = time.perf_counter() - timeStart
 
@@ -1817,6 +1820,8 @@ class Office:
             return resultObject
 
         def __init__(self):
+            self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
             self.namespaceMain = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
             self.namespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/main"
             self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
@@ -1931,7 +1936,7 @@ class Office:
         def _relationshipBuild(self, zipFile, pathFile):
             resultObject = {}
 
-            relationshipRootNode = self.office._rootBuild(zipFile, f"{os.path.dirname(pathFile)}/_rels/{os.path.basename(pathFile)}.rels")
+            relationshipRootNode = self.office._rootBuild(f"{os.path.dirname(pathFile)}/_rels/{os.path.basename(pathFile)}.rels", zipFile)
 
             if relationshipRootNode is not None:
                 for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
@@ -1947,7 +1952,7 @@ class Office:
         def _slideBuild(self, zipFile):
             resultList = []
 
-            presentationRootNode = self.office._rootBuild(zipFile, "ppt/presentation.xml")
+            presentationRootNode = self.office._rootBuild("ppt/presentation.xml", zipFile)
 
             pathObject = self._relationshipBuild(zipFile, "ppt/presentation.xml")
 
@@ -1960,12 +1965,12 @@ class Office:
 
             return resultList
 
-        def _notesText(self, zipFile, pathObject):
+        def _notesText(self, pathObject, zipFile):
             result = ""
 
             for relationshipId in pathObject:
                 if pathObject[relationshipId]["type"].endswith("/notesSlide"):
-                    notesRootNode = self.office._rootBuild(zipFile, pathObject[relationshipId]["path"])
+                    notesRootNode = self.office._rootBuild(pathObject[relationshipId]["path"], zipFile)
 
                     if notesRootNode is not None:
                         textList = []
@@ -1995,7 +2000,7 @@ class Office:
             isDocTitleFound = False
 
             for a in range(len(slidePathList)):
-                slideRootNode = self.office._rootBuild(zipFile, slidePathList[a])
+                slideRootNode = self.office._rootBuild(slidePathList[a], zipFile)
 
                 pathObject = self._relationshipBuild(zipFile, slidePathList[a])
 
@@ -2030,7 +2035,7 @@ class Office:
 
                         pathChart = pathObject[block["relationshipId"]]["path"] if block["relationshipId"] in pathObject else ""
 
-                        chartRootNode = self.office._rootBuild(zipFile, pathChart)
+                        chartRootNode = self.office._rootBuild(pathChart, zipFile)
 
                         if chartRootNode is not None:
                             item["text"] = self.office._chartText(chartRootNode)
@@ -2051,7 +2056,7 @@ class Office:
 
                         itemSecondaryList.append(item)
 
-                notesText = self._notesText(zipFile, pathObject)
+                notesText = self._notesText(pathObject, zipFile)
 
                 if len(notesText) > 0:
                     itemSecondaryList.append({"label": "aside_text", "text": notesText})
@@ -2072,10 +2077,11 @@ class Office:
 
             resultObject = {"pageList": pageList}
 
-            os.makedirs(pathOutput, exist_ok=True)
+            if self.isDebug:
+                os.makedirs(f"{pathOutput}debug/layout/", exist_ok=True)
 
-            with open(f"{pathOutput}ast.json", "w", encoding="utf-8") as file:
-                json.dump(resultObject, file, ensure_ascii=False, indent=4)
+                with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+                    json.dump(resultObject, file, ensure_ascii=False, indent=4)
 
             timeEnd = time.perf_counter() - timeStart
 
@@ -2084,6 +2090,8 @@ class Office:
             return resultObject
 
         def __init__(self):
+            self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
             self.namespaceP = "http://schemas.openxmlformats.org/presentationml/2006/main"
             self.namespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/main"
             self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"

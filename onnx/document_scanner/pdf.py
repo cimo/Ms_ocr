@@ -46,7 +46,7 @@ class Reader:
 
         return decompressor.decompress(bytes(byteList))
 
-    def _applyPngPredictor(self, byteList, columns):
+    def _applyPngPredictor(self, columns, byteList):
         rowLength = columns + 1
         rowCount = len(byteList) // rowLength
 
@@ -279,11 +279,11 @@ class Reader:
             if predictorNode is not None and predictorNode["kind"] == "number" and predictorNode["value"] >= 10:
                 columns = int(columnsNode["value"]) if columnsNode is not None and columnsNode["kind"] == "number" else 1
 
-                result = self._applyPngPredictor(byteList, columns)
+                result = self._applyPngPredictor(columns, byteList)
 
         return result
 
-    def _decodeStream(self, rawList, entryObject, filterList):
+    def _decodeStream(self, rawList, filterList, entryObject):
         result = rawList
 
         for a in range(len(filterList)):
@@ -334,7 +334,7 @@ class Reader:
         if isImage:
             result["isImage"] = True
         else:
-            decodedList = self._decodeStream(rawList, entryObject, filterList)
+            decodedList = self._decodeStream(rawList, filterList, entryObject)
 
             result["decodedByteLength"] = len(decodedList)
             result["content"] = self._byteText(decodedList)
@@ -786,7 +786,7 @@ class Reader:
 
         return result
 
-    def _fontDecode(self, font, raw):
+    def _fontDecode(self, raw, font):
         charList = []
         widthFractionList = []
         codeList = []
@@ -836,7 +836,7 @@ class Reader:
 
         return {"charList": charList, "widthFractionList": widthFractionList, "codeList": codeList}
 
-    def _matrixMultiply(self, leftList, rightList):
+    def _matrixMultiply(self, rightList, leftList):
         return [
             leftList[0] * rightList[0] + leftList[1] * rightList[2],
             leftList[0] * rightList[1] + leftList[1] * rightList[3],
@@ -846,7 +846,7 @@ class Reader:
             leftList[4] * rightList[1] + leftList[5] * rightList[3] + rightList[5]
         ]
 
-    def _transformPoint(self, x, y, matrixList):
+    def _transformPoint(self, matrixList, x, y):
         return [x * matrixList[0] + y * matrixList[2] + matrixList[4], x * matrixList[1] + y * matrixList[3] + matrixList[5]]
 
     def _componentHex(self, value):
@@ -858,7 +858,7 @@ class Reader:
         return f"#{self._componentHex(red)}{self._componentHex(green)}{self._componentHex(blue)}"
 
     def _pathAddPoint(self, x, y):
-        pointList = self._transformPoint(x, y, self.ctmList)
+        pointList = self._transformPoint(self.ctmList, x, y)
 
         if self.isPathEmpty:
             self.pathMinX = pointList[0]
@@ -891,7 +891,7 @@ class Reader:
 
         self._pathReset()
 
-    def _showText(self, font, partList):
+    def _showText(self, partList, font):
         text = ""
         advance = 0
 
@@ -899,7 +899,7 @@ class Reader:
             part = partList[a]
 
             if part["kind"] == "string" or part["kind"] == "hexString":
-                decoded = self._fontDecode(font, part["value"])
+                decoded = self._fontDecode(part["value"], font)
 
                 for b in range(len(decoded["charList"])):
                     text += decoded["charList"][b]
@@ -913,11 +913,11 @@ class Reader:
             elif part["kind"] == "number":
                 advance -= part["value"] / 1000 * self.fontSize * self.horizontalScale
 
-        renderMatrixList = self._matrixMultiply(self.textMatrixList, self.ctmList)
+        renderMatrixList = self._matrixMultiply(self.ctmList, self.textMatrixList)
         deviceFontSize = self.fontSize * math.hypot(renderMatrixList[2], renderMatrixList[3])
 
-        startList = self._transformPoint(0, self.textRise, renderMatrixList)
-        endList = self._transformPoint(advance, self.textRise, renderMatrixList)
+        startList = self._transformPoint(renderMatrixList, 0, self.textRise)
+        endList = self._transformPoint(renderMatrixList, advance, self.textRise)
 
         if len(text.strip()) > 0 and self.textRender != 3 and self.textRender != 7:
             self.elementList.append({
@@ -933,9 +933,9 @@ class Reader:
                 "color": self.fillColor
             })
 
-        self.textMatrixList = self._matrixMultiply([1, 0, 0, 1, advance, 0], self.textMatrixList)
+        self.textMatrixList = self._matrixMultiply(self.textMatrixList, [1, 0, 0, 1, advance, 0])
 
-    def _handleOperator(self, operator, stackList, fontObject, externalObject, stateObject):
+    def _handleOperator(self, operator, stackList, stateObject, fontObject, externalObject):
         def number(indexFromEnd):
             result = 0
 
@@ -948,7 +948,7 @@ class Reader:
             return result
 
         if operator == "cm":
-            self.ctmList = self._matrixMultiply([number(6), number(5), number(4), number(3), number(2), number(1)], self.ctmList)
+            self.ctmList = self._matrixMultiply(self.ctmList, [number(6), number(5), number(4), number(3), number(2), number(1)])
         elif operator == "q":
             self.graphicsStateList.append({
                 "ctmList": list(self.ctmList),
@@ -999,17 +999,17 @@ class Reader:
                 self.currentFont = stateObject[nameNode["value"]]["font"]
                 self.fontSize = stateObject[nameNode["value"]]["fontSize"]
         elif operator == "Td":
-            self.lineMatrixList = self._matrixMultiply([1, 0, 0, 1, number(2), number(1)], self.lineMatrixList)
+            self.lineMatrixList = self._matrixMultiply(self.lineMatrixList, [1, 0, 0, 1, number(2), number(1)])
             self.textMatrixList = list(self.lineMatrixList)
         elif operator == "TD":
             self.leading = -number(1)
-            self.lineMatrixList = self._matrixMultiply([1, 0, 0, 1, number(2), number(1)], self.lineMatrixList)
+            self.lineMatrixList = self._matrixMultiply(self.lineMatrixList, [1, 0, 0, 1, number(2), number(1)])
             self.textMatrixList = list(self.lineMatrixList)
         elif operator == "Tm":
             self.lineMatrixList = [number(6), number(5), number(4), number(3), number(2), number(1)]
             self.textMatrixList = list(self.lineMatrixList)
         elif operator == "T*":
-            self.lineMatrixList = self._matrixMultiply([1, 0, 0, 1, 0, -self.leading], self.lineMatrixList)
+            self.lineMatrixList = self._matrixMultiply(self.lineMatrixList, [1, 0, 0, 1, 0, -self.leading])
             self.textMatrixList = list(self.lineMatrixList)
         elif operator == "Tc":
             self.charSpacing = number(1)
@@ -1021,18 +1021,18 @@ class Reader:
             self.leading = number(1)
         elif operator == "Tj" and self.currentFont is not None:
             if len(stackList) > 0:
-                self._showText(self.currentFont, [stackList[len(stackList) - 1]])
+                self._showText([stackList[len(stackList) - 1]], self.currentFont)
         elif operator == "TJ" and self.currentFont is not None:
             arrayNode = stackList[len(stackList) - 1] if len(stackList) > 0 else None
 
             if arrayNode is not None and arrayNode["kind"] == "array" and arrayNode.get("itemList") is not None:
-                self._showText(self.currentFont, arrayNode["itemList"])
+                self._showText(arrayNode["itemList"], self.currentFont)
         elif (operator == "'" or operator == '"') and self.currentFont is not None:
-            self.lineMatrixList = self._matrixMultiply([1, 0, 0, 1, 0, -self.leading], self.lineMatrixList)
+            self.lineMatrixList = self._matrixMultiply(self.lineMatrixList, [1, 0, 0, 1, 0, -self.leading])
             self.textMatrixList = list(self.lineMatrixList)
 
             if len(stackList) > 0:
-                self._showText(self.currentFont, [stackList[len(stackList) - 1]])
+                self._showText([stackList[len(stackList) - 1]], self.currentFont)
         elif operator == "g":
             self.fillColor = self._colorRgb(number(1), number(1), number(1))
         elif operator == "G":
@@ -1077,8 +1077,8 @@ class Reader:
                 external = externalObject.get(nameNode["value"])
 
                 if external is not None and external["subtype"] == "Image":
-                    cornerAList = self._transformPoint(0, 0, self.ctmList)
-                    cornerBList = self._transformPoint(1, 1, self.ctmList)
+                    cornerAList = self._transformPoint(self.ctmList, 0, 0)
+                    cornerBList = self._transformPoint(self.ctmList, 1, 1)
 
                     self.elementList.append({
                         "type": "image",
@@ -1179,7 +1179,7 @@ class Reader:
 
             if node["kind"] == "operator":
                 if len(node["value"]) > 0:
-                    self._handleOperator(node["value"], stackList, fontObject, externalObject, stateObject)
+                    self._handleOperator(node["value"], stackList, stateObject, fontObject, externalObject)
                 else:
                     self.position += 1
 
