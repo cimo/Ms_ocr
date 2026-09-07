@@ -136,6 +136,9 @@ RUN cd ~ \
     libgomp1 \
     libatomic1 \
     xdg-utils \
+    # Pdf
+    && apt-get update && apt-get install -y \
+    poppler-utils \
     # Cuda
     && echo "<driconf></driconf>" > /etc/drirc \
     && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring_1.1-1_all.deb \

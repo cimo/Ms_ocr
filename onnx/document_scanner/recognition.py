@@ -2,10 +2,10 @@ import sys
 sys.dont_write_bytecode = True
 
 import os
-import io
-import math
 import cv2
 import numpy
+import io
+import math
 
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 from helper import onnxSessionBuild

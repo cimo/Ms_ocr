@@ -10,10 +10,44 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Source
-from engine import Engine
+import layout
+import engine
 
 class HandlerHttpRequest(BaseHTTPRequestHandler):
-    engine = Engine()
+    layoutImage = layout.Image()
+    layoutOfficeDocx = layout.Office.Docx()
+    layoutOfficeXlsx = layout.Office.Xlsx()
+    layoutOfficePptx = layout.Office.Pptx()
+
+    engineProcessor = engine.Processor()
+
+    def _routeLayout(self, text):
+        payload = json.loads(text)
+
+        pathInput = payload.get("pathInput")
+        pathOutput = payload.get("pathOutput")
+
+        extension = os.path.splitext(pathInput)[1].lower()
+        fileName = os.path.basename(pathInput)
+
+        result = {}
+
+        if extension in self.engineProcessor.extensionImageList:
+            self.engineProcessor.pageImageGenerate("single", pathInput, pathOutput)
+
+            result = self.layoutImage.execute(f"{pathOutput}page/", pathOutput, fileName)
+        elif extension == ".pdf":
+            self.engineProcessor.pageImageGenerate("multiple", pathInput, pathOutput)
+
+            result = self.layoutImage.execute(f"{pathOutput}page/", pathOutput, fileName)
+        elif extension == ".docx":
+            result = self.layoutOfficeDocx.execute(pathInput, pathOutput, fileName)
+        elif extension == ".xlsx":
+            result = self.layoutOfficeXlsx.execute(pathInput, pathOutput, fileName)
+        elif extension == ".pptx":
+            result = self.layoutOfficePptx.execute(pathInput, pathOutput, fileName)
+
+        return result
 
     def _routeEngine(self, text):
         payload = json.loads(text)
@@ -24,7 +58,7 @@ class HandlerHttpRequest(BaseHTTPRequestHandler):
 
         fileName = os.path.basename(pathInput)
 
-        return self.engine.execute(pathInput, pathOutput, fileName, searchText)
+        return self.engineProcessor.execute(pathInput, pathOutput, fileName, searchText)
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -33,7 +67,9 @@ class HandlerHttpRequest(BaseHTTPRequestHandler):
 
         result = {}
 
-        if self.path == "/engine":
+        if self.path == "/layout":
+            result = self._routeLayout(text)
+        elif self.path == "/engine":
             result = self._routeEngine(text)
 
         body = json.dumps(result, ensure_ascii=False).encode("utf-8")

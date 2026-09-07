@@ -47,6 +47,28 @@ export default class Service {
                     const pathInputBasename = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
                     const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
+                    const apiLayoutResponse = await instance.api
+                        .post(
+                            "/layout",
+                            {
+                                headers: {
+                                    "Content-Type": "application/json"
+                                }
+                            },
+                            { pathInput, pathOutput }
+                        )
+                        .catch((error: Error) => {
+                            helperSrc.writeLog("Service.ts - api() - post(/api/extract) - post(/layout) - catch()", error.message);
+
+                            helperSrc.responseBody({ state: "ko", message: error.message }, response, 500);
+
+                            return null;
+                        });
+
+                    if (apiLayoutResponse === null) {
+                        return;
+                    }
+
                     instance.api
                         .post<modelService.IapiScannerResponse>(
                             "/engine",

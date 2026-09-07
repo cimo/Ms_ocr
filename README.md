@@ -78,7 +78,7 @@ json
 key             value
 ---             ---
 "uniqueId":     "abc123",
-"pathFile":     "result.json"
+"pathFile":     "result.md"
 ```
 
 5. Logout

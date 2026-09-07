@@ -2,30 +2,37 @@ import sys
 sys.dont_write_bytecode = True
 
 import os
-import shutil
+import cv2
 import time
 import json
+import glob
+import shutil
+import subprocess
 import unicodedata
-import cv2
-import numpy
 
 # Source
-from layout import Layout
-from detection import Detection
-from recognition import Recognition
+import image
+import pdf
+import markdown
 
-class Engine:
-    def _centerPointCalculate(self, pointList):
-        xList = []
-        yList = []
+class Processor:
+    def _extensionImageAllowed(self):
+        resultList = []
 
-        for a in range(len(pointList)):
-            xList.append(pointList[a][0])
-            yList.append(pointList[a][1])
+        mimeTypeList = json.loads(os.environ["MS_O_MIME_TYPE"])
 
+        for a in range(len(mimeTypeList)):
+            if mimeTypeList[a].startswith("image/"):
+                extension = mimeTypeList[a].split("/")[1]
+
+                resultList.append(f".{extension}")
+
+        return resultList
+
+    def _centerPointCalculate(self, coordinateList):
         return {
-            "x": int(round((min(xList) + max(xList)) / 2)),
-            "y": int(round((min(yList) + max(yList)) / 2))
+            "x": int(round((coordinateList[0] + coordinateList[2]) / 2)),
+            "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
         }
 
     def _matchCheck(self, value, searchText):
@@ -37,125 +44,238 @@ class Engine:
 
         return textSearch in text
 
-    def _debugDrawLayout(self, image, layoutList, fileName, pathDebug):
-        imageCopy = image.copy()
+    def _layoutBuild(self, astPageList):
+        resultList = []
 
-        labelDrawnList = []
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemMainList"] + astPageList[a]["itemSecondaryList"]
 
-        for a in range(len(layoutList)):
-            coordinateList = layoutList[a]["coordinate"]
+            for b in range(len(itemList)):
+                resultList.append({
+                    "page": astPageList[a]["number"],
+                    "label": itemList[b]["label"],
+                    "score": itemList[b]["score"],
+                    "centerPoint": self._centerPointCalculate(itemList[b]["coordinate"])
+                })
 
-            cv2.rectangle(imageCopy, (coordinateList[0], coordinateList[1]), (coordinateList[2], coordinateList[3]), (255, 0, 0), 1)
+        return resultList
 
-            text = f"{layoutList[a]['label']} {layoutList[a]['score']:.2f}"
+    def _scaleCalculate(self, pageList, astPageList):
+        resultObject = {}
 
-            textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
+        astPageObject = {}
 
-            x = coordinateList[0]
-            y = coordinateList[1] - 4
+        for a in range(len(astPageList)):
+            astPageObject[astPageList[a]["number"]] = astPageList[a]
 
-            isOverlap = True
+        for a in range(len(pageList)):
+            page = pageList[a]
 
-            while isOverlap:
-                isOverlap = False
+            if page["number"] in astPageObject:
+                astPage = astPageObject[page["number"]]
 
-                for b in range(len(labelDrawnList)):
-                    isSameRow = abs(y - labelDrawnList[b]["y"]) < textHeight + 4
-                    isSameColumn = x < labelDrawnList[b]["x"] + labelDrawnList[b]["width"] and labelDrawnList[b]["x"] < x + textWidth
+                resultObject[page["number"]] = {
+                    "x": astPage["imageWidth"] / page["width"],
+                    "y": astPage["imageHeight"] / page["height"]
+                }
 
-                    if isSameRow and isSameColumn:
-                        isOverlap = True
-                        y = labelDrawnList[b]["y"] - textHeight - 4
+        return resultObject
 
-                        break
+    def _itemBuild(self, pageList, astPageList, searchText):
+        resultList = []
 
-            labelDrawnList.append({"x": x, "y": y, "width": textWidth})
+        scaleObject = self._scaleCalculate(pageList, astPageList)
 
-            cv2.putText(
-                imageCopy,
-                text,
-                (x, y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.4,
-                (255, 0, 0),
-                1,
-                cv2.LINE_AA
-            )
+        for a in range(len(pageList)):
+            page = pageList[a]
 
-        cv2.imwrite(f"{pathDebug}{fileName}", imageCopy)
+            if page["number"] not in scaleObject:
+                continue
 
-    def _debugDrawItem(self, image, detectionList, resultItemList, fileName, pathDebug):
-        imageCopy = image.copy()
+            scale = scaleObject[page["number"]]
 
-        for a in range(len(detectionList)):
-            color = (0, 200, 0) if resultItemList[a]["isMatch"] else (0, 0, 255)
+            elementList = page["elementList"]
 
-            cv2.polylines(imageCopy, [numpy.array(detectionList[a]["coordinate"], dtype=numpy.int32)], True, color, 1)
+            for b in range(len(elementList)):
+                coordinateList = [
+                    elementList[b]["x0"] * scale["x"],
+                    elementList[b]["y0"] * scale["y"],
+                    elementList[b]["x1"] * scale["x"],
+                    elementList[b]["y1"] * scale["y"]
+                ]
 
-        cv2.imwrite(f"{pathDebug}{fileName}", imageCopy)
+                resultList.append({
+                    "id": len(resultList) + 1,
+                    "page": page["number"],
+                    "centerPoint": self._centerPointCalculate(coordinateList),
+                    "text": elementList[b]["text"],
+                    "isMatch": self._matchCheck(elementList[b]["text"], searchText)
+                })
+
+        return resultList
+
+    def _itemAstBuild(self, astPageList, searchText):
+        resultList = []
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemMainList"] + astPageList[a]["itemSecondaryList"]
+
+            for b in range(len(itemList)):
+                if len(itemList[b]["text"]) > 0:
+                    resultList.append({
+                        "id": len(resultList) + 1,
+                        "page": astPageList[a]["number"],
+                        "centerPoint": None,
+                        "text": itemList[b]["text"],
+                        "isMatch": self._matchCheck(itemList[b]["text"], searchText)
+                    })
+
+        return resultList
+
+    def _debugDrawItem(self, pathPage, pathDebug, pageList, astPageList, searchText):
+        scaleObject = self._scaleCalculate(pageList, astPageList)
+
+        for a in range(len(pageList)):
+            page = pageList[a]
+
+            if page["number"] not in scaleObject:
+                continue
+
+            scale = scaleObject[page["number"]]
+
+            imageDebug = cv2.imread(f"{pathPage}{page['number']}.jpg")
+
+            elementList = page["elementList"]
+
+            for b in range(len(elementList)):
+                color = (0, 200, 0) if self._matchCheck(elementList[b]["text"], searchText) else (0, 0, 255)
+
+                cv2.rectangle(
+                    imageDebug,
+                    (int(round(elementList[b]["x0"] * scale["x"])), int(round(elementList[b]["y0"] * scale["y"]))),
+                    (int(round(elementList[b]["x1"] * scale["x"])), int(round(elementList[b]["y1"] * scale["y"]))),
+                    color,
+                    1
+                )
+
+            cv2.imwrite(f"{pathDebug}{page['number']}-item.jpg", imageDebug)
+
+    def pageImageGenerate(self, mode, pathInput, pathOutput):
+        pathPage = f"{pathOutput}page/"
+
+        if os.path.isdir(pathPage):
+            shutil.rmtree(pathPage)
+
+        os.makedirs(pathPage, exist_ok=True)
+
+        if mode == "single":
+            cv2.imwrite(f"{pathPage}1.jpg", cv2.imread(pathInput))
+        elif mode == "multiple":
+            subprocess.run(["pdftoppm", "-jpeg", "-r", "150", pathInput, f"{pathPage}page"], capture_output=True, text=True)
+
+            fileNameList = glob.glob(f"{pathPage}page-*.jpg")
+
+            for a in range(len(fileNameList)):
+                pageNumber = int(os.path.splitext(os.path.basename(fileNameList[a]))[0].split("-")[1])
+
+                os.rename(fileNameList[a], f"{pathPage}{pageNumber}.jpg")
 
     def execute(self, pathInput, pathOutput, fileName, searchText):
         timeStart = time.perf_counter()
 
-        pathDebug = f"{pathOutput}debug/"
+        astPageList = []
 
-        if os.path.isdir(pathDebug):
-            shutil.rmtree(pathDebug)
+        pathAst = f"{pathOutput}{self.astFileName}"
 
-        if self.isDebug:
-            os.makedirs(pathDebug, exist_ok=True)
+        if os.path.isfile(pathAst):
+            with open(pathAst, "r", encoding="utf-8") as file:
+                astObject = json.load(file)
 
-        image = cv2.imread(pathInput)
+                astPageList = astObject["pageList"]
 
-        if image is None:
-            return {"layoutList": [], "itemList": []}
+        extension = os.path.splitext(pathInput)[1].lower()
 
-        imageRgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        markdownText = ""
+        pageCount = 0
 
-        layoutList = self.layout.execute(imageRgb)
-        detectionList = self.detection.execute(image)
+        pageList = []
 
-        resultLayoutList = []
+        isLayoutImage = False
 
-        for a in range(len(layoutList)):
-            coordinateList = layoutList[a]["coordinate"]
+        if extension in self.extensionImageList:
+            isLayoutImage = True
 
-            resultLayoutList.append({
-                "label": layoutList[a]["label"],
-                "score": layoutList[a]["score"],
-                "centerPoint": self._centerPointCalculate([[coordinateList[0], coordinateList[1]], [coordinateList[2], coordinateList[3]]])
-            })
+            pageList = self.imageReader.execute(f"{pathOutput}page/")
 
-        resultItemList = []
+            markdownPage = markdown.Page()
+            markdownText = markdownPage.execute(pageList, astPageList)
 
-        for a in range(len(detectionList)):
-            recognitionObject = self.recognition.execute(image, detectionList[a]["coordinate"])
+            pageCount = len(pageList)
+        elif extension == ".pdf":
+            isLayoutImage = True
 
-            resultItemList.append({
-                "id": a + 1,
-                "centerPoint": self._centerPointCalculate(detectionList[a]["coordinate"]),
-                "text": recognitionObject["text"],
-                "isMatch": self._matchCheck(recognitionObject["text"], searchText)
-            })
+            pdfReader = pdf.Reader()
+            pageList = pdfReader.execute(pathInput)
+
+            markdownPage = markdown.Page()
+            markdownText = markdownPage.execute(pageList, astPageList)
+
+            pageCount = len(pageList)
+        elif extension == ".docx":
+            markdownDocx = markdown.Docx()
+            markdownText = markdownDocx.execute(astPageList)
+
+            pageCount = len(astPageList)
+        elif extension == ".xlsx":
+            markdownXlsx = markdown.Xlsx()
+            markdownText = markdownXlsx.execute(astPageList)
+
+            pageCount = len(astPageList)
+        elif extension == ".pptx":
+            markdownPptx = markdown.Pptx()
+            markdownText = markdownPptx.execute(astPageList)
+
+            pageCount = len(astPageList)
+
+        layoutList = []
+        itemList = []
+
+        if isLayoutImage:
+            layoutList = self._layoutBuild(astPageList)
+            itemList = self._itemBuild(pageList, astPageList, searchText)
+        else:
+            itemList = self._itemAstBuild(astPageList, searchText)
 
         os.makedirs(pathOutput, exist_ok=True)
 
-        with open(f"{pathOutput}result.json", "w", encoding="utf-8") as file:
-            json.dump({"layoutList": resultLayoutList, "itemList": resultItemList}, file, ensure_ascii=False, indent=2)
+        with open(f"{pathOutput}{self.markdownFileName}", "w", encoding="utf-8", errors="replace") as file:
+            file.write(markdownText)
 
-        if self.isDebug:
-            self._debugDrawLayout(image, layoutList, "layout.jpg", pathDebug)
-            self._debugDrawItem(image, detectionList, resultItemList, "item.jpg", pathDebug)
+        with open(f"{pathOutput}{self.resultFileName}", "w", encoding="utf-8") as file:
+            json.dump({"layoutList": layoutList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
+
+        if self.isDebug and isLayoutImage:
+            pathDebug = f"{pathOutput}debug/"
+
+            os.makedirs(pathDebug, exist_ok=True)
+
+            self._debugDrawItem(f"{pathOutput}page/", pathDebug, pageList, astPageList, searchText)
 
         timeEnd = time.perf_counter() - timeStart
 
-        print(f"\nEngine.py - Time: {round(timeEnd, 3)} - {fileName}")
+        print(f"\nEngine.py - Time: {round(timeEnd, 3)} - {fileName} - Page: {pageCount}")
 
-        return {"layoutList": resultLayoutList, "itemList": resultItemList}
+        resultObject = {"pageCount": pageCount, "layoutList": layoutList, "itemList": itemList}
+
+        return resultObject
 
     def __init__(self):
         self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
 
-        self.layout = Layout()
-        self.detection = Detection()
-        self.recognition = Recognition()
+        self.astFileName = "ast.json"
+        self.resultFileName = "result.json"
+        self.markdownFileName = "result.md"
+
+        self.extensionImageList = self._extensionImageAllowed()
+
+        self.imageReader = image.Reader()
