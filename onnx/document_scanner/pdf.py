@@ -2,28 +2,17 @@ import sys
 sys.dont_write_bytecode = True
 
 import math
+import zlib
+import codecs
 import unicodedata
 import re
 
 class Reader:
     def _whitespaceCheck(self, code):
-        return code == 0 or code == 9 or code == 10 or code == 12 or code == 13 or code == 32
+        return code in self.whitespaceSet
 
     def _delimiterCheck(self, code):
-        character = chr(code)
-
-        return (
-            character == "("
-            or character == ")"
-            or character == "<"
-            or character == ">"
-            or character == "["
-            or character == "]"
-            or character == "{"
-            or character == "}"
-            or character == "/"
-            or character == "%"
-        )
+        return code in self.delimiterSet
 
     def _digitCheck(self, code):
         return code >= 48 and code <= 57
@@ -42,218 +31,20 @@ class Reader:
         return byteList.decode("latin-1")
 
     def _textByte(self, text):
-        resultList = bytearray(len(text))
-
-        for a in range(len(text)):
-            resultList[a] = ord(text[a]) & 0xff
-
-        return bytes(resultList)
-
-    def _readBit(self):
-        if self.inflateBitCount == 0:
-            self.inflateBitBuffer = self.inflateInput[self.inflatePosition] if self.inflatePosition < len(self.inflateInput) else 0
-            self.inflatePosition += 1
-            self.inflateBitCount = 8
-
-        result = self.inflateBitBuffer & 1
-
-        self.inflateBitBuffer >>= 1
-        self.inflateBitCount -= 1
-
-        return result
-
-    def _readBits(self, count):
-        result = 0
-
-        for a in range(count):
-            result |= self._readBit() << a
-
-        return result
-
-    def _buildHuffman(self, lengthList):
-        maxBits = 15
-        countList = [0] * (maxBits + 1)
-
-        for a in range(len(lengthList)):
-            countList[lengthList[a]] += 1
-
-        countList[0] = 0
-
-        offsetList = [0] * (maxBits + 2)
-
-        for a in range(1, maxBits + 1):
-            offsetList[a + 1] = offsetList[a] + countList[a]
-
-        symbolList = [0] * len(lengthList)
-
-        for a in range(len(lengthList)):
-            if lengthList[a] != 0:
-                symbolList[offsetList[lengthList[a]]] = a
-                offsetList[lengthList[a]] += 1
-
-        return {"countList": countList, "symbolList": symbolList}
-
-    def _decodeSymbol(self, tree):
-        code = 0
-        first = 0
-        index = 0
-        result = -1
-
-        for a in range(1, 16):
-            if result == -1:
-                code |= self._readBit()
-
-                count = tree["countList"][a]
-
-                if code - first < count:
-                    position = index + (code - first)
-
-                    if position >= 0 and position < len(tree["symbolList"]):
-                        result = tree["symbolList"][position]
-                else:
-                    index += count
-                    first += count
-                    first <<= 1
-                    code <<= 1
-
-        return result
-
-    def _inflateBlock(self, literalTree, distanceTree):
-        isEnd = False
-
-        while isEnd == False:
-            symbol = self._decodeSymbol(literalTree)
-
-            if symbol == 256 or symbol == -1:
-                isEnd = True
-            elif symbol < 256:
-                self.inflateOutputList.append(symbol)
-            else:
-                lengthIndex = symbol - 257
-                length = self.lengthBaseList[lengthIndex] + self._readBits(self.lengthExtraList[lengthIndex])
-
-                distanceSymbol = self._decodeSymbol(distanceTree)
-                distance = self.distanceBaseList[distanceSymbol] + self._readBits(self.distanceExtraList[distanceSymbol])
-
-                start = len(self.inflateOutputList) - distance
-
-                for a in range(length):
-                    value = self.inflateOutputList[start + a] if start + a >= 0 else 0
-
-                    self.inflateOutputList.append(value)
-
-    def _inflateFixed(self):
-        literalLengthList = [0] * 288
-
-        for a in range(288):
-            if a < 144:
-                literalLengthList[a] = 8
-            elif a < 256:
-                literalLengthList[a] = 9
-            elif a < 280:
-                literalLengthList[a] = 7
-            else:
-                literalLengthList[a] = 8
-
-        distanceLengthList = [5] * 30
-
-        self._inflateBlock(self._buildHuffman(literalLengthList), self._buildHuffman(distanceLengthList))
-
-    def _inflateDynamic(self):
-        literalCount = self._readBits(5) + 257
-        distanceCount = self._readBits(5) + 1
-        codeLengthCount = self._readBits(4) + 4
-
-        codeLengthList = [0] * 19
-
-        for a in range(codeLengthCount):
-            codeLengthList[self.codeLengthOrderList[a]] = self._readBits(3)
-
-        codeLengthTree = self._buildHuffman(codeLengthList)
-        allLengthList = []
-
-        while len(allLengthList) < literalCount + distanceCount:
-            symbol = self._decodeSymbol(codeLengthTree)
-
-            if symbol >= 0 and symbol < 16:
-                allLengthList.append(symbol)
-            elif symbol == 16:
-                repeat = self._readBits(2) + 3
-                previous = allLengthList[len(allLengthList) - 1] if len(allLengthList) > 0 else 0
-
-                for a in range(repeat):
-                    allLengthList.append(previous)
-            elif symbol == 17:
-                repeat = self._readBits(3) + 3
-
-                for a in range(repeat):
-                    allLengthList.append(0)
-            else:
-                repeat = self._readBits(7) + 11
-
-                for a in range(repeat):
-                    allLengthList.append(0)
-
-        literalTree = self._buildHuffman(allLengthList[0:literalCount])
-        distanceTree = self._buildHuffman(allLengthList[literalCount:])
-
-        self._inflateBlock(literalTree, distanceTree)
-
-    def _inflateStored(self):
-        self.inflateBitBuffer = 0
-        self.inflateBitCount = 0
-
-        lengthLow = self.inflateInput[self.inflatePosition] if self.inflatePosition < len(self.inflateInput) else 0
-        lengthHigh = self.inflateInput[self.inflatePosition + 1] if self.inflatePosition + 1 < len(self.inflateInput) else 0
-        blockLength = lengthLow | (lengthHigh << 8)
-
-        self.inflatePosition += 4
-
-        for a in range(blockLength):
-            if self.inflatePosition < len(self.inflateInput):
-                self.inflateOutputList.append(self.inflateInput[self.inflatePosition])
-
-            self.inflatePosition += 1
+        return text.encode("latin-1", errors="replace")
 
     def _inflate(self, byteList):
-        self.inflateInput = byteList
-        self.inflatePosition = 0
-        self.inflateBitBuffer = 0
-        self.inflateBitCount = 0
-        self.inflateOutputList = []
+        isZlibHeader = False
 
         if len(byteList) >= 2:
             byte0 = byteList[0]
             byte1 = byteList[1]
 
-            if (byte0 & 0x0f) == 8 and ((byte0 << 8) | byte1) % 31 == 0:
-                self.inflatePosition = 2
+            isZlibHeader = (byte0 & 0x0f) == 8 and ((byte0 << 8) | byte1) % 31 == 0
 
-                if (byte1 & 0x20) != 0:
-                    self.inflatePosition += 4
+        decompressor = zlib.decompressobj() if isZlibHeader else zlib.decompressobj(-15)
 
-        isFinal = False
-
-        while isFinal == False and self.inflatePosition <= len(self.inflateInput):
-            isFinal = self._readBit() == 1
-
-            blockType = self._readBits(2)
-
-            if blockType == 0:
-                self._inflateStored()
-            elif blockType == 1:
-                self._inflateFixed()
-            elif blockType == 2:
-                self._inflateDynamic()
-            else:
-                isFinal = True
-
-        resultList = bytearray(len(self.inflateOutputList))
-
-        for a in range(len(self.inflateOutputList)):
-            resultList[a] = self.inflateOutputList[a] & 0xff
-
-        return bytes(resultList)
+        return decompressor.decompress(bytes(byteList))
 
     def _applyPngPredictor(self, byteList, columns):
         rowLength = columns + 1
@@ -304,18 +95,21 @@ class Reader:
         return bytes(resultList)
 
     def _skipWhitespace(self):
+        byteList = self.byteList
+        length = len(byteList)
+
         isRunning = True
 
         while isRunning:
-            if self.position >= len(self.byteList):
+            if self.position >= length:
                 isRunning = False
             else:
-                code = self.byteList[self.position]
+                code = byteList[self.position]
 
-                if self._whitespaceCheck(code):
+                if code in self.whitespaceSet:
                     self.position += 1
                 elif code == 37:
-                    while self.position < len(self.byteList) and self.byteList[self.position] != 10 and self.byteList[self.position] != 13:
+                    while self.position < length and byteList[self.position] != 10 and byteList[self.position] != 13:
                         self.position += 1
                 else:
                     isRunning = False
@@ -404,28 +198,22 @@ class Reader:
     def _parseHexString(self):
         self.position += 1
 
-        hexText = ""
+        byteList = self.byteList
+        length = len(byteList)
 
-        while self.position < len(self.byteList) and self.byteList[self.position] != 62:
-            code = self.byteList[self.position]
+        startPosition = self.position
 
-            if self._whitespaceCheck(code) == False:
-                hexText += chr(code)
-
+        while self.position < length and byteList[self.position] != 62:
             self.position += 1
+
+        hexText = re.sub(r"[^0-9A-Fa-f]", "", self.text[startPosition:self.position])
 
         self.position += 1
 
         if len(hexText) % 2 == 1:
             hexText += "0"
 
-        value = ""
-
-        for a in range(0, len(hexText), 2):
-            pairText = hexText[a:a + 2]
-
-            if re.fullmatch(r"[0-9A-Fa-f]{2}", pairText) is not None:
-                value += chr(int(pairText, 16))
+        value = bytes.fromhex(hexText).decode("latin-1")
 
         return {"kind": "hexString", "value": value}
 
@@ -591,20 +379,23 @@ class Reader:
     def _parseNumberOrReference(self):
         savedPosition = self.position
 
-        numberText = ""
+        byteList = self.byteList
+        length = len(byteList)
+
         isRunning = True
 
         while isRunning:
-            if self.position >= len(self.byteList):
+            if self.position >= length:
                 isRunning = False
             else:
-                code = self.byteList[self.position]
+                code = byteList[self.position]
 
-                if self._digitCheck(code) or code == 43 or code == 45 or code == 46:
-                    numberText += chr(code)
+                if (code >= 48 and code <= 57) or code == 43 or code == 45 or code == 46:
                     self.position += 1
                 else:
                     isRunning = False
+
+        numberText = self.text[savedPosition:self.position]
 
         firstNumber = self._floatParse(numberText)
 
@@ -615,11 +406,12 @@ class Reader:
 
             self._skipWhitespace()
 
-            secondText = ""
+            secondPosition = self.position
 
-            while self.position < len(self.byteList) and self._digitCheck(self.byteList[self.position]):
-                secondText += chr(self.byteList[self.position])
+            while self.position < length and byteList[self.position] >= 48 and byteList[self.position] <= 57:
                 self.position += 1
+
+            secondText = self.text[secondPosition:self.position]
 
             if len(secondText) > 0:
                 self._skipWhitespace()
@@ -792,6 +584,73 @@ class Reader:
 
         return result
 
+    def _codecGet(self, encoding):
+        for a in range(len(self.codecList)):
+            if self.codecList[a][0] in encoding:
+                return self.codecList[a][1]
+
+        return ""
+
+    def _glyphUnicode(self, name):
+        if name[0:3] == "uni" and len(name) >= 7:
+            return chr(int(name[3:7], 16))
+
+        if name[0:1] == "u" and len(name) >= 5 and len(name) <= 7:
+            return chr(int(name[1:], 16))
+
+        if len(name) == 1:
+            return name
+
+        if name in self.glyphObject:
+            return self.glyphObject[name]
+
+        return ""
+
+    def _buildEncoding(self, encodingNode):
+        resultObject = {}
+
+        baseName = "/StandardEncoding"
+        differenceNode = None
+
+        if encodingNode is not None and encodingNode["kind"] == "name":
+            baseName = encodingNode["value"]
+        elif encodingNode is not None and encodingNode["kind"] == "dictionary" and encodingNode.get("entryObject") is not None:
+            baseNode = self._resolve(encodingNode["entryObject"].get("BaseEncoding"))
+
+            if baseNode is not None and baseNode["kind"] == "name":
+                baseName = baseNode["value"]
+
+            differenceNode = self._resolve(encodingNode["entryObject"].get("Differences"))
+
+        codecName = "cp1252" if "WinAnsi" in baseName else "mac_roman" if "MacRoman" in baseName else "latin-1"
+
+        for a in range(32, 256):
+            character = bytes([a]).decode(codecName, errors="ignore")
+
+            if len(character) > 0:
+                resultObject[a] = character
+
+        if differenceNode is not None and differenceNode["kind"] == "array" and differenceNode.get("itemList") is not None:
+            code = 0
+
+            for a in range(len(differenceNode["itemList"])):
+                item = self._resolve(differenceNode["itemList"][a])
+
+                if item is None:
+                    continue
+
+                if item["kind"] == "number":
+                    code = int(item["value"])
+                elif item["kind"] == "name":
+                    character = self._glyphUnicode(item["value"])
+
+                    if len(character) > 0:
+                        resultObject[code] = character
+
+                    code += 1
+
+        return resultObject
+
     def _buildToUnicode(self, content):
         resultObject = {}
 
@@ -868,6 +727,11 @@ class Reader:
         subtypeNode = self._resolve(entryObject.get("Subtype"))
         subtype = subtypeNode["value"] if subtypeNode is not None and subtypeNode["kind"] == "name" else ""
 
+        encodingNode = self._resolve(entryObject.get("Encoding"))
+        encoding = encodingNode["value"] if encodingNode is not None and encodingNode["kind"] == "name" else ""
+
+        codecName = self._codecGet(encoding) if subtype == "Type0" else ""
+
         isBold = "bold" in baseFont.lower()
         byteLength = 2 if subtype == "Type0" else 1
 
@@ -880,6 +744,9 @@ class Reader:
             "widthScale": 0.001,
             "widthObject": {},
             "defaultWidthFraction": 0.5,
+            "codecName": codecName,
+            "isUnicodeCode": codecName == "utf-16-be",
+            "encodingObject": self._buildEncoding(encodingNode) if subtype != "Type0" else {},
             "toUnicodeObject": {}
         }
 
@@ -924,6 +791,23 @@ class Reader:
         widthFractionList = []
         codeList = []
 
+        if font["codecName"] != "" and font["isUnicodeCode"] == False:
+            decoder = codecs.getincrementaldecoder(font["codecName"])(errors="ignore")
+            byteCount = 0
+
+            for a in range(len(raw)):
+                character = decoder.decode(bytes([ord(raw[a])]))
+                byteCount += 1
+
+                if len(character) > 0:
+                    charList.append(character)
+                    widthFractionList.append(font["defaultWidthFraction"] if byteCount > 1 else font["defaultWidthFraction"] / 2)
+                    codeList.append(ord(raw[a]) if byteCount == 1 else 0)
+
+                    byteCount = 0
+
+            return {"charList": charList, "widthFractionList": widthFractionList, "codeList": codeList}
+
         for a in range(0, len(raw), font["byteLength"]):
             code = ord(raw[a])
 
@@ -932,8 +816,11 @@ class Reader:
 
             character = font["toUnicodeObject"].get(code)
 
+            if character is None and font["byteLength"] == 1:
+                character = font["encodingObject"].get(code)
+
             if character is None:
-                character = chr(code) if font["byteLength"] == 1 else ""
+                character = chr(code) if font["byteLength"] == 1 or font["isUnicodeCode"] else ""
 
             widthFraction = font["defaultWidthFraction"]
 
@@ -1029,10 +916,10 @@ class Reader:
         renderMatrixList = self._matrixMultiply(self.textMatrixList, self.ctmList)
         deviceFontSize = self.fontSize * math.hypot(renderMatrixList[2], renderMatrixList[3])
 
-        startList = self._transformPoint(0, 0, renderMatrixList)
-        endList = self._transformPoint(advance, 0, renderMatrixList)
+        startList = self._transformPoint(0, self.textRise, renderMatrixList)
+        endList = self._transformPoint(advance, self.textRise, renderMatrixList)
 
-        if len(text.strip()) > 0:
+        if len(text.strip()) > 0 and self.textRender != 3 and self.textRender != 7:
             self.elementList.append({
                 "type": "text",
                 "text": text,
@@ -1048,7 +935,7 @@ class Reader:
 
         self.textMatrixList = self._matrixMultiply([1, 0, 0, 1, advance, 0], self.textMatrixList)
 
-    def _handleOperator(self, operator, stackList, fontObject, externalObject):
+    def _handleOperator(self, operator, stackList, fontObject, externalObject, stateObject):
         def number(indexFromEnd):
             result = 0
 
@@ -1063,10 +950,34 @@ class Reader:
         if operator == "cm":
             self.ctmList = self._matrixMultiply([number(6), number(5), number(4), number(3), number(2), number(1)], self.ctmList)
         elif operator == "q":
-            self.graphicsStateList.append(list(self.ctmList))
+            self.graphicsStateList.append({
+                "ctmList": list(self.ctmList),
+                "currentFont": self.currentFont,
+                "fontSize": self.fontSize,
+                "charSpacing": self.charSpacing,
+                "wordSpacing": self.wordSpacing,
+                "horizontalScale": self.horizontalScale,
+                "leading": self.leading,
+                "textRender": self.textRender,
+                "textRise": self.textRise,
+                "fillColor": self.fillColor,
+                "strokeColor": self.strokeColor
+            })
         elif operator == "Q":
             if len(self.graphicsStateList) > 0:
-                self.ctmList = self.graphicsStateList.pop()
+                stateObject = self.graphicsStateList.pop()
+
+                self.ctmList = stateObject["ctmList"]
+                self.currentFont = stateObject["currentFont"]
+                self.fontSize = stateObject["fontSize"]
+                self.charSpacing = stateObject["charSpacing"]
+                self.wordSpacing = stateObject["wordSpacing"]
+                self.horizontalScale = stateObject["horizontalScale"]
+                self.leading = stateObject["leading"]
+                self.textRender = stateObject["textRender"]
+                self.textRise = stateObject["textRise"]
+                self.fillColor = stateObject["fillColor"]
+                self.strokeColor = stateObject["strokeColor"]
         elif operator == "BT":
             self.textMatrixList = [1, 0, 0, 1, 0, 0]
             self.lineMatrixList = [1, 0, 0, 1, 0, 0]
@@ -1077,6 +988,16 @@ class Reader:
 
             if nameNode is not None and nameNode["kind"] == "name":
                 self.currentFont = fontObject.get(nameNode["value"])
+        elif operator == "Tr":
+            self.textRender = int(number(1))
+        elif operator == "Ts":
+            self.textRise = number(1)
+        elif operator == "gs":
+            nameNode = stackList[len(stackList) - 1] if len(stackList) >= 1 else None
+
+            if nameNode is not None and nameNode["kind"] == "name" and nameNode["value"] in stateObject:
+                self.currentFont = stateObject[nameNode["value"]]["font"]
+                self.fontSize = stateObject[nameNode["value"]]["fontSize"]
         elif operator == "Td":
             self.lineMatrixList = self._matrixMultiply([1, 0, 0, 1, number(2), number(1)], self.lineMatrixList)
             self.textMatrixList = list(self.lineMatrixList)
@@ -1212,9 +1133,35 @@ class Reader:
 
         return resultObject
 
+    def _resourceState(self, resourceObject):
+        resultObject = {}
+
+        stateNode = self._resolve(resourceObject.get("ExtGState"))
+
+        if stateNode is not None and stateNode["kind"] == "dictionary" and stateNode.get("entryObject") is not None:
+            nameList = list(stateNode["entryObject"].keys())
+
+            for a in range(len(nameList)):
+                resolved = self._resolve(stateNode["entryObject"][nameList[a]])
+
+                if resolved is not None and resolved.get("entryObject") is not None:
+                    fontNode = self._resolve(resolved["entryObject"].get("Font"))
+
+                    if fontNode is not None and fontNode["kind"] == "array" and fontNode.get("itemList") is not None and len(fontNode["itemList"]) == 2:
+                        fontResolved = self._resolve(fontNode["itemList"][0])
+
+                        if fontResolved is not None:
+                            resultObject[nameList[a]] = {
+                                "font": self._buildFont(fontResolved),
+                                "fontSize": self._numberValue(fontNode["itemList"][1])
+                            }
+
+        return resultObject
+
     def _interpretContent(self, content, resourceObject):
         fontObject = self._resourceFont(resourceObject)
         externalObject = self._resourceExternal(resourceObject)
+        stateObject = self._resourceState(resourceObject)
 
         self.byteList = self._textByte(content)
         self.text = content
@@ -1232,7 +1179,7 @@ class Reader:
 
             if node["kind"] == "operator":
                 if len(node["value"]) > 0:
-                    self._handleOperator(node["value"], stackList, fontObject, externalObject)
+                    self._handleOperator(node["value"], stackList, fontObject, externalObject, stateObject)
                 else:
                     self.position += 1
 
@@ -1430,6 +1377,8 @@ class Reader:
             self.wordSpacing = 0
             self.horizontalScale = 1
             self.leading = 0
+            self.textRender = 0
+            self.textRise = 0
             self.fillColor = "#000000"
             self.strokeColor = "#000000"
             self.currentFont = None
@@ -1467,20 +1416,59 @@ class Reader:
         return self._buildPage()
 
     def __init__(self):
-        self.lengthBaseList = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258]
-        self.lengthExtraList = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0]
-        self.distanceBaseList = [
-            1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385,
-            24577
-        ]
-        self.distanceExtraList = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
-        self.codeLengthOrderList = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+        self.delimiterSet = set(ord(value) for value in "()<>[]{}/%")
+        self.whitespaceSet = set([0, 9, 10, 12, 13, 32])
 
-        self.inflateInput = b""
-        self.inflatePosition = 0
-        self.inflateBitBuffer = 0
-        self.inflateBitCount = 0
-        self.inflateOutputList = []
+        self.codecList = [
+            ["UCS2", "utf-16-be"],
+            ["UTF16", "utf-16-be"],
+            ["RKSJ", "cp932"],
+            ["GBK-EUC", "gbk"],
+            ["GBpc-EUC", "gb2312"],
+            ["GB-EUC", "gb2312"],
+            ["KSCms-UHC", "cp949"],
+            ["KSCpc-EUC", "cp949"],
+            ["KSC-EUC", "euc_kr"],
+            ["HKscs-B5", "big5hkscs"],
+            ["ETen-B5", "big5"],
+            ["B5pc", "big5"],
+            ["EUC", "euc_jp"]
+        ]
+
+        self.glyphObject = {
+            "space": " ", "exclam": "!", "quotedbl": '"', "numbersign": "#", "dollar": "$", "percent": "%", "ampersand": "&",
+            "quotesingle": "'", "parenleft": "(", "parenright": ")", "asterisk": "*", "plus": "+", "comma": ",", "hyphen": "-",
+            "period": ".", "slash": "/", "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
+            "seven": "7", "eight": "8", "nine": "9", "colon": ":", "semicolon": ";", "less": "<", "equal": "=", "greater": ">",
+            "question": "?", "at": "@", "bracketleft": "[", "backslash": "\\", "bracketright": "]", "asciicircum": "^",
+            "underscore": "_", "grave": "`", "braceleft": "{", "bar": "|", "braceright": "}", "asciitilde": "~",
+            "quoteleft": "\u2018", "quoteright": "\u2019", "quotedblleft": "\u201c", "quotedblright": "\u201d",
+            "quotesinglbase": "\u201a", "quotedblbase": "\u201e", "endash": "\u2013", "emdash": "\u2014", "bullet": "\u2022",
+            "ellipsis": "\u2026", "dagger": "\u2020", "daggerdbl": "\u2021", "perthousand": "\u2030", "fi": "\ufb01",
+            "fl": "\ufb02", "degree": "\u00b0", "middot": "\u00b7", "trademark": "\u2122", "copyright": "\u00a9",
+            "registered": "\u00ae", "euro": "\u20ac", "yen": "\u00a5", "sterling": "\u00a3", "section": "\u00a7",
+            "paragraph": "\u00b6", "guillemotleft": "\u00ab", "guillemotright": "\u00bb", "minus": "\u2212",
+            "Agrave": "\u00c0", "Aacute": "\u00c1", "Acircumflex": "\u00c2", "Atilde": "\u00c3", "Adieresis": "\u00c4", "Aring": "\u00c5",
+            "AE": "\u00c6", "Ccedilla": "\u00c7", "Egrave": "\u00c8", "Eacute": "\u00c9", "Ecircumflex": "\u00ca", "Edieresis": "\u00cb",
+            "Igrave": "\u00cc", "Iacute": "\u00cd", "Icircumflex": "\u00ce", "Idieresis": "\u00cf", "Eth": "\u00d0", "Ntilde": "\u00d1",
+            "Ograve": "\u00d2", "Oacute": "\u00d3", "Ocircumflex": "\u00d4", "Otilde": "\u00d5", "Odieresis": "\u00d6", "multiply": "\u00d7",
+            "Oslash": "\u00d8", "Ugrave": "\u00d9", "Uacute": "\u00da", "Ucircumflex": "\u00db", "Udieresis": "\u00dc", "Yacute": "\u00dd",
+            "Thorn": "\u00de", "germandbls": "\u00df", "agrave": "\u00e0", "aacute": "\u00e1", "acircumflex": "\u00e2", "atilde": "\u00e3",
+            "adieresis": "\u00e4", "aring": "\u00e5", "ae": "\u00e6", "ccedilla": "\u00e7", "egrave": "\u00e8", "eacute": "\u00e9",
+            "ecircumflex": "\u00ea", "edieresis": "\u00eb", "igrave": "\u00ec", "iacute": "\u00ed", "icircumflex": "\u00ee",
+            "idieresis": "\u00ef", "eth": "\u00f0", "ntilde": "\u00f1", "ograve": "\u00f2", "oacute": "\u00f3", "ocircumflex": "\u00f4",
+            "otilde": "\u00f5", "odieresis": "\u00f6", "divide": "\u00f7", "oslash": "\u00f8", "ugrave": "\u00f9", "uacute": "\u00fa",
+            "ucircumflex": "\u00fb", "udieresis": "\u00fc", "yacute": "\u00fd", "thorn": "\u00fe", "ydieresis": "\u00ff",
+            "exclamdown": "\u00a1", "cent": "\u00a2", "currency": "\u00a4", "brokenbar": "\u00a6", "dieresis": "\u00a8",
+            "ordfeminine": "\u00aa", "logicalnot": "\u00ac", "macron": "\u00af", "plusminus": "\u00b1", "twosuperior": "\u00b2",
+            "threesuperior": "\u00b3", "acute": "\u00b4", "mu": "\u00b5", "periodcentered": "\u00b7", "cedilla": "\u00b8",
+            "onesuperior": "\u00b9", "ordmasculine": "\u00ba", "onequarter": "\u00bc", "onehalf": "\u00bd", "threequarters": "\u00be",
+            "questiondown": "\u00bf", "Scaron": "\u0160", "scaron": "\u0161", "Zcaron": "\u017d", "zcaron": "\u017e", "OE": "\u0152",
+            "oe": "\u0153", "Ydieresis": "\u0178", "florin": "\u0192", "circumflex": "\u02c6", "tilde": "\u02dc", "dotlessi": "\u0131",
+            "Lslash": "\u0141", "lslash": "\u0142", "Aogonek": "\u0104", "aogonek": "\u0105", "Cacute": "\u0106", "cacute": "\u0107",
+            "Eogonek": "\u0118", "eogonek": "\u0119", "Nacute": "\u0143", "nacute": "\u0144", "Sacute": "\u015a", "sacute": "\u015b",
+            "Zacute": "\u0179", "zacute": "\u017a", "Zdotaccent": "\u017b", "zdotaccent": "\u017c"
+        }
 
         self.ctmList = [1, 0, 0, 1, 0, 0]
         self.textMatrixList = [1, 0, 0, 1, 0, 0]
@@ -1491,6 +1479,8 @@ class Reader:
         self.wordSpacing = 0
         self.horizontalScale = 1
         self.leading = 0
+        self.textRender = 0
+        self.textRise = 0
         self.fillColor = "#000000"
         self.strokeColor = "#000000"
         self.currentFont = None
