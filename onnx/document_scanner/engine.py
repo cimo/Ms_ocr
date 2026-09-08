@@ -218,7 +218,7 @@ class Processor:
         if extension in self.extensionImageList:
             isLayoutImage = True
 
-            pageList = self.imageReader.execute(f"{pathOutput}page/")
+            pageList = self.imageReader.execute(f"{pathOutput}page/", astPageList)
 
             markdownPage = markdown.Page()
             markdownText = markdownPage.execute(astPageList, pageList)

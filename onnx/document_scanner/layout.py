@@ -17,6 +17,9 @@ import xml.etree.ElementTree
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 from helper import onnxSessionBuild
 
+# Source
+import table
+
 class Image:
     def _itemFlow(self, label):
         result = "main"
@@ -407,6 +410,18 @@ class Image:
 
             imageCopy[y1:y2, x1:x2] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
 
+            if item["label"] == "table":
+                for b in range(len(item["tableObject"]["cellList"])):
+                    cell = item["tableObject"]["cellList"][b]
+
+                    cv2.rectangle(
+                        imageCopy,
+                        (int(round(cell["coordinate"][0])), int(round(cell["coordinate"][1]))),
+                        (int(round(cell["coordinate"][2])), int(round(cell["coordinate"][3]))),
+                        color,
+                        1
+                    )
+
             text = f"{item['flow']} {item['order']} - {item['label']} {round(item['score'], 3)}"
 
             textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
@@ -572,6 +587,14 @@ class Image:
                 itemSecondaryList[b]["flow"] = "secondary"
                 itemSecondaryList[b]["order"] = b + 1
 
+            for b in range(len(itemMainList)):
+                if itemMainList[b]["label"] == "table":
+                    itemMainList[b]["tableObject"] = self.tableCell.execute(itemMainList[b]["coordinate"], pageList[a]["image"])
+
+            for b in range(len(itemSecondaryList)):
+                if itemSecondaryList[b]["label"] == "table":
+                    itemSecondaryList[b]["tableObject"] = self.tableCell.execute(itemSecondaryList[b]["coordinate"], pageList[a]["image"])
+
             if self.isDebug:
                 self._debugDraw(itemMainList, itemSecondaryList, pageList[a]["image"], pathOutput, pageList[a]["number"])
 
@@ -684,7 +707,6 @@ class Image:
             "image",
             "figure_title",
             "chart",
-            "table",
             "formula",
             "formula_number",
             "algorithm",
@@ -699,6 +721,8 @@ class Image:
         cv2.setNumThreads(1)
 
         self.onnxSession = onnxSessionBuild(self.pathModel)
+
+        self.tableCell = table.Cell()
 
 class Office:
     def _nodeTag(self, node):

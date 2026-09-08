@@ -178,6 +178,80 @@ class Page:
 
         return resultList
 
+    def _tableCellEscape(self, text):
+        return text.replace("|", "\\|").replace("\n", " ")
+
+    def _tableCellText(self, elementList):
+        result = ""
+
+        lineList = self._lineGroup(elementList)
+
+        for a in range(len(lineList)):
+            lineText = self._lineText(lineList[a], True)
+
+            if len(lineText) == 0:
+                continue
+
+            if len(result) == 0:
+                result = lineText
+            elif self._wideCheck(result[-1:]) and self._wideCheck(lineText[0:1]):
+                result += lineText
+            else:
+                result += f" {lineText}"
+
+        return result
+
+    def _tableSlotIndex(self, edgeList, value):
+        result = 0
+
+        for a in range(1, len(edgeList) - 1):
+            if value >= edgeList[a]:
+                result = a
+
+        return result
+
+    def _tableText(self, tableObject, scaleX, scaleY, coordinate, page):
+        edgeXList = []
+        edgeYList = []
+
+        for a in range(len(tableObject["edgeXList"])):
+            edgeXList.append(tableObject["edgeXList"][a] * scaleX)
+
+        for a in range(len(tableObject["edgeYList"])):
+            edgeYList.append(tableObject["edgeYList"][a] * scaleY)
+
+        elementList = self._elementBoxCollect(scaleX, scaleY, coordinate, page)
+
+        slotObject = {}
+
+        for a in range(len(elementList)):
+            centerX = (elementList[a]["x0"] + elementList[a]["x1"]) / 2
+            centerY = (elementList[a]["y0"] + elementList[a]["y1"]) / 2
+
+            key = (self._tableSlotIndex(edgeYList, centerY), self._tableSlotIndex(edgeXList, centerX))
+
+            if key not in slotObject:
+                slotObject[key] = []
+
+            slotObject[key].append(elementList[a])
+
+        result = ""
+
+        for a in range(tableObject["rowCount"]):
+            rowText = "|"
+
+            for b in range(tableObject["columnCount"]):
+                text = self._tableCellText(slotObject[(a, b)]) if (a, b) in slotObject else ""
+
+                rowText += f" {self._tableCellEscape(text)} |"
+
+            result += f"{rowText}\n"
+
+            if a == 0:
+                result += "| --- " * tableObject["columnCount"] + "|\n"
+
+        return result
+
     def _itemText(self, elementList, isPlain, boxX0, referenceX1):
         result = ""
 
@@ -265,7 +339,12 @@ class Page:
 
                     elementList = elementAssignList[b]
 
-                    if len(elementList) > 0:
+                    if item["label"] == "table":
+                        tableText = self._tableText(item["tableObject"], scaleX, scaleY, item["coordinate"], page)
+
+                        if len(tableText) > 0:
+                            result += f"{tableText}\n"
+                    elif len(elementList) > 0:
                         if item["label"] == "doc_title":
                             result += f"# {self._itemText(elementList, True, item['coordinate'][0] * scaleX, referenceX1)}\n\n"
                         elif item["label"] == "paragraph_title":
@@ -293,7 +372,9 @@ class Page:
 
                     itemText = ""
 
-                    if item["label"] != "table":
+                    if item["label"] == "table":
+                        itemText = self._tableText(item["tableObject"], scaleX, scaleY, item["coordinate"], page)
+                    else:
                         elementList = self._elementBoxCollect(scaleX, scaleY, item["coordinate"], page)
 
                         if len(elementList) > 0:
@@ -330,7 +411,7 @@ class Docx:
     def _headingHash(self, level):
         return "#" * min(level, self.levelHeadingMax)
 
-    def _rowText(self, cellList):
+    def _tableRowText(self, cellList):
         result = "|"
 
         for a in range(len(cellList)):
@@ -354,7 +435,7 @@ class Docx:
                 if item["label"] == "tableRow":
                     cellList = item.get("cellList", [])
 
-                    rowText = self._rowText(cellList)
+                    rowText = self._tableRowText(cellList)
 
                     if isTableOpen == False:
                         separatorText = "| --- " * len(cellList) + "|"
@@ -410,7 +491,7 @@ class Docx:
         self.secondaryTitle = "SECONDARY ELEMENT"
 
 class Xlsx:
-    def _columnLetter(self, index):
+    def _tableColumnLetter(self, index):
         result = ""
 
         value = index + 1
@@ -424,7 +505,7 @@ class Xlsx:
 
         return result
 
-    def _cellEscape(self, text):
+    def _tableCellEscape(self, text):
         return text.replace("|", "\\|").replace("\n", " ")
 
     def execute(self, astPageList):
@@ -453,7 +534,7 @@ class Xlsx:
                 separatorText = "| --- |"
 
                 for b in range(columnCount):
-                    headerText += f" {self._columnLetter(b)} |"
+                    headerText += f" {self._tableColumnLetter(b)} |"
                     separatorText += " --- |"
 
                 result += f"{headerText}\n{separatorText}\n"
@@ -462,7 +543,7 @@ class Xlsx:
                     rowText = f"| {rowItemList[b]['number']} |"
 
                     for c in range(len(rowItemList[b]["cellList"])):
-                        rowText += f" {self._cellEscape(rowItemList[b]['cellList'][c])} |"
+                        rowText += f" {self._tableCellEscape(rowItemList[b]['cellList'][c])} |"
 
                     result += f"{rowText}\n"
 
@@ -500,7 +581,7 @@ class Pptx:
     def _headingHash(self, level):
         return "#" * min(level, self.levelHeadingMax)
 
-    def _rowText(self, cellList):
+    def _tableRowText(self, cellList):
         result = "|"
 
         for a in range(len(cellList)):
@@ -524,7 +605,7 @@ class Pptx:
                 if item["label"] == "tableRow":
                     cellList = item.get("cellList", [])
 
-                    rowText = self._rowText(cellList)
+                    rowText = self._tableRowText(cellList)
 
                     if isTableOpen == False:
                         separatorText = "| --- " * len(cellList) + "|"

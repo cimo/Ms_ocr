@@ -58,6 +58,9 @@ modelList=(
     "PP-OCRv6_medium_det/onnx/pp-ocrV6_medium_det.onnx"
     "PP-OCRv6_medium_rec/onnx/pp-ocrV6_medium_rec.onnx"
     "PP-OCRv6_medium_rec/onnx/dictionary.txt"
+    "PP-LCNet_x1_0_table_cls/onnx/pp-lcNet_x1_0_table_cls.onnx"
+    "RT-DETR-L_wired_table_cell_det/onnx/rt-detr-l_wired_table_cell_det.onnx"
+    "RT-DETR-L_wireless_table_cell_det/onnx/rt-detr-l_wireless_table_cell_det.onnx"
 )
 
 for model in "${modelList[@]}"
