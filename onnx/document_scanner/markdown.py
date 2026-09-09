@@ -4,6 +4,9 @@ import unicodedata
 
 sys.dont_write_bytecode = True
 
+# Source
+import layout
+
 class Page:
     def _medianFontSize(self, elementList):
         result = self.sizeDefault
@@ -373,11 +376,60 @@ class Page:
 
         return "<td></td>"
 
+    def _tableDecorativeCheck(self, itemList):
+        text = ""
+
+        for a in range(len(itemList)):
+            text += itemList[a]["text"]
+
+        return layout.textDecorativeCheck(text)
+
+    def _tableSectionIndex(self, itemList, columnCount):
+        if columnCount < self.countColumnSection:
+            return -1
+
+        result = -1
+
+        for a in range(len(itemList)):
+            if len(itemList[a]["text"].strip()) == 0:
+                continue
+
+            if result >= 0:
+                return -1
+
+            result = a
+
+        return result
+
+    def _tableSectionHtml(self, item, columnCount):
+        attributeText = ""
+
+        if columnCount > 1:
+            attributeText += f" colspan=\"{columnCount}\""
+
+        if item["columnIndex"] > 0:
+            if item["columnIndex"] + item["columnSpan"] >= columnCount:
+                attributeText += " align=\"right\""
+            else:
+                attributeText += " align=\"center\""
+
+        return f"<td{attributeText}>{self._tableCellEscapeHtml(item['text'])}</td>"
+
     def _tableTextHtml(self, rowList, columnCount, alignList):
         result = "<table>\n"
 
         for a in range(len(rowList)):
             itemSortList = sorted(rowList[a]["elementList"], key=lambda item: item["columnIndex"])
+
+            if self._tableDecorativeCheck(itemSortList):
+                continue
+
+            indexSection = self._tableSectionIndex(itemSortList, columnCount)
+
+            if indexSection >= 0:
+                result += f"<tr>{self._tableSectionHtml(itemSortList[indexSection], columnCount)}</tr>\n"
+
+                continue
 
             rowText = "<tr>"
 
@@ -562,8 +614,162 @@ class Page:
 
         return self._tableTextHtml(rowList, columnCount, alignList)
 
+    def _tableSimpleCheck(self, tableObject):
+        cellList = tableObject["cellList"]
+
+        rowCount = tableObject["rowCount"]
+        columnCount = tableObject["columnCount"]
+
+        if rowCount == 0 or columnCount == 0 or len(cellList) == 0:
+            return False
+
+        countSpan = 0
+
+        for a in range(len(cellList)):
+            if cellList[a]["rowSpan"] > 1 or cellList[a]["columnSpan"] > 1:
+                countSpan += 1
+
+        if countSpan / float(len(cellList)) > self.levelCellSpan:
+            return False
+
+        return len(cellList) / float(rowCount * columnCount) >= self.levelCellFill
+
+    def _tableGridCutRatio(self, tableObject, elementList, scaleX):
+        if len(elementList) == 0:
+            return 0.0
+
+        countCut = 0
+
+        for a in range(len(elementList)):
+            element = elementList[a]
+
+            margin = (element["x1"] - element["x0"]) * self.levelGridCutMargin
+
+            for b in range(1, len(tableObject["edgeXList"]) - 1):
+                edge = tableObject["edgeXList"][b] * scaleX
+
+                if edge > element["x0"] + margin and edge < element["x1"] - margin:
+                    countCut += 1
+
+                    break
+
+        return countCut / float(len(elementList))
+
+    def _tableColumnInfer(self, tableObject, elementList, scaleX, coordinate, isReplace):
+        lineList = []
+
+        lineAllList = self._lineGroup(elementList)
+
+        for a in range(len(lineAllList)):
+            if len(lineAllList[a]["elementList"]) > 1:
+                lineList.append(lineAllList[a])
+
+        if len(lineList) < 2 or len(tableObject["edgeYList"]) < 2:
+            return tableObject
+
+        heightList = []
+
+        for a in range(len(elementList)):
+            heightList.append(elementList[a]["y1"] - elementList[a]["y0"])
+
+        heightList.sort()
+
+        height = heightList[len(heightList) // 2]
+
+        tableX0 = coordinate[0] * scaleX
+        tableX1 = coordinate[2] * scaleX
+
+        binSize = height * self.levelColumnBin
+
+        if height <= 0 or tableX1 - tableX0 <= binSize:
+            return tableObject
+
+        binCount = int((tableX1 - tableX0) / binSize) + 1
+
+        countList = []
+
+        for a in range(binCount):
+            countList.append(0)
+
+        for a in range(len(lineList)):
+            binObject = {}
+
+            for b in range(len(lineList[a]["elementList"])):
+                element = lineList[a]["elementList"][b]
+
+                binStart = max(0, int((element["x0"] - tableX0) / binSize))
+                binEnd = min(binCount - 1, int((element["x1"] - tableX0) / binSize))
+
+                for c in range(binStart, binEnd + 1):
+                    binObject[c] = True
+
+            for key in binObject:
+                countList[key] += 1
+
+        countMaximum = len(lineList) * (1 - self.levelColumnFree)
+
+        boundaryList = []
+
+        runStart = -1
+
+        for a in range(binCount + 1):
+            isFree = a < binCount and countList[a] <= countMaximum
+
+            if isFree and runStart == -1:
+                runStart = a
+            elif isFree == False and runStart != -1:
+                isInside = runStart > 0 and a < binCount
+
+                if isInside and (a - runStart) * binSize >= height * self.levelColumnGap:
+                    boundaryList.append(tableX0 + (runStart + a) / 2 * binSize)
+
+                runStart = -1
+
+        if isReplace == False and len(boundaryList) + 1 <= tableObject["columnCount"]:
+            return tableObject
+
+        edgeXList = [coordinate[0]]
+
+        for a in range(len(boundaryList)):
+            edgeXList.append(boundaryList[a] / scaleX)
+
+        edgeXList.append(coordinate[2])
+
+        edgeYList = tableObject["edgeYList"]
+
+        cellList = []
+
+        for a in range(len(edgeYList) - 1):
+            for b in range(len(edgeXList) - 1):
+                cellList.append({
+                    "score": 1.0,
+                    "coordinate": [edgeXList[b], edgeYList[a], edgeXList[b + 1], edgeYList[a + 1]],
+                    "rowIndex": a,
+                    "columnIndex": b,
+                    "rowSpan": 1,
+                    "columnSpan": 1
+                })
+
+        return {
+            "rowCount": len(edgeYList) - 1,
+            "columnCount": len(edgeXList) - 1,
+            "edgeXList": edgeXList,
+            "edgeYList": edgeYList,
+            "cellList": cellList,
+            "type": tableObject["type"]
+        }
+
     def _tableText(self, tableObject, scaleX, scaleY, coordinate, page):
+        # Complex table: sparse grid of merged cells, typical of a pdf form. Handled later with the pdf flow.
+        if self._tableSimpleCheck(tableObject) == False:
+            return ""
+
         elementList = self._elementBoxCollect(scaleX, scaleY, coordinate, page)
+
+        isCut = self._tableGridCutRatio(tableObject, elementList, scaleX) >= self.levelGridCut
+
+        if tableObject["type"] == "wireless" or isCut:
+            tableObject = self._tableColumnInfer(tableObject, elementList, scaleX, coordinate, isCut)
 
         cellList = tableObject["cellList"]
 
@@ -755,6 +961,16 @@ class Page:
         self.levelBlockSimilarity = 0.25
         self.countVerticalMinimum = 3
         self.levelAlign = 0.1
+        self.levelCellFill = 0.5
+        self.levelCellSpan = 0.5
+
+        self.countColumnSection = 3
+
+        self.levelColumnBin = 0.1
+        self.levelColumnFree = 0.6
+        self.levelColumnGap = 0.3
+        self.levelGridCut = 0.1
+        self.levelGridCutMargin = 0.15
 
         self.cellDefaultObject = {"rowSpan": 1, "columnSpan": 1}
 

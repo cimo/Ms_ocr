@@ -18,6 +18,28 @@ sys.path.append(f"{os.path.dirname(__file__)}/..")
 # Source
 from helper import onnxSessionBuild
 
+def textDecorativeCheck(text):
+    symbolObject = {}
+
+    countSymbol = 0
+    countTotal = 0
+
+    for a in range(len(text)):
+        if text[a].isspace():
+            continue
+
+        countTotal += 1
+
+        if text[a].isalnum() == False:
+            countSymbol += 1
+
+            symbolObject[text[a]] = True
+
+    if countTotal < 3:
+        return False
+
+    return len(symbolObject) <= 2 and countSymbol / float(countTotal) >= 0.9
+
 class Image:
     def _itemFlow(self, label):
         result = "main"
@@ -447,14 +469,15 @@ class Image:
 
     def _inference(self, imageRgb):
         imageHeight, imageWidth = imageRgb.shape[0:2]
-        imageResized = cv2.resize(imageRgb, (800, 800), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
+
+        imageResized = cv2.resize(imageRgb, (self.imageSize, self.imageSize), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
 
         tensor = numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
 
         tensorFeedObject = {
             "image": tensor,
-            "im_shape": numpy.array([[800, 800]], dtype=numpy.float32),
-            "scale_factor": numpy.array([[800 / float(imageHeight), 800 / float(imageWidth)]], dtype=numpy.float32)
+            "im_shape": numpy.array([[self.imageSize, self.imageSize]], dtype=numpy.float32),
+            "scale_factor": numpy.array([[self.imageSize / float(imageHeight), self.imageSize / float(imageWidth)]], dtype=numpy.float32)
         }
 
         tensorOutputList = self.onnxSession.run(None, tensorFeedObject)
@@ -602,6 +625,8 @@ class Image:
         self.pathModel = f"{self.osPathDirName}model/pp-docLayout_plus-l.onnx"
 
         self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
+        self.imageSize = 800
 
         self.levelDebugOpacity = 0.2
         self.levelBoxContained = 0.9

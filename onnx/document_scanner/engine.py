@@ -253,12 +253,10 @@ class Processor:
             segmentPage = segmentObject[astPageList[a]["number"]] if astPageList[a]["number"] in segmentObject else self.segmentEmptyObject
 
             for b in range(len(tableList)):
-                gridObject = self.tableVector.execute(tableList[b]["coordinate"], segmentPage)
-
-                if gridObject["rowCount"] == 0 or gridObject["columnCount"] == 0:
-                    gridObject = self.tableCell.execute(tableList[b]["coordinate"], imagePage)
-
-                tableList[b]["tableObject"] = gridObject
+                if len(segmentObject) > 0:
+                    tableList[b]["tableObject"] = self.tableVector.execute(tableList[b]["coordinate"], segmentPage)
+                else:
+                    tableList[b]["tableObject"] = self.tableCell.execute(tableList[b]["coordinate"], imagePage)
 
             if self.isDebug:
                 self._debugDrawTable(tableList, imagePage, pathOutput, astPageList[a]["number"])
@@ -267,7 +265,153 @@ class Processor:
             with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
                 json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
 
-    def pageImageGenerate(self, mode, pathOutput, pathInput):
+    def _orphanLineList(self, elementList):
+        resultList = []
+
+        elementSortList = sorted(elementList, key=lambda element: element["y0"])
+
+        for a in range(len(elementSortList)):
+            element = elementSortList[a]
+
+            isFound = False
+
+            for b in range(len(resultList)):
+                line = resultList[b]
+
+                overlap = min(line["y1"], element["y1"]) - max(line["y0"], element["y0"])
+                height = min(line["y1"] - line["y0"], element["y1"] - element["y0"])
+
+                if height > 0 and overlap / height >= self.levelOrphanOverlap:
+                    line["x0"] = min(line["x0"], element["x0"])
+                    line["y0"] = min(line["y0"], element["y0"])
+                    line["x1"] = max(line["x1"], element["x1"])
+                    line["y1"] = max(line["y1"], element["y1"])
+                    line["isDecorative"] = line["isDecorative"] and element["isDecorative"]
+
+                    isFound = True
+
+                    break
+
+            if isFound == False:
+                resultList.append({"x0": element["x0"], "y0": element["y0"], "x1": element["x1"], "y1": element["y1"], "isDecorative": element["isDecorative"]})
+
+        resultList.sort(key=lambda line: line["y0"])
+
+        return resultList
+
+    def _orphanBlockList(self, lineList):
+        resultList = []
+
+        isOpen = False
+
+        for a in range(len(lineList)):
+            line = lineList[a]
+
+            if line["isDecorative"]:
+                isOpen = False
+
+                continue
+
+            isMerge = False
+
+            if isOpen:
+                block = resultList[len(resultList) - 1]
+
+                gap = line["y0"] - block["y1"]
+                height = line["y1"] - line["y0"]
+
+                isOverlap = min(block["x1"], line["x1"]) > max(block["x0"], line["x0"])
+
+                if isOverlap and gap <= height * self.levelOrphanGap:
+                    block["x0"] = min(block["x0"], line["x0"])
+                    block["x1"] = max(block["x1"], line["x1"])
+                    block["y1"] = max(block["y1"], line["y1"])
+
+                    isMerge = True
+
+            if isMerge == False:
+                resultList.append({"x0": line["x0"], "y0": line["y0"], "x1": line["x1"], "y1": line["y1"]})
+
+                isOpen = True
+
+        return resultList
+
+    def _orphanBuild(self, astPageList, pageList):
+        scaleObject = self._scaleCalculate(astPageList, pageList)
+
+        astPageObject = {}
+
+        for a in range(len(astPageList)):
+            astPageObject[astPageList[a]["number"]] = astPageList[a]
+
+        for a in range(len(pageList)):
+            page = pageList[a]
+
+            if page["number"] not in scaleObject:
+                continue
+
+            scale = scaleObject[page["number"]]
+            astPage = astPageObject[page["number"]]
+
+            itemList = astPage["itemMainList"] + astPage["itemSecondaryList"]
+
+            orphanList = []
+
+            for b in range(len(page["elementList"])):
+                element = page["elementList"][b]
+
+                if element["type"] != "text":
+                    continue
+
+                x0 = element["x0"] * scale["x"]
+                y0 = element["y0"] * scale["y"]
+                x1 = element["x1"] * scale["x"]
+                y1 = element["y1"] * scale["y"]
+
+                centerX = (x0 + x1) / 2
+                centerY = (y0 + y1) / 2
+
+                isInside = False
+
+                for c in range(len(itemList)):
+                    coordinate = itemList[c]["coordinate"]
+
+                    if centerX >= coordinate[0] and centerX <= coordinate[2] and centerY >= coordinate[1] and centerY <= coordinate[3]:
+                        isInside = True
+
+                        break
+
+                if isInside == False:
+                    orphanList.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1, "isDecorative": layout.textDecorativeCheck(element["text"])})
+
+            if len(orphanList) == 0:
+                continue
+
+            blockList = self._orphanBlockList(self._orphanLineList(orphanList))
+
+            for b in range(len(blockList)):
+                block = blockList[b]
+
+                astPage["itemMainList"].append({
+                    "label": "text",
+                    "score": 0.0,
+                    "coordinate": [block["x0"], block["y0"], block["x1"], block["y1"]],
+                    "boxList": [
+                        [int(round(block["x0"])), int(round(block["y0"]))],
+                        [int(round(block["x1"])), int(round(block["y0"]))],
+                        [int(round(block["x1"])), int(round(block["y1"]))],
+                        [int(round(block["x0"])), int(round(block["y1"]))]
+                    ],
+                    "flow": "main",
+                    "order": 0
+                })
+
+            astPage["itemMainList"] = self.layoutImage._orderArrange(0, astPage["itemMainList"], astPage["imageWidth"], astPage["imageHeight"])
+
+            for b in range(len(astPage["itemMainList"])):
+                astPage["itemMainList"][b]["order"] = b + 1
+
+    def _pageImageGenerate(self, mode, pathOutput, pathInput):
         pathPage = f"{pathOutput}page/"
 
         if os.path.isdir(pathPage):
@@ -291,11 +435,11 @@ class Processor:
         resultObject = {"pageList": []}
 
         if extension in self.extensionImageList:
-            self.pageImageGenerate("single", pathOutput, pathInput)
+            self._pageImageGenerate("single", pathOutput, pathInput)
 
             resultObject = self.layoutImage.execute(pathOutput, fileName, f"{pathOutput}page/")
         elif extension == ".pdf":
-            self.pageImageGenerate("multiple", pathOutput, pathInput)
+            self._pageImageGenerate("multiple", pathOutput, pathInput)
 
             resultObject = self.layoutImage.execute(pathOutput, fileName, f"{pathOutput}page/")
         elif extension == ".docx":
@@ -328,6 +472,8 @@ class Processor:
 
             pageList = self.imageReader.execute(f"{pathOutput}page/", astPageList)
 
+            self._orphanBuild(astPageList, pageList)
+
             markdownPage = markdown.Page()
             markdownText = markdownPage.execute(astPageList, pageList)
 
@@ -339,6 +485,8 @@ class Processor:
             pageList = pdfReader.execute(pathInput)
 
             self._tableGridBuild(astPageList, pathOutput, self._segmentCollect(astPageList, pageList))
+
+            self._orphanBuild(astPageList, pageList)
 
             markdownPage = markdown.Page()
             markdownText = markdownPage.execute(astPageList, pageList)
@@ -403,6 +551,9 @@ class Processor:
         self.colorDebugTableCell = (0, 0, 255)
 
         self.segmentEmptyObject = {"horizontalList": [], "verticalList": []}
+
+        self.levelOrphanOverlap = 0.5
+        self.levelOrphanGap = 1.5
 
         self.tableCell = table.Cell()
         self.tableVector = table.Vector()

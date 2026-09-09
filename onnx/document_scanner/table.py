@@ -117,6 +117,7 @@ class Cell:
 
     def _inference(self, imageRgb, tableType):
         imageHeight, imageWidth = imageRgb.shape[0:2]
+
         imageResized = cv2.resize(imageRgb, (self.imageSizeDetection, self.imageSizeDetection), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
 
         tensor = numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
@@ -315,22 +316,21 @@ class Cell:
         for a in range(len(self.labelList)):
             self.onnxSessionDetectionObject[self.labelList[a]] = onnxSessionBuild(self.pathModelDetectionObject[self.labelList[a]])
 
-
 class Vector:
-    def _segmentSelect(self, segmentList, coordinateList, isHorizontal):
+    def _segmentSelect(self, segmentList, coordinateList, isHorizontal, margin):
         resultList = []
 
         for a in range(len(segmentList)):
             segment = segmentList[a]
 
             if isHorizontal:
-                if segment["position"] < coordinateList[1] - self.marginBox or segment["position"] > coordinateList[3] + self.marginBox:
+                if segment["position"] < coordinateList[1] - margin or segment["position"] > coordinateList[3] + margin:
                     continue
 
                 start = max(segment["start"], coordinateList[0])
                 end = min(segment["end"], coordinateList[2])
             else:
-                if segment["position"] < coordinateList[0] - self.marginBox or segment["position"] > coordinateList[2] + self.marginBox:
+                if segment["position"] < coordinateList[0] - margin or segment["position"] > coordinateList[2] + margin:
                     continue
 
                 start = max(segment["start"], coordinateList[1])
@@ -415,8 +415,10 @@ class Vector:
         return resultList
 
     def execute(self, coordinateList, segmentObject):
-        edgeXList = self._edgeBuild(self._segmentSelect(segmentObject["verticalList"], coordinateList, False))
-        edgeYList = self._edgeBuild(self._segmentSelect(segmentObject["horizontalList"], coordinateList, True))
+        margin = max(self.marginBox, (coordinateList[2] - coordinateList[0]) * self.levelMarginBox)
+
+        edgeXList = self._edgeBuild(self._segmentSelect(segmentObject["verticalList"], coordinateList, False, margin))
+        edgeYList = self._edgeBuild(self._segmentSelect(segmentObject["horizontalList"], coordinateList, True, margin))
 
         edgeXList = self._edgeFilter(edgeXList, coordinateList[1], coordinateList[3], self.levelEdgeColumn)
         edgeYList = self._edgeFilter(edgeYList, coordinateList[0], coordinateList[2], self.levelEdgeRow)
@@ -479,6 +481,7 @@ class Vector:
 
     def __init__(self):
         self.marginBox = 4.0
+        self.levelMarginBox = 0.01
         self.lengthMinimum = 8.0
         self.tolerance = 3.0
         self.levelCoverage = 0.8
