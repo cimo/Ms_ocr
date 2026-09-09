@@ -1,6 +1,4 @@
 import sys
-sys.dont_write_bytecode = True
-
 import os
 import cv2
 import time
@@ -10,11 +8,14 @@ import shutil
 import subprocess
 import unicodedata
 
+sys.dont_write_bytecode = True
+
 # Source
 import layout
 import image
 import pdf
 import markdown
+import table
 
 class Processor:
     def _extensionImageAllowed(self):
@@ -98,6 +99,9 @@ class Processor:
             elementList = page["elementList"]
 
             for b in range(len(elementList)):
+                if elementList[b]["type"] != "text":
+                    continue
+
                 coordinateList = [
                     elementList[b]["x0"] * scale["x"],
                     elementList[b]["y0"] * scale["y"],
@@ -149,6 +153,9 @@ class Processor:
             elementList = page["elementList"]
 
             for b in range(len(elementList)):
+                if elementList[b]["type"] != "text":
+                    continue
+
                 color = (0, 200, 0) if self._matchCheck(searchText, elementList[b]["text"]) else (0, 0, 255)
 
                 cv2.rectangle(
@@ -160,6 +167,105 @@ class Processor:
                 )
 
             cv2.imwrite(f"{pathOutput}debug/engine/{page['number']}.jpg", imageDebug)
+
+    def _segmentCollect(self, astPageList, pageList):
+        resultObject = {}
+
+        scaleObject = self._scaleCalculate(astPageList, pageList)
+
+        for a in range(len(pageList)):
+            page = pageList[a]
+
+            if page["number"] not in scaleObject:
+                continue
+
+            scale = scaleObject[page["number"]]
+
+            horizontalList = []
+            verticalList = []
+
+            elementList = page["elementList"]
+
+            for b in range(len(elementList)):
+                if elementList[b]["type"] != "rect" and elementList[b]["type"] != "path":
+                    continue
+
+                x0 = elementList[b]["x0"] * scale["x"]
+                y0 = elementList[b]["y0"] * scale["y"]
+                x1 = elementList[b]["x1"] * scale["x"]
+                y1 = elementList[b]["y1"] * scale["y"]
+
+                width = x1 - x0
+                height = y1 - y0
+
+                if height <= self.thicknessSegment and width > self.lengthSegment:
+                    horizontalList.append({"position": (y0 + y1) / 2, "start": x0, "end": x1})
+                elif width <= self.thicknessSegment and height > self.lengthSegment:
+                    verticalList.append({"position": (x0 + x1) / 2, "start": y0, "end": y1})
+
+            resultObject[page["number"]] = {"horizontalList": horizontalList, "verticalList": verticalList}
+
+        return resultObject
+
+    def _debugDrawTable(self, tableList, image, pathOutput, pageNumber):
+        for a in range(len(tableList)):
+            x1 = max(0, int(round(tableList[a]["coordinate"][0])) - self.marginDebugTable)
+            y1 = max(0, int(round(tableList[a]["coordinate"][1])) - self.marginDebugTable)
+            x2 = min(image.shape[1], int(round(tableList[a]["coordinate"][2])) + self.marginDebugTable)
+            y2 = min(image.shape[0], int(round(tableList[a]["coordinate"][3])) + self.marginDebugTable)
+
+            imageCopy = image[y1:y2, x1:x2].copy()
+
+            cellList = tableList[a]["tableObject"]["cellList"]
+
+            for b in range(len(cellList)):
+                cv2.rectangle(
+                    imageCopy,
+                    (int(round(cellList[b]["coordinate"][0])) - x1, int(round(cellList[b]["coordinate"][1])) - y1),
+                    (int(round(cellList[b]["coordinate"][2])) - x1, int(round(cellList[b]["coordinate"][3])) - y1),
+                    self.colorDebugTableCell,
+                    1
+                )
+
+            cv2.imwrite(f"{pathOutput}debug/table/{pageNumber}_{a + 1}.jpg", imageCopy)
+
+    def _tableGridBuild(self, astPageList, pathOutput, segmentObject):
+        if self.isDebug:
+            if os.path.isdir(f"{pathOutput}debug/table/"):
+                shutil.rmtree(f"{pathOutput}debug/table/")
+
+            os.makedirs(f"{pathOutput}debug/table/", exist_ok=True)
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemMainList"] + astPageList[a]["itemSecondaryList"]
+
+            tableList = []
+
+            for b in range(len(itemList)):
+                if itemList[b]["label"] == "table":
+                    tableList.append(itemList[b])
+
+            if len(tableList) == 0:
+                continue
+
+            imagePage = cv2.imread(f"{pathOutput}page/{astPageList[a]['number']}.jpg")
+
+            segmentPage = segmentObject[astPageList[a]["number"]] if astPageList[a]["number"] in segmentObject else self.segmentEmptyObject
+
+            for b in range(len(tableList)):
+                gridObject = self.tableVector.execute(tableList[b]["coordinate"], segmentPage)
+
+                if gridObject["rowCount"] == 0 or gridObject["columnCount"] == 0:
+                    gridObject = self.tableCell.execute(tableList[b]["coordinate"], imagePage)
+
+                tableList[b]["tableObject"] = gridObject
+
+            if self.isDebug:
+                self._debugDrawTable(tableList, imagePage, pathOutput, astPageList[a]["number"])
+
+        if self.isDebug:
+            with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+                json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
 
     def pageImageGenerate(self, mode, pathOutput, pathInput):
         pathPage = f"{pathOutput}page/"
@@ -218,6 +324,8 @@ class Processor:
         if extension in self.extensionImageList:
             isLayoutImage = True
 
+            self._tableGridBuild(astPageList, pathOutput, {})
+
             pageList = self.imageReader.execute(f"{pathOutput}page/", astPageList)
 
             markdownPage = markdown.Page()
@@ -229,6 +337,8 @@ class Processor:
 
             pdfReader = pdf.Reader()
             pageList = pdfReader.execute(pathInput)
+
+            self._tableGridBuild(astPageList, pathOutput, self._segmentCollect(astPageList, pageList))
 
             markdownPage = markdown.Page()
             markdownText = markdownPage.execute(astPageList, pageList)
@@ -285,6 +395,17 @@ class Processor:
 
     def __init__(self):
         self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
+        self.thicknessSegment = 3.0
+        self.lengthSegment = 8.0
+
+        self.marginDebugTable = 10
+        self.colorDebugTableCell = (0, 0, 255)
+
+        self.segmentEmptyObject = {"horizontalList": [], "verticalList": []}
+
+        self.tableCell = table.Cell()
+        self.tableVector = table.Vector()
 
         self.layoutImage = layout.Image()
         self.layoutOfficeDocx = layout.Office.Docx()

@@ -79,10 +79,19 @@ export default class Service {
                                 );
                             }
                         })
-                        .catch((error: Error) => {
+                        .catch(async (error: Error) => {
                             helperSrc.writeLog("Service.ts - api() - post(/api/extract) - post(/engine) - catch()", error.message);
 
                             helperSrc.responseBody({ state: "ko", message: error.message }, response, 500);
+
+                            const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(pathInputBasename);
+
+                            if (typeof fileOrFolderDelete !== "boolean") {
+                                helperSrc.writeLog(
+                                    "Service.ts - api() - post(/api/extract) - post(/engine) - catch() - fileOrFolderDelete()",
+                                    fileOrFolderDelete.toString()
+                                );
+                            }
                         });
                 })
                 .catch((error: Error) => {

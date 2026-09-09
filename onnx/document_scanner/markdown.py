@@ -1,8 +1,8 @@
 import sys
-sys.dont_write_bytecode = True
-
 import math
 import unicodedata
+
+sys.dont_write_bytecode = True
 
 class Page:
     def _medianFontSize(self, elementList):
@@ -178,9 +178,6 @@ class Page:
 
         return resultList
 
-    def _tableCellEscape(self, text):
-        return text.replace("|", "\\|").replace("\n", " ")
-
     def _tableCellText(self, elementList):
         result = ""
 
@@ -201,54 +198,404 @@ class Page:
 
         return result
 
-    def _tableSlotIndex(self, edgeList, value):
-        result = 0
+    def _tableSpanCheck(self, cellList):
+        for a in range(len(cellList)):
+            if cellList[a]["rowSpan"] > 1 or cellList[a]["columnSpan"] > 1:
+                return True
 
-        for a in range(1, len(edgeList) - 1):
-            if value >= edgeList[a]:
+        return False
+
+    def _tableSlotAlign(self, elementList, slotX0, slotX1):
+        x0 = elementList[0]["x0"]
+        x1 = elementList[0]["x1"]
+
+        for a in range(len(elementList)):
+            x0 = min(x0, elementList[a]["x0"])
+            x1 = max(x1, elementList[a]["x1"])
+
+        gapLeft = x0 - slotX0
+        gapRight = slotX1 - x1
+
+        level = (slotX1 - slotX0) * self.levelAlign
+
+        if gapLeft - gapRight > level:
+            return "right"
+
+        if gapRight - gapLeft > level:
+            return "left"
+
+        return "center"
+
+    def _tableAlignList(self, columnCount, rowCount, alignObject):
+        resultList = []
+
+        for a in range(columnCount):
+            countObject = {"left": 0, "right": 0, "center": 0}
+
+            for b in range(rowCount):
+                if (b, a) in alignObject:
+                    countObject[alignObject[(b, a)]] += 1
+
+            align = "left"
+
+            for key in countObject:
+                if countObject[key] > countObject[align]:
+                    align = key
+
+            resultList.append(align)
+
+        return resultList
+
+    def _tableCellFind(self, cellList, element, scaleX, scaleY):
+        centerX = (element["x0"] + element["x1"]) / 2
+        centerY = (element["y0"] + element["y1"]) / 2
+
+        result = -1
+
+        overlapMaximum = 0.0
+        distanceMinimum = 0.0
+
+        for a in range(len(cellList)):
+            coordinate = cellList[a]["coordinate"]
+
+            x0 = coordinate[0] * scaleX
+            y0 = coordinate[1] * scaleY
+            x1 = coordinate[2] * scaleX
+            y1 = coordinate[3] * scaleY
+
+            overlap = max(0.0, min(element["x1"], x1) - max(element["x0"], x0)) * max(0.0, min(element["y1"], y1) - max(element["y0"], y0))
+
+            if overlap > overlapMaximum:
                 result = a
+                overlapMaximum = overlap
+
+                continue
+
+            if overlapMaximum > 0.0:
+                continue
+
+            distance = abs(centerX - (x0 + x1) / 2) + abs(centerY - (y0 + y1) / 2)
+
+            if result == -1 or distance < distanceMinimum:
+                result = a
+                distanceMinimum = distance
 
         return result
 
-    def _tableText(self, tableObject, scaleX, scaleY, coordinate, page):
-        edgeXList = []
-        edgeYList = []
-
-        for a in range(len(tableObject["edgeXList"])):
-            edgeXList.append(tableObject["edgeXList"][a] * scaleX)
-
-        for a in range(len(tableObject["edgeYList"])):
-            edgeYList.append(tableObject["edgeYList"][a] * scaleY)
-
-        elementList = self._elementBoxCollect(scaleX, scaleY, coordinate, page)
-
-        slotObject = {}
+    def _tableItemCreate(self, cell, cellIndex, elementList, scaleX):
+        x0 = elementList[0]["x0"]
+        x1 = elementList[0]["x1"]
+        y0 = elementList[0]["y0"]
+        y1 = elementList[0]["y1"]
 
         for a in range(len(elementList)):
-            centerX = (elementList[a]["x0"] + elementList[a]["x1"]) / 2
-            centerY = (elementList[a]["y0"] + elementList[a]["y1"]) / 2
+            x0 = min(x0, elementList[a]["x0"])
+            x1 = max(x1, elementList[a]["x1"])
+            y0 = min(y0, elementList[a]["y0"])
+            y1 = max(y1, elementList[a]["y1"])
 
-            key = (self._tableSlotIndex(edgeYList, centerY), self._tableSlotIndex(edgeXList, centerX))
+        return {
+            "x0": x0,
+            "x1": x1,
+            "y0": y0,
+            "y1": y1,
+            "cellIndex": cellIndex,
+            "columnIndex": cell["columnIndex"],
+            "columnSpan": cell["columnSpan"],
+            "text": self._tableCellText(elementList),
+            "align": self._tableSlotAlign(elementList, cell["coordinate"][0] * scaleX, cell["coordinate"][2] * scaleX)
+        }
 
-            if key not in slotObject:
-                slotObject[key] = []
+    def _tableTextVerticalCheck(self, lineList):
+        if len(lineList) < self.countVerticalMinimum:
+            return False
 
-            slotObject[key].append(elementList[a])
+        for a in range(len(lineList)):
+            if len(lineList[a]["elementList"]) != 1:
+                return False
+
+            if len(lineList[a]["elementList"][0]["text"].strip()) != 1:
+                return False
+
+        return True
+
+    def _tableItemBuild(self, cellList, elementList, scaleX, scaleY):
+        elementObject = {}
+
+        for a in range(len(elementList)):
+            index = self._tableCellFind(cellList, elementList[a], scaleX, scaleY)
+
+            if index == -1:
+                continue
+
+            if index not in elementObject:
+                elementObject[index] = []
+
+            elementObject[index].append(elementList[a])
+
+        resultList = []
+
+        for index in elementObject:
+            lineList = self._lineGroup(elementObject[index])
+
+            if self._tableTextVerticalCheck(lineList):
+                item = self._tableItemCreate(cellList[index], index, elementObject[index], scaleX)
+
+                item["y0"] = lineList[0]["y0"]
+                item["y1"] = lineList[0]["y1"]
+
+                resultList.append(item)
+
+                continue
+
+            for a in range(len(lineList)):
+                resultList.append(self._tableItemCreate(cellList[index], index, lineList[a]["elementList"], scaleX))
+
+        return resultList
+
+    def _tableCellHtml(self, item, alignList):
+        attributeText = ""
+
+        if item["columnSpan"] > 1:
+            attributeText += f" colspan=\"{item['columnSpan']}\""
+
+        if item["columnSpan"] == 1 and len(item["text"]) > 0 and alignList[item["columnIndex"]] != "left":
+            attributeText += f" align=\"{alignList[item['columnIndex']]}\""
+
+        return f"<td{attributeText}>{self._tableCellEscapeHtml(item['text'])}</td>"
+
+    def _tableCellEscapeHtml(self, text):
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _tableCellEmptyHtml(self, columnSpan):
+        if columnSpan > 1:
+            return f"<td colspan=\"{columnSpan}\"></td>"
+
+        return "<td></td>"
+
+    def _tableTextHtml(self, rowList, columnCount, alignList):
+        result = "<table>\n"
+
+        for a in range(len(rowList)):
+            itemSortList = sorted(rowList[a]["elementList"], key=lambda item: item["columnIndex"])
+
+            rowText = "<tr>"
+
+            columnCurrent = 0
+
+            for b in range(len(itemSortList)):
+                item = itemSortList[b]
+
+                if item["columnIndex"] > columnCurrent:
+                    rowText += self._tableCellEmptyHtml(item["columnIndex"] - columnCurrent)
+
+                    columnCurrent = item["columnIndex"]
+
+                rowText += self._tableCellHtml(item, alignList)
+
+                columnCurrent = max(columnCurrent, item["columnIndex"] + item["columnSpan"])
+
+            if columnCount > columnCurrent:
+                rowText += self._tableCellEmptyHtml(columnCount - columnCurrent)
+
+            result += f"{rowText}</tr>\n"
+
+        result += "</table>\n"
+
+        return result
+
+    def _tableColumnSeparatorList(self, cellList, indexList, columnStart, columnEnd):
+        resultList = []
+
+        for a in range(columnStart + 1, columnEnd):
+            isSeparator = True
+
+            for b in range(len(indexList)):
+                cell = cellList[indexList[b]]
+
+                if cell["columnIndex"] < a and cell["columnIndex"] + cell["columnSpan"] > a:
+                    isSeparator = False
+
+                    break
+
+            if isSeparator:
+                resultList.append(a)
+
+        return resultList
+
+    def _tableRowSeparatorList(self, cellList, indexList, rowStart, rowEnd):
+        resultList = []
+
+        for a in range(rowStart + 1, rowEnd):
+            isSeparator = True
+
+            for b in range(len(indexList)):
+                cell = cellList[indexList[b]]
+
+                if cell["rowIndex"] < a and cell["rowIndex"] + cell["rowSpan"] > a:
+                    isSeparator = False
+
+                    break
+
+            if isSeparator:
+                resultList.append(a)
+
+        return resultList
+
+    def _tableColumnBoundaryObject(self, cellList, indexList):
+        resultObject = {}
+
+        for a in range(len(indexList)):
+            cell = cellList[indexList[a]]
+
+            resultObject[cell["columnIndex"]] = True
+            resultObject[cell["columnIndex"] + cell["columnSpan"]] = True
+
+        return resultObject
+
+    def _tableRowBoundaryObject(self, cellList, indexList):
+        resultObject = {}
+
+        for a in range(len(indexList)):
+            cell = cellList[indexList[a]]
+
+            resultObject[cell["rowIndex"]] = True
+            resultObject[cell["rowIndex"] + cell["rowSpan"]] = True
+
+        return resultObject
+
+    def _tableSplitCheck(self, firstObject, secondObject):
+        countShared = 0
+
+        for key in firstObject:
+            if key in secondObject:
+                countShared += 1
+
+        countTotal = len(firstObject) + len(secondObject) - countShared
+
+        if countTotal == 0:
+            return False
+
+        return countShared / countTotal <= self.levelBlockSimilarity
+
+    def _tableBlockSplit(self, cellList, indexList, columnStart, columnEnd, rowStart, rowEnd):
+        separatorColumnList = self._tableColumnSeparatorList(cellList, indexList, columnStart, columnEnd)
+
+        for a in range(len(separatorColumnList)):
+            firstList = []
+            secondList = []
+
+            for b in range(len(indexList)):
+                if cellList[indexList[b]]["columnIndex"] < separatorColumnList[a]:
+                    firstList.append(indexList[b])
+                else:
+                    secondList.append(indexList[b])
+
+            if len(firstList) == 0 or len(secondList) == 0:
+                continue
+
+            firstObject = self._tableRowBoundaryObject(cellList, firstList)
+            secondObject = self._tableRowBoundaryObject(cellList, secondList)
+
+            if self._tableSplitCheck(firstObject, secondObject) == False:
+                continue
+
+            return self._tableBlockSplit(cellList, firstList, columnStart, separatorColumnList[a], rowStart, rowEnd) + self._tableBlockSplit(
+                cellList, secondList, separatorColumnList[a], columnEnd, rowStart, rowEnd
+            )
+
+        separatorRowList = self._tableRowSeparatorList(cellList, indexList, rowStart, rowEnd)
+
+        for a in range(len(separatorRowList)):
+            firstList = []
+            secondList = []
+
+            for b in range(len(indexList)):
+                if cellList[indexList[b]]["rowIndex"] < separatorRowList[a]:
+                    firstList.append(indexList[b])
+                else:
+                    secondList.append(indexList[b])
+
+            if len(firstList) == 0 or len(secondList) == 0:
+                continue
+
+            firstObject = self._tableColumnBoundaryObject(cellList, firstList)
+            secondObject = self._tableColumnBoundaryObject(cellList, secondList)
+
+            if self._tableSplitCheck(firstObject, secondObject) == False:
+                continue
+
+            return self._tableBlockSplit(cellList, firstList, columnStart, columnEnd, rowStart, separatorRowList[a]) + self._tableBlockSplit(
+                cellList, secondList, columnStart, columnEnd, separatorRowList[a], rowEnd
+            )
+
+        return [{"indexList": indexList, "columnStart": columnStart, "columnEnd": columnEnd}]
+
+    def _tableBlockText(self, itemList, columnStart, columnEnd):
+        itemBlockList = []
+
+        for a in range(len(itemList)):
+            itemBlockList.append({
+                "x0": itemList[a]["x0"],
+                "x1": itemList[a]["x1"],
+                "y0": itemList[a]["y0"],
+                "y1": itemList[a]["y1"],
+                "columnIndex": itemList[a]["columnIndex"] - columnStart,
+                "columnSpan": itemList[a]["columnSpan"],
+                "text": itemList[a]["text"],
+                "align": itemList[a]["align"]
+            })
+
+        rowList = self._lineGroup(itemBlockList)
+
+        alignObject = {}
+
+        for a in range(len(rowList)):
+            for b in range(len(rowList[a]["elementList"])):
+                item = rowList[a]["elementList"][b]
+
+                alignObject[(a, item["columnIndex"])] = item["align"]
+
+        columnCount = columnEnd - columnStart
+
+        alignList = self._tableAlignList(columnCount, len(rowList), alignObject)
+
+        return self._tableTextHtml(rowList, columnCount, alignList)
+
+    def _tableText(self, tableObject, scaleX, scaleY, coordinate, page):
+        elementList = self._elementBoxCollect(scaleX, scaleY, coordinate, page)
+
+        cellList = tableObject["cellList"]
+
+        itemList = self._tableItemBuild(cellList, elementList, scaleX, scaleY)
+
+        indexList = []
+
+        for a in range(len(cellList)):
+            indexList.append(a)
+
+        blockList = self._tableBlockSplit(cellList, indexList, 0, tableObject["columnCount"], 0, tableObject["rowCount"])
 
         result = ""
 
-        for a in range(tableObject["rowCount"]):
-            rowText = "|"
+        for a in range(len(blockList)):
+            block = blockList[a]
 
-            for b in range(tableObject["columnCount"]):
-                text = self._tableCellText(slotObject[(a, b)]) if (a, b) in slotObject else ""
+            blockObject = {}
 
-                rowText += f" {self._tableCellEscape(text)} |"
+            for b in range(len(block["indexList"])):
+                blockObject[block["indexList"][b]] = True
 
-            result += f"{rowText}\n"
+            itemBlockList = []
 
-            if a == 0:
-                result += "| --- " * tableObject["columnCount"] + "|\n"
+            for b in range(len(itemList)):
+                if itemList[b]["cellIndex"] in blockObject:
+                    itemBlockList.append(itemList[b])
+
+            if len(itemBlockList) == 0:
+                continue
+
+            result += self._tableBlockText(itemBlockList, block["columnStart"], block["columnEnd"])
 
         return result
 
@@ -405,21 +752,36 @@ class Page:
 
         self.wideList = ["W", "F"]
 
+        self.levelBlockSimilarity = 0.25
+        self.countVerticalMinimum = 3
+        self.levelAlign = 0.1
+
+        self.cellDefaultObject = {"rowSpan": 1, "columnSpan": 1}
+
         self.secondaryTitle = "SECONDARY ELEMENT"
 
 class Docx:
     def _headingHash(self, level):
         return "#" * min(level, self.levelHeadingMax)
 
-    def _tableRowText(self, cellList):
-        result = "|"
+    def _tableCellEscapeHtml(self, text):
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _tableRowHtml(self, cellList):
+        result = "<tr>"
 
         for a in range(len(cellList)):
-            cellText = cellList[a].replace("|", "\\|").replace("\n", " ")
+            attributeText = ""
 
-            result += f" {cellText} |"
+            if cellList[a]["rowSpan"] > 1:
+                attributeText += f" rowspan=\"{cellList[a]['rowSpan']}\""
 
-        return result
+            if cellList[a]["columnSpan"] > 1:
+                attributeText += f" colspan=\"{cellList[a]['columnSpan']}\""
+
+            result += f"<td{attributeText}>{self._tableCellEscapeHtml(cellList[a]['text'])}</td>"
+
+        return f"{result}</tr>"
 
     def execute(self, astPageList):
         result = ""
@@ -435,12 +797,10 @@ class Docx:
                 if item["label"] == "tableRow":
                     cellList = item.get("cellList", [])
 
-                    rowText = self._tableRowText(cellList)
+                    rowText = self._tableRowHtml(cellList)
 
                     if isTableOpen == False:
-                        separatorText = "| --- " * len(cellList) + "|"
-
-                        result += f"{rowText}\n{separatorText}\n"
+                        result += f"<table>\n{rowText}\n"
 
                         isTableOpen = True
                     else:
@@ -449,7 +809,7 @@ class Docx:
                     continue
 
                 if isTableOpen:
-                    result += "\n"
+                    result += "</table>\n\n"
 
                     isTableOpen = False
 
@@ -463,7 +823,7 @@ class Docx:
                     result += f"{item['text']}\n\n"
 
             if isTableOpen:
-                result += "\n"
+                result += "</table>\n\n"
 
         secondaryText = ""
 
@@ -505,8 +865,51 @@ class Xlsx:
 
         return result
 
-    def _tableCellEscape(self, text):
-        return text.replace("|", "\\|").replace("\n", " ")
+    def _tableCellEscapeHtml(self, text):
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _tableColumnIndex(self, reference):
+        result = 0
+
+        for a in range(len(reference)):
+            if reference[a].isalpha() == False:
+                break
+
+            result = result * 26 + (ord(reference[a].upper()) - 64)
+
+        return result - 1
+
+    def _tableRowNumber(self, reference):
+        result = ""
+
+        for a in range(len(reference)):
+            if reference[a].isdigit():
+                result += reference[a]
+
+        return int(result)
+
+    def _tableMergeObject(self, mergeList):
+        resultObject = {}
+
+        for a in range(len(mergeList)):
+            referenceList = mergeList[a].split(":")
+
+            if len(referenceList) != 2:
+                continue
+
+            columnStart = self._tableColumnIndex(referenceList[0])
+            columnEnd = self._tableColumnIndex(referenceList[1])
+            rowStart = self._tableRowNumber(referenceList[0])
+            rowEnd = self._tableRowNumber(referenceList[1])
+
+            for b in range(rowStart, rowEnd + 1):
+                for c in range(columnStart, columnEnd + 1):
+                    if b == rowStart and c == columnStart:
+                        resultObject[(b, c)] = {"rowSpan": rowEnd - rowStart + 1, "columnSpan": columnEnd - columnStart + 1}
+                    else:
+                        resultObject[(b, c)] = None
+
+        return resultObject
 
     def execute(self, astPageList):
         result = ""
@@ -527,32 +930,42 @@ class Xlsx:
 
             result += f"# {sheetName}\n\n"
 
+            mergeObject = self._tableMergeObject(astPage.get("mergeList", []))
+
             if len(rowItemList) > 0:
                 columnCount = len(rowItemList[0]["cellList"])
 
-                headerText = "| row |"
-                separatorText = "| --- |"
+                headerText = "<tr><td>row</td>"
 
                 for b in range(columnCount):
-                    headerText += f" {self._tableColumnLetter(b)} |"
-                    separatorText += " --- |"
+                    headerText += f"<td>{self._tableColumnLetter(b)}</td>"
 
-                result += f"{headerText}\n{separatorText}\n"
+                result += f"<table>\n{headerText}</tr>\n"
 
                 for b in range(len(rowItemList)):
-                    rowText = f"| {rowItemList[b]['number']} |"
+                    rowNumber = rowItemList[b]["number"]
+
+                    rowText = f"<tr><td>{rowNumber}</td>"
 
                     for c in range(len(rowItemList[b]["cellList"])):
-                        rowText += f" {self._tableCellEscape(rowItemList[b]['cellList'][c])} |"
+                        mergeCellObject = mergeObject[(rowNumber, c)] if (rowNumber, c) in mergeObject else {"rowSpan": 1, "columnSpan": 1}
 
-                    result += f"{rowText}\n"
+                        if mergeCellObject is None:
+                            continue
 
-                result += "\n"
+                        attributeText = ""
 
-            mergeList = astPage.get("mergeList", [])
+                        if mergeCellObject["rowSpan"] > 1:
+                            attributeText += f" rowspan=\"{mergeCellObject['rowSpan']}\""
 
-            if len(mergeList) > 0:
-                result += f"Merge: {', '.join(mergeList)}\n\n"
+                        if mergeCellObject["columnSpan"] > 1:
+                            attributeText += f" colspan=\"{mergeCellObject['columnSpan']}\""
+
+                        rowText += f"<td{attributeText}>{self._tableCellEscapeHtml(rowItemList[b]['cellList'][c])}</td>"
+
+                    result += f"{rowText}</tr>\n"
+
+                result += "</table>\n\n"
 
         secondaryText = ""
 
@@ -581,15 +994,24 @@ class Pptx:
     def _headingHash(self, level):
         return "#" * min(level, self.levelHeadingMax)
 
-    def _tableRowText(self, cellList):
-        result = "|"
+    def _tableCellEscapeHtml(self, text):
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _tableRowHtml(self, cellList):
+        result = "<tr>"
 
         for a in range(len(cellList)):
-            cellText = cellList[a].replace("|", "\\|").replace("\n", " ")
+            attributeText = ""
 
-            result += f" {cellText} |"
+            if cellList[a]["rowSpan"] > 1:
+                attributeText += f" rowspan=\"{cellList[a]['rowSpan']}\""
 
-        return result
+            if cellList[a]["columnSpan"] > 1:
+                attributeText += f" colspan=\"{cellList[a]['columnSpan']}\""
+
+            result += f"<td{attributeText}>{self._tableCellEscapeHtml(cellList[a]['text'])}</td>"
+
+        return f"{result}</tr>"
 
     def execute(self, astPageList):
         result = ""
@@ -605,12 +1027,10 @@ class Pptx:
                 if item["label"] == "tableRow":
                     cellList = item.get("cellList", [])
 
-                    rowText = self._tableRowText(cellList)
+                    rowText = self._tableRowHtml(cellList)
 
                     if isTableOpen == False:
-                        separatorText = "| --- " * len(cellList) + "|"
-
-                        result += f"{rowText}\n{separatorText}\n"
+                        result += f"<table>\n{rowText}\n"
 
                         isTableOpen = True
                     else:
@@ -619,7 +1039,7 @@ class Pptx:
                     continue
 
                 if isTableOpen:
-                    result += "\n"
+                    result += "</table>\n\n"
 
                     isTableOpen = False
 
@@ -631,7 +1051,7 @@ class Pptx:
                     result += f"{item['text']}\n\n"
 
             if isTableOpen:
-                result += "\n"
+                result += "</table>\n\n"
 
         secondaryText = ""
 

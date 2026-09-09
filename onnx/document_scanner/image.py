@@ -1,9 +1,9 @@
 import sys
-sys.dont_write_bytecode = True
-
 import os
 import cv2
 import glob
+
+sys.dont_write_bytecode = True
 
 # Source
 import detection
@@ -36,7 +36,40 @@ class Reader:
 
         return resultObject
 
-    def _edgeInsideCollect(self, tableList, pointList):
+    def _edgeSplitCheck(self, coordinateList, edge, imageInk):
+        y0 = max(0, int(round(coordinateList[1])))
+        y1 = min(imageInk.shape[0], int(round(coordinateList[3])))
+
+        height = y1 - y0
+
+        if height <= 0:
+            return False
+
+        window = int(round(height * self.levelSplitMargin))
+
+        x0 = max(0, int(round(edge)) - window)
+        x1 = min(imageInk.shape[1], int(round(edge)) + window + 1)
+
+        ratioList = imageInk[y0:y1, x0:x1].sum(axis=0) / float(height)
+
+        gapMinimum = height * self.levelSplitGap
+        gapCount = 0
+
+        for a in range(len(ratioList)):
+            if ratioList[a] >= self.levelSplitLine:
+                return True
+
+            if ratioList[a] == 0.0:
+                gapCount += 1
+
+                if gapCount >= gapMinimum:
+                    return True
+            else:
+                gapCount = 0
+
+        return False
+
+    def _edgeInsideCollect(self, tableList, pointList, imageInk):
         coordinateList = self._coordinateCalculate(pointList)
 
         centerY = (coordinateList[1] + coordinateList[3]) / 2
@@ -63,8 +96,13 @@ class Reader:
         resultList = []
 
         for a in range(len(edgeList)):
-            if len(resultList) == 0 or edgeList[a] - resultList[len(resultList) - 1] > margin:
-                resultList.append(edgeList[a])
+            if len(resultList) > 0 and edgeList[a] - resultList[len(resultList) - 1] <= margin:
+                continue
+
+            if self._edgeSplitCheck(coordinateList, edgeList[a], imageInk) == False:
+                continue
+
+            resultList.append(edgeList[a])
 
         return resultList
 
@@ -116,12 +154,14 @@ class Reader:
 
             detectionList = self.detection.execute(image)
 
+            imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+
             tableList = tableObject[pageNumber]
 
             elementList = []
 
             for b in range(len(detectionList)):
-                quadList = self._quadSplit(detectionList[b]["coordinate"], self._edgeInsideCollect(tableList, detectionList[b]["coordinate"]))
+                quadList = self._quadSplit(detectionList[b]["coordinate"], self._edgeInsideCollect(tableList, detectionList[b]["coordinate"], imageInk))
 
                 for c in range(len(quadList)):
                     recognitionObject = self.recognition.execute(quadList[c], image)
@@ -148,6 +188,8 @@ class Reader:
 
     def __init__(self):
         self.levelSplitMargin = 0.5
+        self.levelSplitLine = 0.8
+        self.levelSplitGap = 0.4
 
         self.detection = detection.Detection()
         self.recognition = recognition.Recognition()

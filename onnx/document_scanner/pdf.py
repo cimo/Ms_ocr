@@ -1,11 +1,11 @@
 import sys
-sys.dont_write_bytecode = True
-
 import math
+import unicodedata
 import zlib
 import codecs
-import unicodedata
 import re
+
+sys.dont_write_bytecode = True
 
 class Reader:
     def _whitespaceCheck(self, code):

@@ -1,13 +1,14 @@
 import sys
-sys.dont_write_bytecode = True
-
 import os
 import cv2
 import numpy
 import io
 import math
 
+sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
+
+# Source
 from helper import onnxSessionBuild
 
 class Recognition:

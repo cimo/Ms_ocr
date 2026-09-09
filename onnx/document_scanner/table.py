@@ -1,11 +1,12 @@
 import sys
-sys.dont_write_bytecode = True
-
 import os
 import cv2
 import numpy
 
+sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
+
+# Source
 from helper import onnxSessionBuild
 
 class Cell:
@@ -313,3 +314,173 @@ class Cell:
 
         for a in range(len(self.labelList)):
             self.onnxSessionDetectionObject[self.labelList[a]] = onnxSessionBuild(self.pathModelDetectionObject[self.labelList[a]])
+
+
+class Vector:
+    def _segmentSelect(self, segmentList, coordinateList, isHorizontal):
+        resultList = []
+
+        for a in range(len(segmentList)):
+            segment = segmentList[a]
+
+            if isHorizontal:
+                if segment["position"] < coordinateList[1] - self.marginBox or segment["position"] > coordinateList[3] + self.marginBox:
+                    continue
+
+                start = max(segment["start"], coordinateList[0])
+                end = min(segment["end"], coordinateList[2])
+            else:
+                if segment["position"] < coordinateList[0] - self.marginBox or segment["position"] > coordinateList[2] + self.marginBox:
+                    continue
+
+                start = max(segment["start"], coordinateList[1])
+                end = min(segment["end"], coordinateList[3])
+
+            if end - start < self.lengthMinimum:
+                continue
+
+            resultList.append({"position": segment["position"], "start": start, "end": end})
+
+        return resultList
+
+    def _intervalMerge(self, intervalList):
+        resultList = []
+
+        intervalSortedList = sorted(intervalList, key=lambda intervalObject: intervalObject[0])
+
+        for a in range(len(intervalSortedList)):
+            if len(resultList) > 0 and intervalSortedList[a][0] <= resultList[len(resultList) - 1][1] + self.tolerance:
+                resultList[len(resultList) - 1][1] = max(resultList[len(resultList) - 1][1], intervalSortedList[a][1])
+            else:
+                resultList.append([intervalSortedList[a][0], intervalSortedList[a][1]])
+
+        return resultList
+
+    def _edgeBuild(self, segmentList):
+        resultList = []
+
+        segmentSortedList = sorted(segmentList, key=lambda segmentObject: segmentObject["position"])
+
+        for a in range(len(segmentSortedList)):
+            if len(resultList) > 0 and segmentSortedList[a]["position"] - resultList[len(resultList) - 1]["position"] <= self.tolerance:
+                resultList[len(resultList) - 1]["intervalList"].append([segmentSortedList[a]["start"], segmentSortedList[a]["end"]])
+            else:
+                resultList.append({
+                    "position": segmentSortedList[a]["position"],
+                    "intervalList": [[segmentSortedList[a]["start"], segmentSortedList[a]["end"]]]
+                })
+
+        for a in range(len(resultList)):
+            resultList[a]["intervalList"] = self._intervalMerge(resultList[a]["intervalList"])
+
+        return resultList
+
+    def _coverageCheck(self, intervalList, start, end):
+        length = end - start
+
+        if length <= 0:
+            return True
+
+        covered = 0.0
+
+        for a in range(len(intervalList)):
+            covered += max(0.0, min(intervalList[a][1], end) - max(intervalList[a][0], start))
+
+        return covered / length >= self.levelCoverage
+
+    def _edgeFilter(self, edgeList, start, end, level):
+        resultList = []
+
+        length = end - start
+
+        for a in range(len(edgeList)):
+            covered = 0.0
+
+            intervalList = edgeList[a]["intervalList"]
+
+            for b in range(len(intervalList)):
+                covered += max(0.0, min(intervalList[b][1], end) - max(intervalList[b][0], start))
+
+            if a == 0 or a == len(edgeList) - 1 or covered / length >= level:
+                resultList.append(edgeList[a])
+
+        return resultList
+
+    def _positionList(self, edgeList):
+        resultList = []
+
+        for a in range(len(edgeList)):
+            resultList.append(edgeList[a]["position"])
+
+        return resultList
+
+    def execute(self, coordinateList, segmentObject):
+        edgeXList = self._edgeBuild(self._segmentSelect(segmentObject["verticalList"], coordinateList, False))
+        edgeYList = self._edgeBuild(self._segmentSelect(segmentObject["horizontalList"], coordinateList, True))
+
+        edgeXList = self._edgeFilter(edgeXList, coordinateList[1], coordinateList[3], self.levelEdgeColumn)
+        edgeYList = self._edgeFilter(edgeYList, coordinateList[0], coordinateList[2], self.levelEdgeRow)
+
+        if len(edgeXList) < 2 or len(edgeYList) < 2:
+            return {"rowCount": 0, "columnCount": 0, "edgeXList": [], "edgeYList": [], "cellList": [], "type": "wired"}
+
+        rowCount = len(edgeYList) - 1
+        columnCount = len(edgeXList) - 1
+
+        consumedObject = {}
+
+        cellList = []
+
+        for a in range(rowCount):
+            for b in range(columnCount):
+                if (a, b) in consumedObject:
+                    continue
+
+                columnSpan = 1
+
+                while b + columnSpan < columnCount and not self._coverageCheck(
+                    edgeXList[b + columnSpan]["intervalList"], edgeYList[a]["position"], edgeYList[a + 1]["position"]
+                ):
+                    columnSpan += 1
+
+                rowSpan = 1
+
+                while a + rowSpan < rowCount and not self._coverageCheck(
+                    edgeYList[a + rowSpan]["intervalList"], edgeXList[b]["position"], edgeXList[b + columnSpan]["position"]
+                ):
+                    rowSpan += 1
+
+                for c in range(rowSpan):
+                    for d in range(columnSpan):
+                        consumedObject[(a + c, b + d)] = True
+
+                cellList.append({
+                    "score": 1.0,
+                    "coordinate": [
+                        edgeXList[b]["position"],
+                        edgeYList[a]["position"],
+                        edgeXList[b + columnSpan]["position"],
+                        edgeYList[a + rowSpan]["position"]
+                    ],
+                    "rowIndex": a,
+                    "columnIndex": b,
+                    "rowSpan": rowSpan,
+                    "columnSpan": columnSpan
+                })
+
+        return {
+            "rowCount": rowCount,
+            "columnCount": columnCount,
+            "edgeXList": self._positionList(edgeXList),
+            "edgeYList": self._positionList(edgeYList),
+            "cellList": cellList,
+            "type": "wired"
+        }
+
+    def __init__(self):
+        self.marginBox = 4.0
+        self.lengthMinimum = 8.0
+        self.tolerance = 3.0
+        self.levelCoverage = 0.8
+        self.levelEdgeColumn = 0.0
+        self.levelEdgeRow = 0.4

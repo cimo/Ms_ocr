@@ -1,6 +1,4 @@
 import sys
-sys.dont_write_bytecode = True
-
 import os
 import cv2
 import numpy
@@ -14,11 +12,11 @@ import unicodedata
 import zipfile
 import xml.etree.ElementTree
 
+sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
-from helper import onnxSessionBuild
 
 # Source
-import table
+from helper import onnxSessionBuild
 
 class Image:
     def _itemFlow(self, label):
@@ -410,18 +408,6 @@ class Image:
 
             imageCopy[y1:y2, x1:x2] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
 
-            if item["label"] == "table":
-                for b in range(len(item["tableObject"]["cellList"])):
-                    cell = item["tableObject"]["cellList"][b]
-
-                    cv2.rectangle(
-                        imageCopy,
-                        (int(round(cell["coordinate"][0])), int(round(cell["coordinate"][1]))),
-                        (int(round(cell["coordinate"][2])), int(round(cell["coordinate"][3]))),
-                        color,
-                        1
-                    )
-
             text = f"{item['flow']} {item['order']} - {item['label']} {round(item['score'], 3)}"
 
             textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
@@ -587,14 +573,6 @@ class Image:
                 itemSecondaryList[b]["flow"] = "secondary"
                 itemSecondaryList[b]["order"] = b + 1
 
-            for b in range(len(itemMainList)):
-                if itemMainList[b]["label"] == "table":
-                    itemMainList[b]["tableObject"] = self.tableCell.execute(itemMainList[b]["coordinate"], pageList[a]["image"])
-
-            for b in range(len(itemSecondaryList)):
-                if itemSecondaryList[b]["label"] == "table":
-                    itemSecondaryList[b]["tableObject"] = self.tableCell.execute(itemSecondaryList[b]["coordinate"], pageList[a]["image"])
-
             if self.isDebug:
                 self._debugDraw(itemMainList, itemSecondaryList, pageList[a]["image"], pathOutput, pageList[a]["number"])
 
@@ -712,8 +690,6 @@ class Image:
             "algorithm",
             "aside_text",
             "footnote",
-            "footer",
-            "number",
             "seal"
         ]
 
@@ -721,8 +697,6 @@ class Image:
         cv2.setNumThreads(1)
 
         self.onnxSession = onnxSessionBuild(self.pathModel)
-
-        self.tableCell = table.Cell()
 
 class Office:
     def _nodeTag(self, node):
@@ -1036,6 +1010,33 @@ class Office:
 
             return resultList
 
+        def _cellPropertyValue(self, cellNode, tagProperty):
+            result = None
+
+            for node in cellNode:
+                if self.office._nodeTag(node) == "tcPr":
+                    for nodeProperty in node:
+                        if self.office._nodeTag(nodeProperty) == tagProperty:
+                            result = self.office._nodeValue(nodeProperty)
+
+            return result
+
+        def _cellColumnSpan(self, cellNode):
+            value = self._cellPropertyValue(cellNode, "gridSpan")
+
+            if value is None or value == "":
+                return 1
+
+            return int(value)
+
+        def _cellMergeVertical(self, cellNode):
+            value = self._cellPropertyValue(cellNode, "vMerge")
+
+            if value is None:
+                return ""
+
+            return value if value != "" else "continue"
+
         def _blockTable(self, tableNode, styleObject, sizeDocument):
             resultList = []
 
@@ -1048,7 +1049,8 @@ class Office:
             columnMax = 0
             isData = len(rowNodeList) >= 2
 
-            rowTextList = []
+            rowCellList = []
+            openObject = {}
 
             for a in range(len(rowNodeList)):
                 cellNodeList = []
@@ -1057,9 +1059,8 @@ class Office:
                     if self.office._nodeTag(node) == "tc":
                         cellNodeList.append(node)
 
-                columnMax = max(columnMax, len(cellNodeList))
-
-                cellTextList = []
+                cellList = []
+                columnIndex = 0
 
                 for b in range(len(cellNodeList)):
                     textList = []
@@ -1081,16 +1082,29 @@ class Office:
                     if len(self._paragraphDrawingCollect(cellNodeList[b])) > 0:
                         isData = False
 
-                    cellTextList.append(" ".join(textList))
+                    columnSpan = self._cellColumnSpan(cellNodeList[b])
 
-                rowTextList.append(cellTextList)
+                    if self._cellMergeVertical(cellNodeList[b]) == "continue" and columnIndex in openObject:
+                        openObject[columnIndex]["rowSpan"] += 1
+                    else:
+                        cellObject = {"text": " ".join(textList), "rowSpan": 1, "columnSpan": columnSpan}
+
+                        cellList.append(cellObject)
+
+                        openObject[columnIndex] = cellObject
+
+                    columnIndex += columnSpan
+
+                columnMax = max(columnMax, columnIndex)
+
+                rowCellList.append(cellList)
 
             if columnMax < 2:
                 isData = False
 
             if isData:
-                for a in range(len(rowTextList)):
-                    resultList.append({"kind": "tableRow", "cellList": rowTextList[a]})
+                for a in range(len(rowCellList)):
+                    resultList.append({"kind": "tableRow", "cellList": rowCellList[a]})
             else:
                 for a in range(len(rowNodeList)):
                     for node in rowNodeList[a]:
@@ -1358,7 +1372,12 @@ class Office:
                 block = blockList[a]
 
                 if block["kind"] == "tableRow":
-                    itemMainList.append({"label": "tableRow", "text": " | ".join(block["cellList"]), "cellList": block["cellList"]})
+                    textList = []
+
+                    for b in range(len(block["cellList"])):
+                        textList.append(block["cellList"][b]["text"])
+
+                    itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"]})
                 elif block["kind"] == "image":
                     item = {"label": "image", "text": ""}
 
@@ -1890,10 +1909,13 @@ class Office:
 
             for rowNode in tableNode:
                 if self.office._nodeTag(rowNode) == "tr":
-                    cellTextList = []
+                    cellList = []
 
                     for cellNode in rowNode:
                         if self.office._nodeTag(cellNode) == "tc":
+                            if cellNode.attrib.get("hMerge", "") == "1" or cellNode.attrib.get("vMerge", "") == "1":
+                                continue
+
                             textList = []
 
                             for paragraphNode in cellNode.iter(f"{{{self.namespaceDrawing}}}p"):
@@ -1902,9 +1924,13 @@ class Office:
                                 if len(text) > 0:
                                     textList.append(text)
 
-                            cellTextList.append(" ".join(textList))
+                            cellList.append({
+                                "text": " ".join(textList),
+                                "rowSpan": int(cellNode.attrib.get("rowSpan", "1")),
+                                "columnSpan": int(cellNode.attrib.get("gridSpan", "1"))
+                            })
 
-                    resultList.append({"kind": "tableRow", "cellList": cellTextList})
+                    resultList.append({"kind": "tableRow", "cellList": cellList})
 
             return resultList
 
@@ -2053,7 +2079,12 @@ class Office:
                         else:
                             itemMainList.append({"label": "text", "text": block["text"]})
                     elif block["kind"] == "tableRow":
-                        itemMainList.append({"label": "tableRow", "text": " | ".join(block["cellList"]), "cellList": block["cellList"]})
+                        textList = []
+
+                        for c in range(len(block["cellList"])):
+                            textList.append(block["cellList"][c]["text"])
+
+                        itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"]})
                     elif block["kind"] == "chart":
                         item = {"label": "chart", "text": ""}
 
