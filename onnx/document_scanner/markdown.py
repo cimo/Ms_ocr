@@ -938,7 +938,13 @@ class Page:
                     else:
                         pageText += f"{itemText}\n"
 
-                secondaryText += f"- Page {astPage['number']}\n{pageText}\n"
+                pageLineList = pageText.splitlines()
+
+                for b in range(len(pageLineList)):
+                    if len(pageLineList[b]) > 0:
+                        pageLineList[b] = f"  {pageLineList[b]}"
+
+                secondaryText += f"- Page {astPage['number']}\n\n" + "\n".join(pageLineList) + "\n\n"
 
         if len(secondaryText) > 0:
             result += f"---\n\n{self.secondaryTitle}:\n\n{secondaryText}"
