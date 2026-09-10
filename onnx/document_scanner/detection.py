@@ -162,6 +162,5 @@ class Detection:
         self.standardList = numpy.array([0.229, 0.224, 0.225], dtype=numpy.float32)
 
         cv2.setUseOptimized(True)
-        cv2.setNumThreads(1)
 
         self.onnxSession = onnxSessionBuild(self.pathModel)

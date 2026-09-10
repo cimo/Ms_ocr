@@ -10,51 +10,6 @@ sys.path.append(f"{os.path.dirname(__file__)}/..")
 from helper import onnxSessionBuild
 
 class Test:
-    def _tableDetect(self, image):
-        imageHeight, imageWidth = image.shape[0:2]
-
-        imageRgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        imageResized = cv2.resize(imageRgb, (self.imageSizeLayout, self.imageSizeLayout), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
-
-        tensor = numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
-
-        tensorFeedObject = {
-            "image": tensor,
-            "im_shape": numpy.array([[self.imageSizeLayout, self.imageSizeLayout]], dtype=numpy.float32),
-            "scale_factor": numpy.array([[self.imageSizeLayout / float(imageHeight), self.imageSizeLayout / float(imageWidth)]], dtype=numpy.float32)
-        }
-
-        tensorOutputList = self.onnxSessionLayout.run(None, tensorFeedObject)
-
-        boxCount = int(tensorOutputList[1][0])
-
-        resultList = []
-
-        for a in range(boxCount):
-            value = tensorOutputList[0][a]
-
-            classId = int(value[0])
-            score = float(value[1])
-
-            if classId != self.classIdTable or score < self.scoreThreshold:
-                continue
-
-            x1 = max(0, min(int(round(float(value[2]))), imageWidth))
-            y1 = max(0, min(int(round(float(value[3]))), imageHeight))
-            x2 = max(0, min(int(round(float(value[4]))), imageWidth))
-            y2 = max(0, min(int(round(float(value[5]))), imageHeight))
-
-            if x2 <= x1 or y2 <= y1:
-                continue
-
-            resultList.append({
-                "score": score,
-                "coordinate": [x1, y1, x2, y2]
-            })
-
-        return self._boxContainedRemove(resultList)
-
     def _typeClassify(self, imageRgb):
         imageHeight, imageWidth = imageRgb.shape[0:2]
 
@@ -270,6 +225,82 @@ class Test:
 
         return resultList
 
+    def _textCollect(self, itemList, coordinateTableList):
+        resultList = []
+
+        for a in range(len(itemList)):
+            coordinateList = [
+                itemList[a]["bbox"][0] - coordinateTableList[0],
+                itemList[a]["bbox"][1] - coordinateTableList[1],
+                itemList[a]["bbox"][2] - coordinateTableList[0],
+                itemList[a]["bbox"][3] - coordinateTableList[1]
+            ]
+
+            centerX = (coordinateList[0] + coordinateList[2]) / 2
+            centerY = (coordinateList[1] + coordinateList[3]) / 2
+
+            if centerX < 0 or centerY < 0 or centerX > coordinateTableList[2] - coordinateTableList[0] or centerY > coordinateTableList[3] - coordinateTableList[1]:
+                continue
+
+            resultList.append(coordinateList)
+
+        return resultList
+
+    def _coverageValidate(self, coverageList, textList):
+        resultList = []
+
+        for a in range(len(coverageList)):
+            coverageCoordinateList = coverageList[a]
+
+            isText = False
+
+            for b in range(len(textList)):
+                centerX = (textList[b][0] + textList[b][2]) / 2
+                centerY = (textList[b][1] + textList[b][3]) / 2
+
+                if centerX >= coverageCoordinateList[0] and centerX <= coverageCoordinateList[2] and centerY >= coverageCoordinateList[1] and centerY <= coverageCoordinateList[3]:
+                    isText = True
+
+                    break
+
+            resultList.append({"coordinate": coverageCoordinateList, "isText": isText})
+
+        return resultList
+
+    def _textCutCollect(self, textList, cellList):
+        resultList = []
+
+        for a in range(len(textList)):
+            coordinateList = textList[a]
+
+            margin = (coordinateList[2] - coordinateList[0]) * self.levelMarginText
+
+            isCut = False
+
+            for b in range(len(cellList)):
+                cellCoordinateList = cellList[b]["coordinate"]
+
+                overlap = min(cellCoordinateList[3], coordinateList[3]) - max(cellCoordinateList[1], coordinateList[1])
+
+                if overlap < (coordinateList[3] - coordinateList[1]) * self.levelOverlapText:
+                    continue
+
+                for c in range(2):
+                    edge = cellCoordinateList[c * 2]
+
+                    if edge > coordinateList[0] + margin and edge < coordinateList[2] - margin:
+                        isCut = True
+
+                        break
+
+                if isCut:
+                    break
+
+            if isCut:
+                resultList.append(coordinateList)
+
+        return resultList
+
     def _coverageCollect(self, imageRgb, cellList):
         if len(cellList) == 0:
             return []
@@ -305,7 +336,7 @@ class Test:
 
             resultList.append([x, y, x + width, y + height])
 
-        return self._coverageSplit(resultList, cellList)
+        return self._coverageFilter(self._coverageSplit(resultList, cellList), cellList)
 
     def _coverageSplit(self, coverageList, cellList):
         resultList = []
@@ -341,22 +372,33 @@ class Test:
 
         return resultList
 
-    def _debugLayout(self, image, tableList, fileName):
-        imageDebug = image.copy()
+    def _coverageFilter(self, coverageList, cellList):
+        widthList = []
+        heightList = []
 
-        for a in range(len(tableList)):
-            coordinateList = tableList[a]["coordinate"]
+        for a in range(len(cellList)):
+            coordinateList = cellList[a]["coordinate"]
 
-            boxRegion = imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]]
-            boxOverlay = numpy.full(boxRegion.shape, self.colorTable, dtype=numpy.uint8)
+            widthList.append(coordinateList[2] - coordinateList[0])
+            heightList.append(coordinateList[3] - coordinateList[1])
 
-            imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
+        widthList.sort()
+        heightList.sort()
 
-            cv2.putText(imageDebug, f"table {a} {tableList[a]['score']:.2f}", (coordinateList[0], max(14, coordinateList[1] - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colorTable, 1)
+        widthMinimum = widthList[int(len(widthList) / 2)] * self.levelCoverageSize
+        heightMinimum = heightList[int(len(heightList) / 2)] * self.levelCoverageSize
 
-        cv2.imwrite(f"{self.pathOutput}{fileName}_layout.jpg", imageDebug)
+        resultList = []
 
-    def _debugCell(self, image, coordinateList, cellList, coverageList, typeObject, fileName, tableIndex):
+        for a in range(len(coverageList)):
+            if coverageList[a][2] - coverageList[a][0] < widthMinimum or coverageList[a][3] - coverageList[a][1] < heightMinimum:
+                continue
+
+            resultList.append(coverageList[a])
+
+        return resultList
+
+    def _debugCell(self, image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, tableIndex, tableType):
         imageDebug = image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]].copy()
 
         for a in range(len(cellList)):
@@ -365,21 +407,19 @@ class Test:
             cv2.rectangle(imageDebug, (cellCoordinateList[0], cellCoordinateList[1]), (cellCoordinateList[2], cellCoordinateList[3]), self.colorCell, 1)
 
         for a in range(len(coverageList)):
-            cv2.rectangle(imageDebug, (coverageList[a][0], coverageList[a][1]), (coverageList[a][2], coverageList[a][3]), self.colorCoverage, 1)
+            coverageCoordinateList = coverageList[a]["coordinate"]
 
-        cv2.imwrite(f"{self.pathOutput}{fileName}_table{tableIndex}_{typeObject['type']}.jpg", imageDebug)
+            color = self.colorCoverage if coverageList[a]["isText"] else self.colorCoverageEmpty
 
-    def execute(self, pathImage):
-        fileName = os.path.splitext(os.path.basename(pathImage))[0]
+            cv2.rectangle(imageDebug, (coverageCoordinateList[0], coverageCoordinateList[1]), (coverageCoordinateList[2], coverageCoordinateList[3]), color, 1)
 
-        image = cv2.imread(pathImage)
+        for a in range(len(textCutList)):
+            cv2.rectangle(imageDebug, (textCutList[a][0], textCutList[a][1]), (textCutList[a][2], textCutList[a][3]), self.colorTextCut, 1)
 
-        if image is None:
-            return
+        cv2.imwrite(f"{pathOutput}debug/table/{numberPage}_table{tableIndex}_{tableType}.jpg", imageDebug)
 
-        tableList = self._tableDetect(image)
-
-        self._debugLayout(image, tableList, fileName)
+    def execute(self, tableList, image):
+        resultList = []
 
         for a in range(len(tableList)):
             coordinateList = tableList[a]["coordinate"]
@@ -388,23 +428,37 @@ class Test:
 
             typeObject = self._typeClassify(imageRgb)
 
-            cellList = self._cellDetect(imageRgb, typeObject["type"])
+            resultList.append({
+                "coordinate": coordinateList,
+                "type": typeObject["type"],
+                "cellList": self._cellDetect(imageRgb, typeObject["type"])
+            })
 
-            coverageList = self._coverageCollect(imageRgb, cellList)
+        return resultList
 
-            self._debugCell(image, coordinateList, cellList, coverageList, typeObject, fileName, a)
+    def debugWrite(self, tableList, image, itemList, pathOutput, numberPage):
+        for a in range(len(tableList)):
+            coordinateList = tableList[a]["coordinate"]
+
+            imageRgb = cv2.cvtColor(image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]], cv2.COLOR_BGR2RGB)
+
+            cellList = tableList[a]["cellList"]
+
+            textList = self._textCollect(itemList, coordinateList)
+
+            coverageList = self._coverageValidate(self._coverageCollect(imageRgb, cellList), textList)
+
+            textCutList = self._textCutCollect(textList, cellList)
+
+            self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, a, tableList[a]["type"])
 
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathModelLayout = f"{self.osPathDirName}model/pp-docLayout_plus-l.onnx"
         self.pathModelClassification = f"{self.osPathDirName}model/pp-lcNet_x1_0_table_cls.onnx"
         self.pathModelCellObject = {
             "wired": f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx",
             "wireless": f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
         }
-        self.pathOutput = f"{self.osPathDirName}../../file/output/table/"
-
-        self.imageSizeLayout = 800
         self.imageSizeCell = 640
         self.imageSizeShort = 256
         self.imageSizeCrop = 224
@@ -417,16 +471,16 @@ class Test:
         self.levelBoxOverlap = 0.7
         self.levelCoverageArea = 0.005
         self.levelCoverageKernel = 0.4
+        self.levelCoverageSize = 0.4
         self.levelDebugOpacity = 0.2
         self.levelMarginCoverage = 0.02
+        self.levelMarginText = 0.15
+        self.levelOverlapText = 0.5
 
-        self.scoreThreshold = 0.3
         self.scoreThresholdCellObject = {
             "wired": 0.3,
             "wireless": 0.15
         }
-
-        self.classIdTable = 8
 
         self.countContainedMinimum = 2
 
@@ -434,27 +488,16 @@ class Test:
 
         self.marginCoverage = 4
 
-        self.colorTable = (0, 0, 255)
         self.colorCell = (0, 200, 0)
         self.colorCoverage = (0, 0, 255)
+        self.colorCoverageEmpty = (255, 0, 0)
+        self.colorTextCut = (255, 0, 255)
 
         self.labelList = ["wired", "wireless"]
 
-        cv2.setUseOptimized(True)
-        cv2.setNumThreads(1)
-
-        os.makedirs(self.pathOutput, exist_ok=True)
-
-        self.onnxSessionLayout = onnxSessionBuild(self.pathModelLayout)
         self.onnxSessionClassification = onnxSessionBuild(self.pathModelClassification)
 
         self.onnxSessionCellObject = {}
 
         for a in range(len(self.labelList)):
             self.onnxSessionCellObject[self.labelList[a]] = onnxSessionBuild(self.pathModelCellObject[self.labelList[a]])
-
-if __name__ == "__main__":
-    test = Test()
-
-    for a in range(1, len(sys.argv)):
-        test.execute(sys.argv[a])

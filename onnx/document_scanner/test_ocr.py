@@ -1,8 +1,6 @@
 import sys
 import os
 import cv2
-import json
-import numpy
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
@@ -28,78 +26,166 @@ class Test:
             "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
         }
 
-    def _debugDraw(self, image, coordinateItemList, fileName):
+    def _edgeSplitCheck(self, coordinateList, edge, imageInk):
+        y0 = max(0, int(round(coordinateList[1])))
+        y1 = min(imageInk.shape[0], int(round(coordinateList[3])))
+
+        height = y1 - y0
+
+        if height <= 0:
+            return False
+
+        window = int(round(height * self.levelSplitMargin))
+
+        x0 = max(0, int(round(edge)) - window)
+        x1 = min(imageInk.shape[1], int(round(edge)) + window + 1)
+
+        ratioList = imageInk[y0:y1, x0:x1].sum(axis=0) / float(height)
+
+        gapMinimum = height * self.levelSplitGap
+        gapCount = 0
+
+        for a in range(len(ratioList)):
+            if ratioList[a] >= self.levelSplitLine:
+                return True
+
+            if ratioList[a] == 0.0:
+                gapCount += 1
+
+                if gapCount >= gapMinimum:
+                    return True
+            else:
+                gapCount = 0
+
+        return False
+
+    def _edgeInsideCollect(self, tableList, pointList, imageInk):
+        coordinateList = self._coordinateCalculate(pointList)
+
+        centerY = (coordinateList[1] + coordinateList[3]) / 2
+
+        margin = (coordinateList[3] - coordinateList[1]) * self.levelSplitMargin
+
+        edgeList = []
+
+        for a in range(len(tableList)):
+            offsetX = tableList[a]["coordinate"][0]
+            offsetY = tableList[a]["coordinate"][1]
+
+            cellList = tableList[a]["cellList"]
+
+            for b in range(len(cellList)):
+                if centerY < cellList[b]["coordinate"][1] + offsetY or centerY > cellList[b]["coordinate"][3] + offsetY:
+                    continue
+
+                edgeCellList = [cellList[b]["coordinate"][0] + offsetX, cellList[b]["coordinate"][2] + offsetX]
+
+                for c in range(len(edgeCellList)):
+                    if edgeCellList[c] > coordinateList[0] + margin and edgeCellList[c] < coordinateList[2] - margin:
+                        edgeList.append(edgeCellList[c])
+
+        edgeList.sort()
+
+        resultList = []
+
+        for a in range(len(edgeList)):
+            if len(resultList) > 0 and edgeList[a] - resultList[len(resultList) - 1] <= margin:
+                continue
+
+            if self._edgeSplitCheck(coordinateList, edgeList[a], imageInk) == False:
+                continue
+
+            resultList.append(edgeList[a])
+
+        return resultList
+
+    def _pointInterpolate(self, pointStart, pointEnd, ratio):
+        return [
+            pointStart[0] + (pointEnd[0] - pointStart[0]) * ratio,
+            pointStart[1] + (pointEnd[1] - pointStart[1]) * ratio
+        ]
+
+    def _quadSplit(self, pointList, edgeList):
+        if len(edgeList) == 0:
+            return [pointList]
+
+        xLeft = min(pointList[0][0], pointList[3][0])
+        xRight = max(pointList[1][0], pointList[2][0])
+
+        ratioList = [0.0]
+
+        for a in range(len(edgeList)):
+            ratioList.append((edgeList[a] - xLeft) / (xRight - xLeft))
+
+        ratioList.append(1.0)
+
+        resultList = []
+
+        for a in range(len(ratioList) - 1):
+            resultList.append([
+                self._pointInterpolate(pointList[0], pointList[1], ratioList[a]),
+                self._pointInterpolate(pointList[0], pointList[1], ratioList[a + 1]),
+                self._pointInterpolate(pointList[3], pointList[2], ratioList[a + 1]),
+                self._pointInterpolate(pointList[3], pointList[2], ratioList[a])
+            ])
+
+        return resultList
+
+    def _debugText(self, image, coordinateItemList, pathOutput, numberPage):
         imageDebug = image.copy()
 
         for a in range(len(coordinateItemList)):
             coordinateList = coordinateItemList[a]
 
-            boxRegion = imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]]
-            boxOverlay = numpy.full(boxRegion.shape, self.colorText, dtype=numpy.uint8)
+            cv2.rectangle(imageDebug, (coordinateList[0], coordinateList[1]), (coordinateList[2], coordinateList[3]), self.colorText, 1)
 
-            imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
+        cv2.imwrite(f"{pathOutput}debug/ocr/{numberPage}.jpg", imageDebug)
 
-        cv2.imwrite(f"{self.pathOutput}{fileName}/{self.debugFileName}", imageDebug)
-
-    def execute(self, pathImage):
-        fileName = os.path.splitext(os.path.basename(pathImage))[0]
-
-        image = cv2.imread(pathImage)
-
-        if image is None:
-            return
-
+    def execute(self, image, tableList, numberPage, pathOutput):
         detectionList = self.detection.execute(image)
+
+        imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+
+        quadPageList = []
+
+        for a in range(len(detectionList)):
+            quadList = self._quadSplit(detectionList[a]["coordinate"], self._edgeInsideCollect(tableList, detectionList[a]["coordinate"], imageInk))
+
+            for b in range(len(quadList)):
+                quadPageList.append(quadList[b])
+
+        recognitionList = self.recognition.executeBatch(quadPageList, image)
 
         itemList = []
         coordinateItemList = []
 
-        for a in range(len(detectionList)):
-            recognitionObject = self.recognition.execute(detectionList[a]["coordinate"], image)
-
-            if len(recognitionObject["text"].strip()) == 0:
+        for a in range(len(quadPageList)):
+            if len(recognitionList[a]["text"].strip()) == 0:
                 continue
 
-            coordinateList = self._coordinateCalculate(detectionList[a]["coordinate"])
+            coordinateList = self._coordinateCalculate(quadPageList[a])
 
             itemList.append({
                 "id": len(itemList) + 1,
-                "page": self.numberPage,
+                "page": numberPage,
+                "bbox": [int(round(coordinateList[0])), int(round(coordinateList[1])), int(round(coordinateList[2])), int(round(coordinateList[3]))],
                 "centerPoint": self._centerPointCalculate(coordinateList),
-                "text": recognitionObject["text"],
+                "text": recognitionList[a]["text"],
                 "isMatch": False
             })
 
-            coordinateItemList.append(coordinateList)
+            coordinateItemList.append(itemList[len(itemList) - 1]["bbox"])
 
-        os.makedirs(f"{self.pathOutput}{fileName}/", exist_ok=True)
+        self._debugText(image, coordinateItemList, pathOutput, numberPage)
 
-        self._debugDraw(image, coordinateItemList, fileName)
-
-        with open(f"{self.pathOutput}{fileName}/{self.resultFileName}", "w", encoding="utf-8") as file:
-            json.dump({"layoutList": [], "itemList": itemList}, file, ensure_ascii=False, indent=2)
+        return itemList
 
     def __init__(self):
-        self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathOutput = f"{self.osPathDirName}../../file/output/ocr/"
+        self.levelSplitMargin = 0.5
+        self.levelSplitLine = 0.8
+        self.levelSplitGap = 0.4
 
-        self.resultFileName = "result.json"
-        self.debugFileName = "debug.jpg"
-
-        self.levelDebugOpacity = 0.2
-
-        self.colorText = (0, 255, 255)
-
-        self.numberPage = 1
-
-        cv2.setUseOptimized(True)
-        cv2.setNumThreads(1)
+        self.colorText = (0, 200, 0)
 
         self.detection = detection.Detection()
         self.recognition = recognition.Recognition()
-
-if __name__ == "__main__":
-    test = Test()
-
-    for a in range(1, len(sys.argv)):
-        test.execute(sys.argv[a])
