@@ -3,11 +3,6 @@ import cv2
 
 sys.dont_write_bytecode = True
 
-# Source
-import layout
-import table
-import ocr
-
 class Image:
     def _pageBuild(self, pathInput, pathOutput):
         image = cv2.imread(pathInput)
@@ -34,16 +29,16 @@ class Image:
 
             tablePageList = self.table.execute(astPage, pageList[a]["image"])
 
-            itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, pageList[a]["number"], pathOutput)
+            itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, len(itemList), pageList[a]["number"], pathOutput)
 
             self.table.cellRefine(tablePageList, itemPageList)
 
             self.table.textAssign(tablePageList, itemPageList)
 
-            self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
+            self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
 
-            layoutList = layoutList + self.layout.resultBuild(astPage)
-            tableList = tableList + self.table.resultBuild(tablePageList, pageList[a]["number"])
+            layoutList = layoutList + self.layout.resultBuild(astPage, len(layoutList))
+            tableList = tableList + self.table.resultBuild(tablePageList, len(tableList), pageList[a]["number"])
             itemList = itemList + itemPageList
 
         self.layout.astWrite(pathOutput, astPageList)
@@ -55,9 +50,9 @@ class Image:
             "itemList": itemList
         }
 
-    def __init__(self):
+    def __init__(self, layout, table, ocr):
         self.numberPageFirst = 1
 
-        self.layout = layout.Layout()
-        self.table = table.Table()
-        self.ocr = ocr.Ocr()
+        self.layout = layout
+        self.table = table
+        self.ocr = ocr

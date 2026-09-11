@@ -79,6 +79,9 @@ class Markdown:
         for a in range(len(extensionObject["image"])):
             self.builderObject[extensionObject["image"][a]] = builderImage
 
+        for a in range(len(extensionObject["pdf"])):
+            self.builderObject[extensionObject["pdf"][a]] = builderImage
+
         builderOffice = self.Office(self)
 
         for a in range(len(extensionObject["office"])):

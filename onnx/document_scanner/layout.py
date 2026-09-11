@@ -325,7 +325,7 @@ class Layout:
 
         cv2.imwrite(f"{pathOutput}debug/layout/{numberPage}.jpg", imageDebug)
 
-    def resultBuild(self, astPage):
+    def resultBuild(self, astPage, countStart):
         resultList = []
 
         flowObject = {"main": astPage["itemMainList"], "secondary": astPage["itemSecondaryList"]}
@@ -335,7 +335,7 @@ class Layout:
 
             for a in range(len(itemList)):
                 resultList.append({
-                    "id": len(resultList) + 1,
+                    "id": countStart + len(resultList) + 1,
                     "page": astPage["number"],
                     "flow": flow,
                     "label": itemList[a]["label"],

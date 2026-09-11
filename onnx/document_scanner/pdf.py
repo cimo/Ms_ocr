@@ -1,4 +1,8 @@
 import sys
+import os
+import glob
+import subprocess
+import cv2
 import math
 import unicodedata
 import zlib
@@ -6,6 +10,120 @@ import codecs
 import re
 
 sys.dont_write_bytecode = True
+
+class Process:
+    def _pageBuild(self, pathInput, pathOutput):
+        subprocess.run(["pdftoppm", "-jpeg", "-r", self.resolutionPage, pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
+
+        pathFileList = glob.glob(f"{pathOutput}page/page-*.jpg")
+
+        resultList = []
+
+        for a in range(len(pathFileList)):
+            numberPage = int(os.path.splitext(os.path.basename(pathFileList[a]))[0].split("-")[1])
+
+            pathPage = f"{pathOutput}page/{numberPage}.jpg"
+
+            os.rename(pathFileList[a], pathPage)
+
+            resultList.append({"number": numberPage, "image": cv2.imread(pathPage)})
+
+        return sorted(resultList, key=lambda pageObject: pageObject["number"])
+
+    def _itemBuild(self, image, pageReader, countStart, numberPage):
+        imageHeight, imageWidth = image.shape[0:2]
+
+        scaleX = imageWidth / pageReader["width"]
+        scaleY = imageHeight / pageReader["height"]
+
+        elementList = pageReader["elementList"]
+
+        resultList = []
+
+        for a in range(len(elementList)):
+            if elementList[a]["type"] != "text":
+                continue
+
+            bboxList = [
+                int(round(elementList[a]["x0"] * scaleX)),
+                int(round(elementList[a]["y0"] * scaleY)),
+                int(round(elementList[a]["x1"] * scaleX)),
+                int(round(elementList[a]["y1"] * scaleY))
+            ]
+
+            resultList.append({
+                "id": countStart + len(resultList) + 1,
+                "page": numberPage,
+                "bbox": bboxList,
+                "centerPoint": self._centerPointCalculate(bboxList),
+                "text": elementList[a]["text"],
+                "isMatch": False
+            })
+
+        return resultList
+
+    def _centerPointCalculate(self, bboxList):
+        return {
+            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
+            "y": int(round((bboxList[1] + bboxList[3]) / 2))
+        }
+
+    def _debugText(self, image, itemList, pathOutput, numberPage):
+        imageDebug = image.copy()
+
+        for a in range(len(itemList)):
+            bboxList = itemList[a]["bbox"]
+
+            cv2.rectangle(imageDebug, (bboxList[0], bboxList[1]), (bboxList[2], bboxList[3]), (0, 200, 0), 1)
+
+        cv2.imwrite(f"{pathOutput}debug/ocr/{numberPage}.jpg", imageDebug)
+
+    def execute(self, pathInput, pathOutput):
+        pageList = self._pageBuild(pathInput, pathOutput)
+
+        pageReaderList = self.reader.execute(pathInput)
+
+        astPageList = []
+        layoutList = []
+        tableList = []
+        itemList = []
+
+        for a in range(len(pageList)):
+            astPage = self.layout.execute(pathOutput, pageList[a]["image"], pageList[a]["number"])
+
+            astPageList.append(astPage)
+
+            tablePageList = self.table.execute(astPage, pageList[a]["image"])
+
+            itemPageList = self._itemBuild(pageList[a]["image"], pageReaderList[a], len(itemList), pageList[a]["number"])
+
+            self._debugText(pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
+
+            self.table.cellRefine(tablePageList, itemPageList)
+
+            self.table.textAssign(tablePageList, itemPageList)
+
+            self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
+
+            layoutList = layoutList + self.layout.resultBuild(astPage, len(layoutList))
+            tableList = tableList + self.table.resultBuild(tablePageList, len(tableList), pageList[a]["number"])
+            itemList = itemList + itemPageList
+
+        self.layout.astWrite(pathOutput, astPageList)
+
+        return {
+            "pageCount": len(pageList),
+            "layoutList": layoutList,
+            "tableList": tableList,
+            "itemList": itemList
+        }
+
+    def __init__(self, layout, table):
+        self.resolutionPage = "150"
+
+        self.reader = Reader()
+        self.layout = layout
+        self.table = table
 
 class Reader:
     def _byteText(self, byteList):

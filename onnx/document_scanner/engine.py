@@ -8,7 +8,11 @@ import time
 sys.dont_write_bytecode = True
 
 # Source
+import layout
+import table
+import ocr
 import image
+import pdf
 import office
 import markdown
 
@@ -72,8 +76,7 @@ class Engine:
         if extension in self.extensionObject["image"]:
             resultObject = self.image.execute(pathInput, pathOutput)
         elif extension in self.extensionObject["pdf"]:
-            # to do pdf
-            return
+            resultObject = self.pdf.execute(pathInput, pathOutput)
         elif extension in self.extensionObject["office"]:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
 
@@ -100,12 +103,12 @@ class Engine:
 
         self.debugNameList = ["layout", "table", "ocr"]
 
-        self.image = image.Image()
-
-        # to do pdf
-
+        self.layout = layout.Layout()
+        self.table = table.Table()
+        self.ocr = ocr.Ocr()
+        self.image = image.Image(self.layout, self.table, self.ocr)
+        self.pdf = pdf.Process(self.layout, self.table)
         self.office = office.Office()
-
         self.markdown = markdown.Markdown(self.extensionObject)
 
         cv2.setUseOptimized(True)

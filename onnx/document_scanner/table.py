@@ -648,7 +648,7 @@ class Table:
             for b in range(len(cellList)):
                 cellList[b]["text"] = self._textJoin(textList, cellList[b]["coordinate"])
 
-    def debugWrite(self, tableList, image, itemList, pathOutput, numberPage):
+    def debugWrite(self, tableList, image, itemList, pathOutput, numberPage, countStart):
         for a in range(len(tableList)):
             coordinateList = tableList[a]["coordinate"]
 
@@ -662,9 +662,9 @@ class Table:
 
             textCutList = self._textCutCollect(textList, cellList)
 
-            self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, a + 1, tableList[a]["type"])
+            self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, countStart + a + 1, tableList[a]["type"])
 
-    def resultBuild(self, tablePageList, numberPage):
+    def resultBuild(self, tablePageList, countStart, numberPage):
         resultList = []
 
         for a in range(len(tablePageList)):
@@ -695,7 +695,7 @@ class Table:
                 })
 
             resultList.append({
-                "id": len(resultList) + 1,
+                "id": countStart + len(resultList) + 1,
                 "page": numberPage,
                 "type": tablePageList[a]["type"],
                 "bbox": coordinateList,

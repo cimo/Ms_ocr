@@ -141,7 +141,7 @@ class Ocr:
 
         cv2.imwrite(f"{pathOutput}debug/ocr/{numberPage}.jpg", imageDebug)
 
-    def execute(self, image, tableList, numberPage, pathOutput):
+    def execute(self, image, tableList, countStart, numberPage, pathOutput):
         detectionList = self.detection.execute(image)
 
         imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
@@ -166,7 +166,7 @@ class Ocr:
             coordinateList = self._coordinateCalculate(quadPageList[a])
 
             itemList.append({
-                "id": len(itemList) + 1,
+                "id": countStart + len(itemList) + 1,
                 "page": numberPage,
                 "bbox": [int(round(coordinateList[0])), int(round(coordinateList[1])), int(round(coordinateList[2])), int(round(coordinateList[3]))],
                 "centerPoint": self._centerPointCalculate(coordinateList),

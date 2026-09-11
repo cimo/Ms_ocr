@@ -1,11 +1,5 @@
 cd /home/app
 rm -rf file/output/*/
-nohup python3 onnx/document_scanner/server.py > log/document_scanner.log 2>&1 &
-for a in $(seq 1 60); do
-  if grep -qi "Ready on" log/document_scanner.log 2>/dev/null; then break; fi
-  sleep 2
-done
-sleep 3
 IFS=$'\n'
 for pathFile in $(ls file/test/); do
   nameFile="${pathFile%.*}"
@@ -15,6 +9,4 @@ for pathFile in $(ls file/test/); do
     http://127.0.0.1:1114/engine
   echo
 done
-pkill -f server.py
-grep -iv Provider log/document_scanner.log | grep -iE "error|traceback|exception" | head -20
 echo "--- fine"
