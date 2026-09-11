@@ -3,7 +3,6 @@ import os
 import cv2
 import numpy
 import json
-import time
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
@@ -353,8 +352,6 @@ class Layout:
         return resultList
 
     def execute(self, pathOutput, image, numberPage):
-        timeStart = time.perf_counter()
-
         imageHeight, imageWidth = image.shape[0:2]
 
         itemList = self._itemOrder(self._detect(image), imageWidth)
@@ -370,10 +367,6 @@ class Layout:
 
         self._mediaWrite(itemList, image, numberPage, pathOutput)
         self._debugBox(image, itemList, pathOutput, numberPage)
-
-        timeEnd = time.perf_counter() - timeStart
-
-        print(f"\ntest_layout.py - Time: {round(timeEnd, 3)} - Page: {numberPage}")
 
         return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList}
 

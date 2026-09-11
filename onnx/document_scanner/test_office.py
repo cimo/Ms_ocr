@@ -338,6 +338,13 @@ class Office:
 
         return resultObject
 
+    def __init__(self):
+            self.readerObject = {
+                ".docx": Office.Docx(self),
+                ".xlsx": Office.Xlsx(self),
+                ".pptx": Office.Pptx(self)
+            }
+
     class Docx:
         def _fallbackRemove(self, node):
             for child in list(node):
@@ -455,24 +462,20 @@ class Office:
             resultList = []
 
             for node in paragraphNode.iter():
-                tag = self.office._xmlNodeTag(node)
+                if self.office._xmlNodeTag(node) != "drawing":
+                    continue
 
-                if tag == "drawing":
-                    chartNode = node.find(f".//{{{self.namespaceChart}}}chart")
+                chartNode = node.find(f".//{{{self.namespaceChart}}}chart")
 
-                    if chartNode is not None:
-                        resultList.append({"kind": "image", "relationshipId": chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", ""), "isChart": True})
-                    else:
-                        relationshipId = ""
+                if chartNode is not None:
+                    resultList.append({"kind": "image", "relationshipId": chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", ""), "isChart": True})
 
-                        blipNode = node.find(f".//{{{self.namespaceDrawing}}}blip")
+                    continue
 
-                        if blipNode is not None:
-                            relationshipId = blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")
+                blipNode = node.find(f".//{{{self.namespaceDrawing}}}blip")
 
-                        resultList.append({"kind": "image", "relationshipId": relationshipId, "isChart": False})
-                elif tag == "pict":
-                    resultList.append({"kind": "image", "relationshipId": "", "isChart": False})
+                if blipNode is not None:
+                    resultList.append({"kind": "image", "relationshipId": blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", ""), "isChart": False})
 
             return resultList
 
@@ -1194,12 +1197,10 @@ class Office:
                                 tag = self.office._xmlNodeTag(drawingNode)
 
                                 if tag == "graphicFrame":
-                                    item = {"label": "image", "text": ""}
-
                                     chartNode = drawingNode.find(f".//{{{self.namespaceChart}}}chart")
 
                                     if chartNode is not None:
-                                        item["label"] = "chart"
+                                        item = {"label": "chart", "text": ""}
 
                                         relationshipId = chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
                                         pathChart = pathObject[relationshipId] if relationshipId in pathObject else ""
@@ -1209,13 +1210,13 @@ class Office:
                                         if chartRootNode is not None:
                                             item["text"] = self.office._xmlChartText(chartRootNode)
 
-                                    resultList.append(item)
+                                        resultList.append(item)
                                 elif tag == "pic":
-                                    item = {"label": "image", "text": ""}
-
                                     blipNode = drawingNode.find(f".//{{{self.namespaceDrawing}}}blip")
 
                                     if blipNode is not None:
+                                        item = {"label": "image", "text": ""}
+
                                         relationshipId = blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")
                                         pathMedia = pathObject[relationshipId] if relationshipId in pathObject else ""
 
@@ -1227,7 +1228,7 @@ class Office:
 
                                             item["path"] = f"media/{os.path.basename(pathMedia)}"
 
-                                    resultList.append(item)
+                                        resultList.append(item)
 
             return resultList
 
@@ -1491,17 +1492,11 @@ class Office:
 
                         for a in range(len(blockList)):
                             resultList.append(blockList[a])
-                    else:
-                        resultList.append({"kind": "image", "relationshipId": ""})
                 elif tag == "pic":
-                    relationshipId = ""
-
                     blipNode = node.find(f".//{{{self.namespaceDrawing}}}blip")
 
                     if blipNode is not None:
-                        relationshipId = blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")
-
-                    resultList.append({"kind": "image", "relationshipId": relationshipId})
+                        resultList.append({"kind": "image", "relationshipId": blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")})
                 elif tag == "grpSp":
                     blockList = self._blockBuild(node)
 
@@ -1672,10 +1667,3 @@ class Office:
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
 
             self.placeholderSkipList = ["sldNum", "dt", "ftr"]
-
-    def __init__(self):
-        self.readerObject = {
-            ".docx": Office.Docx(self),
-            ".xlsx": Office.Xlsx(self),
-            ".pptx": Office.Pptx(self)
-        }

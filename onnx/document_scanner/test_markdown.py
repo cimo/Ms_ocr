@@ -42,7 +42,7 @@ class Markdown:
         if len(secondaryList) == 0:
             return blockList
 
-        return blockList + ["---", "SECONDARY ELEMENT:"] + secondaryList
+        return blockList + [self.textSecondaryTitle] + secondaryList
 
     def _tableWrite(self, headerList, gridList):
         separatorList = []
@@ -65,6 +65,7 @@ class Markdown:
         self.separatorCellEscaped = "\\|"
 
         self.textCellEmpty = "​"
+        self.textSecondaryTitle = "> **SECONDARY ELEMENT**"
         self.textCellSeparator = "---"
 
     class Image:
@@ -441,6 +442,16 @@ class Markdown:
 
             return resultList
 
+        def _itemChildWrite(self, text):
+            textList = text.split(self.markdown.separatorLine)
+
+            lineList = [f"{self.prefixItemChild}{textList[0]}"]
+
+            for a in range(1, len(textList)):
+                lineList.append(f"{self.prefixItemChildContinue}{textList[a]}")
+
+            return self.markdown.separatorLine.join(lineList)
+
         def _docxBuild(self, astPageList, tableList):
             blockList = []
             secondaryList = []
@@ -483,8 +494,13 @@ class Markdown:
                 if len(itemSecondaryList) == 0:
                     continue
 
-                secondaryList.append(f"- Slide {astPageList[a]['number']}")
-                secondaryList = secondaryList + self._secondaryBuild(itemSecondaryList)
+                lineList = [f"- Slide {astPageList[a]['number']}"]
+                textList = self._secondaryBuild(itemSecondaryList)
+
+                for b in range(len(textList)):
+                    lineList.append(self._itemChildWrite(textList[b]))
+
+                secondaryList.append(self.markdown.separatorLine.join(lineList))
 
             return self.markdown.separatorBlock.join(self.markdown._secondaryAppend(blockList, secondaryList))
 
@@ -499,6 +515,9 @@ class Markdown:
 
         def __init__(self):
             self.levelHeadingMax = 6
+
+            self.prefixItemChild = "  - "
+            self.prefixItemChildContinue = "    "
 
             self.office = test_office.Office()
 
