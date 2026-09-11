@@ -2,6 +2,7 @@ import sys
 import os
 import cv2
 import numpy
+import unicodedata
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
@@ -543,12 +544,25 @@ class Table:
     def _textJoin(self, textList, cellCoordinateList):
         textSortedList = sorted(self._textInsideCollect(textList, cellCoordinateList), key=lambda textObject: (textObject["coordinate"][1], textObject["coordinate"][0]))
 
-        resultList = []
+        result = ""
 
         for a in range(len(textSortedList)):
-            resultList.append(textSortedList[a]["text"])
+            if len(result) == 0:
+                result = textSortedList[a]["text"]
 
-        return " ".join(resultList)
+                continue
+
+            if self._wideCheck(result[-1:]) and self._wideCheck(textSortedList[a]["text"][0:1]):
+                result += textSortedList[a]["text"]
+
+                continue
+
+            result += f" {textSortedList[a]['text']}"
+
+        return result
+
+    def _wideCheck(self, character):
+        return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
 
     def _coverageValidate(self, coverageList, textList):
         resultList = []

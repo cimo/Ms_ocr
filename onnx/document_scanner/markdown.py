@@ -1,4 +1,5 @@
 import sys
+import unicodedata
 
 sys.dont_write_bytecode = True
 
@@ -6,6 +7,27 @@ sys.dont_write_bytecode = True
 import office
 
 class Markdown:
+    def _textJoin(self, textList):
+        result = ""
+
+        for a in range(len(textList)):
+            if len(result) == 0:
+                result = textList[a]
+
+                continue
+
+            if self._wideCheck(result[-1:]) and self._wideCheck(textList[a][0:1]):
+                result += textList[a]
+
+                continue
+
+            result += f"{self.separatorText}{textList[a]}"
+
+        return result
+
+    def _wideCheck(self, character):
+        return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
+
     def _textEscape(self, text):
         return text.replace("<", "\\<")
 
@@ -192,7 +214,7 @@ class Markdown:
             for a in range(len(itemSortedList)):
                 textList.append(itemSortedList[a]["text"])
 
-            return self.markdown._textEscape(self.markdown.separatorText.join(textList))
+            return self.markdown._textEscape(self.markdown._textJoin(textList))
 
         def _blockWrite(self, layoutObject, tableList, itemList):
             label = layoutObject["label"]
@@ -341,7 +363,7 @@ class Markdown:
             for a in range(len(lineList)):
                 textList.append(self._lineText(lineList[a]))
 
-            return self.markdown.separatorText.join(textList)
+            return self.markdown._textJoin(textList)
 
         def execute(self, resultObject, extension):
             layoutList = resultObject["layoutList"]
