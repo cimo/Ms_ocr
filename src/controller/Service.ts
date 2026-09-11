@@ -62,9 +62,9 @@ export default class Service {
 
                             helperSrc.responseBody(
                                 {
-                                    state: "ok",
-                                    message: "",
-                                    data: JSON.stringify({ uniqueId, layoutList: data.layoutList, itemList: data.itemList })
+                                    state: data.response.state,
+                                    message: data.response.message,
+                                    data: JSON.stringify({ uniqueId })
                                 },
                                 response,
                                 200

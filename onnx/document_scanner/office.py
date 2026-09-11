@@ -10,12 +10,6 @@ import xml.etree.ElementTree
 sys.dont_write_bytecode = True
 
 class Office:
-    def _xmlNodeTag(self, node):
-        return node.tag.split("}")[1] if "}" in node.tag else node.tag
-
-    def _xmlNodeValue(self, node, namespace):
-        return node.attrib.get(f"{{{namespace}}}val", "")
-
     def _xmlRootBuild(self, pathFile, zipFile):
         result = None
 
@@ -23,6 +17,12 @@ class Office:
             result = xml.etree.ElementTree.fromstring(zipFile.read(pathFile))
 
         return result
+
+    def _xmlNodeValue(self, node, namespace):
+        return node.attrib.get(f"{{{namespace}}}val", "")
+
+    def _xmlNodeTag(self, node):
+        return node.tag.split("}")[1] if "}" in node.tag else node.tag
 
     def _xmlChartText(self, chartRootNode):
         namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
@@ -120,51 +120,6 @@ class Office:
 
         return resultList
 
-    def _tableBuild(self, astPageList):
-        resultList = []
-
-        for a in range(len(astPageList)):
-            itemList = astPageList[a]["itemMainList"]
-
-            rowList = []
-
-            for b in range(len(itemList) + 1):
-                if b < len(itemList) and itemList[b]["label"] == "tableRow":
-                    rowList.append(itemList[b])
-
-                    continue
-
-                if len(rowList) == 0:
-                    continue
-
-                cellList = []
-
-                gridList = self._gridBuild(rowList)
-
-                for c in range(len(gridList)):
-                    cellList.append({
-                        "rowIndex": gridList[c]["rowIndex"],
-                        "columnIndex": gridList[c]["columnIndex"],
-                        "rowSpan": gridList[c]["rowSpan"],
-                        "columnSpan": gridList[c]["columnSpan"],
-                        "bbox": list([0, 0, 0, 0]),
-                        "centerPoint": dict({"x": 0, "y": 0}),
-                        "text": gridList[c]["text"]
-                    })
-
-                resultList.append({
-                    "id": len(resultList) + 1,
-                    "page": astPageList[a]["number"],
-                    "type": "office",
-                    "bbox": list([0, 0, 0, 0]),
-                    "centerPoint": dict({"x": 0, "y": 0}),
-                    "cellList": cellList
-                })
-
-                rowList = []
-
-        return resultList
-
     def _tableXlsxBuild(self, astPageList):
         resultList = []
 
@@ -214,47 +169,6 @@ class Office:
 
         return resultList
 
-    def _itemBuild(self, astPageList):
-        resultList = []
-
-        for a in range(len(astPageList)):
-            itemList = astPageList[a]["itemMainList"] + astPageList[a]["itemSecondaryList"]
-
-            for b in range(len(itemList)):
-                if len(itemList[b]["text"]) == 0:
-                    continue
-
-                resultList.append({
-                    "id": len(resultList) + 1,
-                    "page": astPageList[a]["number"],
-                    "bbox": list([0, 0, 0, 0]),
-                    "centerPoint": dict({"x": 0, "y": 0}),
-                    "text": itemList[b]["text"],
-                    "isMatch": False
-                })
-
-        return resultList
-
-    def _gridColumnIndex(self, reference):
-        result = 0
-
-        for a in range(len(reference)):
-            if reference[a].isalpha() == False:
-                break
-
-            result = result * 26 + (ord(reference[a].upper()) - 64)
-
-        return result - 1
-
-    def _gridRowNumber(self, reference):
-        result = ""
-
-        for a in range(len(reference)):
-            if reference[a].isdigit():
-                result += reference[a]
-
-        return int(result)
-
     def _gridMergeObject(self, mergeList):
         resultObject = {}
 
@@ -277,6 +191,71 @@ class Office:
                         resultObject[(b, c)] = None
 
         return resultObject
+
+    def _gridColumnIndex(self, reference):
+        result = 0
+
+        for a in range(len(reference)):
+            if reference[a].isalpha() == False:
+                break
+
+            result = result * 26 + (ord(reference[a].upper()) - 64)
+
+        return result - 1
+
+    def _gridRowNumber(self, reference):
+        result = ""
+
+        for a in range(len(reference)):
+            if reference[a].isdigit():
+                result += reference[a]
+
+        return int(result)
+
+    def _tableBuild(self, astPageList):
+        resultList = []
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemMainList"]
+
+            rowList = []
+
+            for b in range(len(itemList) + 1):
+                if b < len(itemList) and itemList[b]["label"] == "tableRow":
+                    rowList.append(itemList[b])
+
+                    continue
+
+                if len(rowList) == 0:
+                    continue
+
+                cellList = []
+
+                gridList = self._gridBuild(rowList)
+
+                for c in range(len(gridList)):
+                    cellList.append({
+                        "rowIndex": gridList[c]["rowIndex"],
+                        "columnIndex": gridList[c]["columnIndex"],
+                        "rowSpan": gridList[c]["rowSpan"],
+                        "columnSpan": gridList[c]["columnSpan"],
+                        "bbox": list([0, 0, 0, 0]),
+                        "centerPoint": dict({"x": 0, "y": 0}),
+                        "text": gridList[c]["text"]
+                    })
+
+                resultList.append({
+                    "id": len(resultList) + 1,
+                    "page": astPageList[a]["number"],
+                    "type": "office",
+                    "bbox": list([0, 0, 0, 0]),
+                    "centerPoint": dict({"x": 0, "y": 0}),
+                    "cellList": cellList
+                })
+
+                rowList = []
+
+        return resultList
 
     def _gridBuild(self, rowList):
         occupiedObject = {}
@@ -308,6 +287,27 @@ class Office:
                 })
 
                 columnIndex += columnSpan
+
+        return resultList
+
+    def _itemBuild(self, astPageList):
+        resultList = []
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemMainList"] + astPageList[a]["itemSecondaryList"]
+
+            for b in range(len(itemList)):
+                if len(itemList[b]["text"]) == 0:
+                    continue
+
+                resultList.append({
+                    "id": len(resultList) + 1,
+                    "page": astPageList[a]["number"],
+                    "bbox": list([0, 0, 0, 0]),
+                    "centerPoint": dict({"x": 0, "y": 0}),
+                    "text": itemList[b]["text"],
+                    "isMatch": False
+                })
 
         return resultList
 
@@ -346,93 +346,6 @@ class Office:
             }
 
     class Docx:
-        def _fallbackRemove(self, node):
-            for child in list(node):
-                if self.office._xmlNodeTag(child) == "Fallback":
-                    node.remove(child)
-                else:
-                    self._fallbackRemove(child)
-
-        def _textCollect(self, node):
-            result = ""
-
-            tag = self.office._xmlNodeTag(node)
-
-            if tag != "txbxContent":
-                if tag == "t":
-                    result += node.text if node.text is not None else ""
-                elif tag == "tab" or tag == "br":
-                    result += " "
-
-                for childNode in node:
-                    result += self._textCollect(childNode)
-
-            return result
-
-        def _paragraphText(self, paragraphNode):
-            return self._textCollect(paragraphNode).strip()
-
-        def _paragraphSize(self, sizeDocument, paragraphNode):
-            sizeDefault = sizeDocument
-
-            sizeDefaultNode = paragraphNode.find(f"{{{self.namespaceMain}}}pPr/{{{self.namespaceMain}}}rPr/{{{self.namespaceMain}}}sz")
-
-            if sizeDefaultNode is not None and self.office._xmlNodeValue(sizeDefaultNode, self.namespaceMain) != "":
-                sizeDefault = float(self.office._xmlNodeValue(sizeDefaultNode, self.namespaceMain))
-
-            countObject = {}
-
-            for runNode in paragraphNode.iter(f"{{{self.namespaceMain}}}r"):
-                size = sizeDefault
-                length = 0
-
-                sizeNode = runNode.find(f"{{{self.namespaceMain}}}rPr/{{{self.namespaceMain}}}sz")
-
-                if sizeNode is not None and self.office._xmlNodeValue(sizeNode, self.namespaceMain) != "":
-                    size = float(self.office._xmlNodeValue(sizeNode, self.namespaceMain))
-
-                for node in runNode.iter(f"{{{self.namespaceMain}}}t"):
-                    if node.text is not None:
-                        length += len(node.text)
-
-                if length > 0:
-                    countObject[size] = countObject.get(size, 0) + length
-
-            result = 0.0
-            countMax = 0
-
-            for size in countObject:
-                if countObject[size] > countMax:
-                    countMax = countObject[size]
-                    result = size
-
-            return result
-
-        def _paragraphStyle(self, paragraphNode):
-            result = ""
-
-            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}pStyle"):
-                result = self.office._xmlNodeValue(node, self.namespaceMain)
-
-            return result
-
-        def _paragraphOutlineLevel(self, paragraphNode):
-            result = -1
-
-            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}outlineLvl"):
-                if self.office._xmlNodeValue(node, self.namespaceMain) != "":
-                    result = int(self.office._xmlNodeValue(node, self.namespaceMain))
-
-            return result
-
-        def _paragraphNumberingCheck(self, paragraphNode):
-            result = False
-
-            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}numPr"):
-                result = True
-
-            return result
-
         def _styleBuild(self, styleRootNode):
             resultObject = {}
 
@@ -458,24 +371,30 @@ class Office:
 
             return resultObject
 
-        def _paragraphDrawingCollect(self, paragraphNode):
+        def _fallbackRemove(self, node):
+            for child in list(node):
+                if self.office._xmlNodeTag(child) == "Fallback":
+                    node.remove(child)
+                else:
+                    self._fallbackRemove(child)
+
+        def _blockBuild(self, containerNode, styleObject, sizeDocument):
             resultList = []
 
-            for node in paragraphNode.iter():
-                if self.office._xmlNodeTag(node) != "drawing":
-                    continue
+            for node in containerNode:
+                tag = self.office._xmlNodeTag(node)
 
-                chartNode = node.find(f".//{{{self.namespaceChart}}}chart")
+                blockList = []
 
-                if chartNode is not None:
-                    resultList.append({"kind": "image", "relationshipId": chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", ""), "isChart": True})
+                if tag == "p":
+                    blockList = self._blockParagraph(node, styleObject, False, sizeDocument)
+                elif tag == "tbl":
+                    blockList = self._blockTable(node, styleObject, sizeDocument)
+                elif tag != "sectPr":
+                    blockList = self._blockBuild(node, styleObject, sizeDocument)
 
-                    continue
-
-                blipNode = node.find(f".//{{{self.namespaceDrawing}}}blip")
-
-                if blipNode is not None:
-                    resultList.append({"kind": "image", "relationshipId": blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", ""), "isChart": False})
+                for a in range(len(blockList)):
+                    resultList.append(blockList[a])
 
             return resultList
 
@@ -520,6 +439,107 @@ class Office:
 
             return resultList
 
+        def _paragraphText(self, paragraphNode):
+            return self._textCollect(paragraphNode).strip()
+
+        def _textCollect(self, node):
+            result = ""
+
+            tag = self.office._xmlNodeTag(node)
+
+            if tag != "txbxContent":
+                if tag == "t":
+                    result += node.text if node.text is not None else ""
+                elif tag == "tab" or tag == "br":
+                    result += " "
+
+                for childNode in node:
+                    result += self._textCollect(childNode)
+
+            return result
+
+        def _paragraphStyle(self, paragraphNode):
+            result = ""
+
+            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}pStyle"):
+                result = self.office._xmlNodeValue(node, self.namespaceMain)
+
+            return result
+
+        def _paragraphOutlineLevel(self, paragraphNode):
+            result = -1
+
+            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}outlineLvl"):
+                if self.office._xmlNodeValue(node, self.namespaceMain) != "":
+                    result = int(self.office._xmlNodeValue(node, self.namespaceMain))
+
+            return result
+
+        def _paragraphSize(self, sizeDocument, paragraphNode):
+            sizeDefault = sizeDocument
+
+            sizeDefaultNode = paragraphNode.find(f"{{{self.namespaceMain}}}pPr/{{{self.namespaceMain}}}rPr/{{{self.namespaceMain}}}sz")
+
+            if sizeDefaultNode is not None and self.office._xmlNodeValue(sizeDefaultNode, self.namespaceMain) != "":
+                sizeDefault = float(self.office._xmlNodeValue(sizeDefaultNode, self.namespaceMain))
+
+            countObject = {}
+
+            for runNode in paragraphNode.iter(f"{{{self.namespaceMain}}}r"):
+                size = sizeDefault
+                length = 0
+
+                sizeNode = runNode.find(f"{{{self.namespaceMain}}}rPr/{{{self.namespaceMain}}}sz")
+
+                if sizeNode is not None and self.office._xmlNodeValue(sizeNode, self.namespaceMain) != "":
+                    size = float(self.office._xmlNodeValue(sizeNode, self.namespaceMain))
+
+                for node in runNode.iter(f"{{{self.namespaceMain}}}t"):
+                    if node.text is not None:
+                        length += len(node.text)
+
+                if length > 0:
+                    countObject[size] = countObject.get(size, 0) + length
+
+            result = 0.0
+            countMax = 0
+
+            for size in countObject:
+                if countObject[size] > countMax:
+                    countMax = countObject[size]
+                    result = size
+
+            return result
+
+        def _paragraphNumberingCheck(self, paragraphNode):
+            result = False
+
+            for node in paragraphNode.iter(f"{{{self.namespaceMain}}}numPr"):
+                result = True
+
+            return result
+
+        def _paragraphDrawingCollect(self, paragraphNode):
+            resultList = []
+
+            for node in paragraphNode.iter():
+                if self.office._xmlNodeTag(node) != "drawing":
+                    continue
+
+                chartNode = node.find(f".//{{{self.namespaceChart}}}chart")
+
+                if chartNode is not None:
+                    resultList.append({"kind": "image", "relationshipId": chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", ""), "isChart": True})
+
+                    continue
+
+                blipNode = node.find(f".//{{{self.namespaceDrawing}}}blip")
+
+                if blipNode is not None:
+                    resultList.append({"kind": "image", "relationshipId": blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", ""), "isChart": False})
+
+            return resultList
+
         def _blockWrapped(self, containerNode, styleObject, sizeDocument):
             blockList = []
 
@@ -561,33 +581,6 @@ class Office:
                     resultList[a]["isAside"] = len(resultList[a]["text"]) <= self.levelAsideLength
 
             return resultList
-
-        def _cellPropertyValue(self, cellNode, tagProperty):
-            result = None
-
-            for node in cellNode:
-                if self.office._xmlNodeTag(node) == "tcPr":
-                    for nodeProperty in node:
-                        if self.office._xmlNodeTag(nodeProperty) == tagProperty:
-                            result = self.office._xmlNodeValue(nodeProperty, self.namespaceMain)
-
-            return result
-
-        def _cellColumnSpan(self, cellNode):
-            value = self._cellPropertyValue(cellNode, "gridSpan")
-
-            if value is None or value == "":
-                return 1
-
-            return int(value)
-
-        def _cellMergeVertical(self, cellNode):
-            value = self._cellPropertyValue(cellNode, "vMerge")
-
-            if value is None:
-                return ""
-
-            return value if value != "" else "continue"
 
         def _blockTable(self, tableNode, styleObject, sizeDocument):
             resultList = []
@@ -668,114 +661,35 @@ class Office:
 
             return resultList
 
-        def _blockBuild(self, containerNode, styleObject, sizeDocument):
-            resultList = []
+        def _cellColumnSpan(self, cellNode):
+            value = self._cellPropertyValue(cellNode, "gridSpan")
 
-            for node in containerNode:
-                tag = self.office._xmlNodeTag(node)
+            if value is None or value == "":
+                return 1
 
-                blockList = []
+            return int(value)
 
-                if tag == "p":
-                    blockList = self._blockParagraph(node, styleObject, False, sizeDocument)
-                elif tag == "tbl":
-                    blockList = self._blockTable(node, styleObject, sizeDocument)
-                elif tag != "sectPr":
-                    blockList = self._blockBuild(node, styleObject, sizeDocument)
+        def _cellPropertyValue(self, cellNode, tagProperty):
+            result = None
 
-                for a in range(len(blockList)):
-                    resultList.append(blockList[a])
+            for node in cellNode:
+                if self.office._xmlNodeTag(node) == "tcPr":
+                    for nodeProperty in node:
+                        if self.office._xmlNodeTag(nodeProperty) == tagProperty:
+                            result = self.office._xmlNodeValue(nodeProperty, self.namespaceMain)
 
-            return resultList
+            return result
 
-        def _asideRunFlush(self, runIndexList, blockList):
-            if len(runIndexList) >= self.levelAsideCount:
-                for a in range(len(runIndexList)):
-                    blockList[runIndexList[a]]["isAside"] = True
+        def _cellMergeVertical(self, cellNode):
+            value = self._cellPropertyValue(cellNode, "vMerge")
+
+            if value is None:
+                return ""
+
+            return value if value != "" else "continue"
 
         def _wideCheck(self, character):
             return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
-
-        def _bodyTextCheck(self, block):
-            result = False
-
-            if block["kind"] == "paragraph" and block["outlineLevel"] == -1 and block["isList"] == False:
-                if block["style"] != "Title" and block["styleName"] != "title" and re.match(r"Heading(\d)", block["style"]) is None:
-                    if "caption" not in block["styleName"] and "Caption" not in block["style"] and "didascalia" not in block["styleName"]:
-                        result = True
-
-            return result
-
-        def _sentenceEndCheck(self, text):
-            textClean = re.sub(r"(\s*\[[^\[\]]{1,20}\]|[)\]}\"'”’»›])+$", "", text.strip())
-
-            return len(textClean) > 0 and textClean[-1:] in self.sentenceEndList
-
-        def _continuationCheck(self, previous, block):
-            result = False
-
-            if previous is not None and previous["kind"] == "paragraph" and previous["isAside"] == False:
-                if len(previous["text"]) > self.levelAsideLength and previous["size"] == block["size"]:
-                    if self._sentenceEndCheck(previous["text"]) == False:
-                        result = True
-
-            return result
-
-        def _previousParagraph(self, index, blockList):
-            result = None
-
-            for a in range(index - 1, -1, -1):
-                block = blockList[a]
-
-                if block["kind"] == "paragraph":
-                    if block["isAside"] == False:
-                        result = block
-
-                        break
-                elif block["kind"] != "image":
-                    break
-
-            return result
-
-        def _previousBlock(self, index, blockList):
-            result = None
-
-            for a in range(index - 1, -1, -1):
-                block = blockList[a]
-
-                if block["kind"] == "image":
-                    continue
-
-                if block["kind"] == "paragraph":
-                    result = block
-
-                break
-
-            return result
-
-        def _continuationMark(self, blockList):
-            for a in range(len(blockList)):
-                block = blockList[a]
-
-                if block["kind"] == "paragraph" and block["isAside"] == False and block["isContinuation"] == False and self._bodyTextCheck(block):
-                    isChained = False
-
-                    if block["isWrapped"]:
-                        previousBlock = self._previousBlock(a, blockList)
-
-                        if previousBlock is not None and previousBlock["isAside"] and previousBlock["size"] == block["size"]:
-                            if self._sentenceEndCheck(previousBlock["text"]) == False:
-                                block["isAside"] = True
-
-                                isChained = True
-
-                    if isChained == False and (len(block["text"]) <= self.levelAsideLength or block["text"][0:1].islower()):
-                        previous = self._previousParagraph(a, blockList)
-
-                        if self._continuationCheck(previous, block):
-                            block["isContinuation"] = True
-
-            return blockList
 
         def _asideMark(self, blockList):
             runIndexList = []
@@ -806,6 +720,92 @@ class Office:
             self._asideRunFlush(runIndexList, blockList)
 
             return blockList
+
+        def _bodyTextCheck(self, block):
+            result = False
+
+            if block["kind"] == "paragraph" and block["outlineLevel"] == -1 and block["isList"] == False:
+                if block["style"] != "Title" and block["styleName"] != "title" and re.match(r"Heading(\d)", block["style"]) is None:
+                    if "caption" not in block["styleName"] and "Caption" not in block["style"] and "didascalia" not in block["styleName"]:
+                        result = True
+
+            return result
+
+        def _continuationCheck(self, previous, block):
+            result = False
+
+            if previous is not None and previous["kind"] == "paragraph" and previous["isAside"] == False:
+                if len(previous["text"]) > self.levelAsideLength and previous["size"] == block["size"]:
+                    if self._sentenceEndCheck(previous["text"]) == False:
+                        result = True
+
+            return result
+
+        def _sentenceEndCheck(self, text):
+            textClean = re.sub(r"(\s*\[[^\[\]]{1,20}\]|[)\]}\"'”’»›])+$", "", text.strip())
+
+            return len(textClean) > 0 and textClean[-1:] in self.sentenceEndList
+
+        def _asideRunFlush(self, runIndexList, blockList):
+            if len(runIndexList) >= self.levelAsideCount:
+                for a in range(len(runIndexList)):
+                    blockList[runIndexList[a]]["isAside"] = True
+
+        def _continuationMark(self, blockList):
+            for a in range(len(blockList)):
+                block = blockList[a]
+
+                if block["kind"] == "paragraph" and block["isAside"] == False and block["isContinuation"] == False and self._bodyTextCheck(block):
+                    isChained = False
+
+                    if block["isWrapped"]:
+                        previousBlock = self._previousBlock(a, blockList)
+
+                        if previousBlock is not None and previousBlock["isAside"] and previousBlock["size"] == block["size"]:
+                            if self._sentenceEndCheck(previousBlock["text"]) == False:
+                                block["isAside"] = True
+
+                                isChained = True
+
+                    if isChained == False and (len(block["text"]) <= self.levelAsideLength or block["text"][0:1].islower()):
+                        previous = self._previousParagraph(a, blockList)
+
+                        if self._continuationCheck(previous, block):
+                            block["isContinuation"] = True
+
+            return blockList
+
+        def _previousBlock(self, index, blockList):
+            result = None
+
+            for a in range(index - 1, -1, -1):
+                block = blockList[a]
+
+                if block["kind"] == "image":
+                    continue
+
+                if block["kind"] == "paragraph":
+                    result = block
+
+                break
+
+            return result
+
+        def _previousParagraph(self, index, blockList):
+            result = None
+
+            for a in range(index - 1, -1, -1):
+                block = blockList[a]
+
+                if block["kind"] == "paragraph":
+                    if block["isAside"] == False:
+                        result = block
+
+                        break
+                elif block["kind"] != "image":
+                    break
+
+            return result
 
         def _bodySize(self, blockList):
             countObject = {}
@@ -1015,16 +1015,13 @@ class Office:
             self.sentenceEndList = [".", "!", "?", "…", ";", ":", "。", "！", "？", "；", "："]
 
     class Xlsx:
-        def _cellColumn(self, reference):
-            result = 0
+        def _sharedStringBuild(self, sharedStringRootNode):
+            resultList = []
 
-            for a in range(len(reference)):
-                if reference[a].isalpha():
-                    result = result * 26 + (ord(reference[a].upper()) - 64)
-                else:
-                    break
+            for node in sharedStringRootNode.iter(f"{{{self.namespaceMain}}}si"):
+                resultList.append(self._stringText(node))
 
-            return max(0, result - 1)
+            return resultList
 
         def _stringText(self, node):
             result = ""
@@ -1039,19 +1036,6 @@ class Office:
                     result += self._stringText(childNode)
 
             return result
-
-        def _sharedStringBuild(self, sharedStringRootNode):
-            resultList = []
-
-            for node in sharedStringRootNode.iter(f"{{{self.namespaceMain}}}si"):
-                resultList.append(self._stringText(node))
-
-            return resultList
-
-        def _dateFormatCheck(self, formatCode):
-            formatClean = re.sub(r"\"[^\"]*\"|\[[^\]]*\]|\\.", "", formatCode)
-
-            return re.search(r"[dmyhs]", formatClean, re.IGNORECASE) is not None
 
         def _dateStyleBuild(self, styleRootNode):
             resultList = []
@@ -1082,64 +1066,33 @@ class Office:
 
             return resultList
 
-        def _numberCheck(self, text):
-            return re.match(r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$", text) is not None
+        def _dateFormatCheck(self, formatCode):
+            formatClean = re.sub(r"\"[^\"]*\"|\[[^\]]*\]|\\.", "", formatCode)
 
-        def _numberText(self, text):
-            result = text
+            return re.search(r"[dmyhs]", formatClean, re.IGNORECASE) is not None
 
-            value = float(text)
+        def _sheetBuild(self, zipFile):
+            resultList = []
 
-            if value == int(value):
-                result = str(int(value))
+            workbookRootNode = self.office._xmlRootBuild("xl/workbook.xml", zipFile)
+            relationshipRootNode = self.office._xmlRootBuild("xl/_rels/workbook.xml.rels", zipFile)
 
-            return result
+            pathObject = {}
 
-        def _dateText(self, value):
-            dateValue = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=value)
+            if relationshipRootNode is not None:
+                for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
+                    target = node.attrib.get("Target", "")
 
-            result = dateValue.strftime("%Y-%m-%d %H:%M:%S")
+                    pathObject[node.attrib.get("Id", "")] = target[1:] if target.startswith("/") else f"xl/{target}"
 
-            if value < 1.0:
-                result = dateValue.strftime("%H:%M:%S")
-            elif value == int(value):
-                result = dateValue.strftime("%Y-%m-%d")
+            if workbookRootNode is not None:
+                for node in workbookRootNode.iter(f"{{{self.namespaceMain}}}sheet"):
+                    relationshipId = node.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
 
-            return result
+                    if relationshipId in pathObject and "worksheets/" in pathObject[relationshipId]:
+                        resultList.append({"name": node.attrib.get("name", ""), "path": pathObject[relationshipId]})
 
-        def _cellText(self, cellNode, sharedStringList, dateStyleList):
-            result = ""
-
-            cellType = cellNode.attrib.get("t", "n")
-
-            valueNode = cellNode.find(f"{{{self.namespaceMain}}}v")
-            valueText = valueNode.text if valueNode is not None and valueNode.text is not None else ""
-
-            if cellType == "s":
-                if valueText != "" and int(valueText) < len(sharedStringList):
-                    result = sharedStringList[int(valueText)]
-            elif cellType == "inlineStr":
-                inlineNode = cellNode.find(f"{{{self.namespaceMain}}}is")
-
-                if inlineNode is not None:
-                    result = self._stringText(inlineNode)
-            elif cellType == "b":
-                result = "TRUE" if valueText == "1" else "FALSE"
-            elif cellType == "str" or cellType == "e":
-                result = valueText
-            else:
-                result = valueText
-
-                if valueText != "" and self._numberCheck(valueText):
-                    styleText = cellNode.attrib.get("s", "")
-                    styleIndex = int(styleText) if styleText.isdigit() else -1
-
-                    if styleIndex in dateStyleList:
-                        result = self._dateText(float(valueText))
-                    else:
-                        result = self._numberText(valueText)
-
-            return result.strip()
+            return resultList
 
         def _pivotRangeCollect(self, zipFile, sheetPath):
             resultList = []
@@ -1170,67 +1123,16 @@ class Office:
 
             return resultList
 
-        def _drawingCollect(self, zipFile, sheetPath, pathOutput):
-            resultList = []
+        def _cellColumn(self, reference):
+            result = 0
 
-            relationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels", zipFile)
+            for a in range(len(reference)):
+                if reference[a].isalpha():
+                    result = result * 26 + (ord(reference[a].upper()) - 64)
+                else:
+                    break
 
-            if relationshipRootNode is not None:
-                for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
-                    if node.attrib.get("Type", "").endswith("/drawing"):
-                        target = node.attrib.get("Target", "")
-                        pathDrawing = target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(sheetPath)}/{target}")
-
-                        drawingRootNode = self.office._xmlRootBuild(pathDrawing, zipFile)
-                        drawingRelationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(pathDrawing)}/_rels/{os.path.basename(pathDrawing)}.rels", zipFile)
-
-                        pathObject = {}
-
-                        if drawingRelationshipRootNode is not None:
-                            for relationshipNode in drawingRelationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
-                                targetDrawing = relationshipNode.attrib.get("Target", "")
-
-                                pathObject[relationshipNode.attrib.get("Id", "")] = targetDrawing[1:] if targetDrawing.startswith("/") else os.path.normpath(f"{os.path.dirname(pathDrawing)}/{targetDrawing}")
-
-                        if drawingRootNode is not None:
-                            for drawingNode in drawingRootNode.iter():
-                                tag = self.office._xmlNodeTag(drawingNode)
-
-                                if tag == "graphicFrame":
-                                    chartNode = drawingNode.find(f".//{{{self.namespaceChart}}}chart")
-
-                                    if chartNode is not None:
-                                        item = {"label": "chart", "text": ""}
-
-                                        relationshipId = chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
-                                        pathChart = pathObject[relationshipId] if relationshipId in pathObject else ""
-
-                                        chartRootNode = self.office._xmlRootBuild(pathChart, zipFile)
-
-                                        if chartRootNode is not None:
-                                            item["text"] = self.office._xmlChartText(chartRootNode)
-
-                                        resultList.append(item)
-                                elif tag == "pic":
-                                    blipNode = drawingNode.find(f".//{{{self.namespaceDrawing}}}blip")
-
-                                    if blipNode is not None:
-                                        item = {"label": "image", "text": ""}
-
-                                        relationshipId = blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")
-                                        pathMedia = pathObject[relationshipId] if relationshipId in pathObject else ""
-
-                                        if pathMedia in zipFile.namelist():
-                                            os.makedirs(f"{pathOutput}media/", exist_ok=True)
-
-                                            with open(f"{pathOutput}media/{os.path.basename(pathMedia)}", "wb") as file:
-                                                file.write(zipFile.read(pathMedia))
-
-                                            item["path"] = f"media/{os.path.basename(pathMedia)}"
-
-                                        resultList.append(item)
-
-            return resultList
+            return max(0, result - 1)
 
         def _rowCollect(self, sheetRootNode, sharedStringList, dateStyleList, pivotRangeList):
             rowObjectList = []
@@ -1301,6 +1203,65 @@ class Office:
 
             return resultList
 
+        def _cellText(self, cellNode, sharedStringList, dateStyleList):
+            result = ""
+
+            cellType = cellNode.attrib.get("t", "n")
+
+            valueNode = cellNode.find(f"{{{self.namespaceMain}}}v")
+            valueText = valueNode.text if valueNode is not None and valueNode.text is not None else ""
+
+            if cellType == "s":
+                if valueText != "" and int(valueText) < len(sharedStringList):
+                    result = sharedStringList[int(valueText)]
+            elif cellType == "inlineStr":
+                inlineNode = cellNode.find(f"{{{self.namespaceMain}}}is")
+
+                if inlineNode is not None:
+                    result = self._stringText(inlineNode)
+            elif cellType == "b":
+                result = "TRUE" if valueText == "1" else "FALSE"
+            elif cellType == "str" or cellType == "e":
+                result = valueText
+            else:
+                result = valueText
+
+                if valueText != "" and self._numberCheck(valueText):
+                    styleText = cellNode.attrib.get("s", "")
+                    styleIndex = int(styleText) if styleText.isdigit() else -1
+
+                    if styleIndex in dateStyleList:
+                        result = self._dateText(float(valueText))
+                    else:
+                        result = self._numberText(valueText)
+
+            return result.strip()
+
+        def _numberCheck(self, text):
+            return re.match(r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$", text) is not None
+
+        def _dateText(self, value):
+            dateValue = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=value)
+
+            result = dateValue.strftime("%Y-%m-%d %H:%M:%S")
+
+            if value < 1.0:
+                result = dateValue.strftime("%H:%M:%S")
+            elif value == int(value):
+                result = dateValue.strftime("%Y-%m-%d")
+
+            return result
+
+        def _numberText(self, text):
+            result = text
+
+            value = float(text)
+
+            if value == int(value):
+                result = str(int(value))
+
+            return result
+
         def _mergeCollect(self, sheetRootNode):
             resultList = []
 
@@ -1312,26 +1273,65 @@ class Office:
 
             return resultList
 
-        def _sheetBuild(self, zipFile):
+        def _drawingCollect(self, zipFile, sheetPath, pathOutput):
             resultList = []
 
-            workbookRootNode = self.office._xmlRootBuild("xl/workbook.xml", zipFile)
-            relationshipRootNode = self.office._xmlRootBuild("xl/_rels/workbook.xml.rels", zipFile)
-
-            pathObject = {}
+            relationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(sheetPath)}/_rels/{os.path.basename(sheetPath)}.rels", zipFile)
 
             if relationshipRootNode is not None:
                 for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
-                    target = node.attrib.get("Target", "")
+                    if node.attrib.get("Type", "").endswith("/drawing"):
+                        target = node.attrib.get("Target", "")
+                        pathDrawing = target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(sheetPath)}/{target}")
 
-                    pathObject[node.attrib.get("Id", "")] = target[1:] if target.startswith("/") else f"xl/{target}"
+                        drawingRootNode = self.office._xmlRootBuild(pathDrawing, zipFile)
+                        drawingRelationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(pathDrawing)}/_rels/{os.path.basename(pathDrawing)}.rels", zipFile)
 
-            if workbookRootNode is not None:
-                for node in workbookRootNode.iter(f"{{{self.namespaceMain}}}sheet"):
-                    relationshipId = node.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
+                        pathObject = {}
 
-                    if relationshipId in pathObject and "worksheets/" in pathObject[relationshipId]:
-                        resultList.append({"name": node.attrib.get("name", ""), "path": pathObject[relationshipId]})
+                        if drawingRelationshipRootNode is not None:
+                            for relationshipNode in drawingRelationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
+                                targetDrawing = relationshipNode.attrib.get("Target", "")
+
+                                pathObject[relationshipNode.attrib.get("Id", "")] = targetDrawing[1:] if targetDrawing.startswith("/") else os.path.normpath(f"{os.path.dirname(pathDrawing)}/{targetDrawing}")
+
+                        if drawingRootNode is not None:
+                            for drawingNode in drawingRootNode.iter():
+                                tag = self.office._xmlNodeTag(drawingNode)
+
+                                if tag == "graphicFrame":
+                                    chartNode = drawingNode.find(f".//{{{self.namespaceChart}}}chart")
+
+                                    if chartNode is not None:
+                                        item = {"label": "chart", "text": ""}
+
+                                        relationshipId = chartNode.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
+                                        pathChart = pathObject[relationshipId] if relationshipId in pathObject else ""
+
+                                        chartRootNode = self.office._xmlRootBuild(pathChart, zipFile)
+
+                                        if chartRootNode is not None:
+                                            item["text"] = self.office._xmlChartText(chartRootNode)
+
+                                        resultList.append(item)
+                                elif tag == "pic":
+                                    blipNode = drawingNode.find(f".//{{{self.namespaceDrawing}}}blip")
+
+                                    if blipNode is not None:
+                                        item = {"label": "image", "text": ""}
+
+                                        relationshipId = blipNode.attrib.get(f"{{{self.namespaceRelationship}}}embed", "")
+                                        pathMedia = pathObject[relationshipId] if relationshipId in pathObject else ""
+
+                                        if pathMedia in zipFile.namelist():
+                                            os.makedirs(f"{pathOutput}media/", exist_ok=True)
+
+                                            with open(f"{pathOutput}media/{os.path.basename(pathMedia)}", "wb") as file:
+                                                file.write(zipFile.read(pathMedia))
+
+                                            item["path"] = f"media/{os.path.basename(pathMedia)}"
+
+                                        resultList.append(item)
 
             return resultList
 
@@ -1404,63 +1404,37 @@ class Office:
             self.numberFormatDateList = [14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]
 
     class Pptx:
-        def _textCollect(self, node):
-            result = ""
-
-            tag = self.office._xmlNodeTag(node)
-
-            if tag == "t":
-                result += node.text if node.text is not None else ""
-            elif tag == "br" or tag == "tab":
-                result += " "
-
-            for childNode in node:
-                result += self._textCollect(childNode)
-
-            return result
-
-        def _paragraphText(self, paragraphNode):
-            return self._textCollect(paragraphNode).strip()
-
-        def _placeholderType(self, shapeNode):
-            result = ""
-
-            placeholderNode = shapeNode.find(f"{{{self.namespaceMain}}}nvSpPr/{{{self.namespaceMain}}}nvPr/{{{self.namespaceMain}}}ph")
-
-            if placeholderNode is not None:
-                result = placeholderNode.attrib.get("type", "body")
-
-            return result
-
-        def _blockTable(self, tableNode):
+        def _slideBuild(self, zipFile):
             resultList = []
 
-            for rowNode in tableNode:
-                if self.office._xmlNodeTag(rowNode) == "tr":
-                    cellList = []
+            presentationRootNode = self.office._xmlRootBuild("ppt/presentation.xml", zipFile)
 
-                    for cellNode in rowNode:
-                        if self.office._xmlNodeTag(cellNode) == "tc":
-                            if cellNode.attrib.get("hMerge", "") == "1" or cellNode.attrib.get("vMerge", "") == "1":
-                                continue
+            pathObject = self._relationshipBuild(zipFile, "ppt/presentation.xml")
 
-                            textList = []
+            if presentationRootNode is not None:
+                for node in presentationRootNode.iter(f"{{{self.namespaceMain}}}sldId"):
+                    relationshipId = node.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
 
-                            for paragraphNode in cellNode.iter(f"{{{self.namespaceDrawing}}}p"):
-                                text = self._paragraphText(paragraphNode)
-
-                                if len(text) > 0:
-                                    textList.append(text)
-
-                            cellList.append({
-                                "text": " ".join(textList),
-                                "rowSpan": int(cellNode.attrib.get("rowSpan", "1")),
-                                "columnSpan": int(cellNode.attrib.get("gridSpan", "1"))
-                            })
-
-                    resultList.append({"kind": "tableRow", "cellList": cellList})
+                    if relationshipId in pathObject:
+                        resultList.append(pathObject[relationshipId]["path"])
 
             return resultList
+
+        def _relationshipBuild(self, zipFile, pathFile):
+            resultObject = {}
+
+            relationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(pathFile)}/_rels/{os.path.basename(pathFile)}.rels", zipFile)
+
+            if relationshipRootNode is not None:
+                for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
+                    target = node.attrib.get("Target", "")
+
+                    resultObject[node.attrib.get("Id", "")] = {
+                        "path": target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(pathFile)}/{target}"),
+                        "type": node.attrib.get("Type", "")
+                    }
+
+            return resultObject
 
         def _blockBuild(self, containerNode):
             resultList = []
@@ -1505,35 +1479,61 @@ class Office:
 
             return resultList
 
-        def _relationshipBuild(self, zipFile, pathFile):
-            resultObject = {}
+        def _placeholderType(self, shapeNode):
+            result = ""
 
-            relationshipRootNode = self.office._xmlRootBuild(f"{os.path.dirname(pathFile)}/_rels/{os.path.basename(pathFile)}.rels", zipFile)
+            placeholderNode = shapeNode.find(f"{{{self.namespaceMain}}}nvSpPr/{{{self.namespaceMain}}}nvPr/{{{self.namespaceMain}}}ph")
 
-            if relationshipRootNode is not None:
-                for node in relationshipRootNode.iter(f"{{{self.namespacePackage}}}Relationship"):
-                    target = node.attrib.get("Target", "")
+            if placeholderNode is not None:
+                result = placeholderNode.attrib.get("type", "body")
 
-                    resultObject[node.attrib.get("Id", "")] = {
-                        "path": target[1:] if target.startswith("/") else os.path.normpath(f"{os.path.dirname(pathFile)}/{target}"),
-                        "type": node.attrib.get("Type", "")
-                    }
+            return result
 
-            return resultObject
+        def _paragraphText(self, paragraphNode):
+            return self._textCollect(paragraphNode).strip()
 
-        def _slideBuild(self, zipFile):
+        def _textCollect(self, node):
+            result = ""
+
+            tag = self.office._xmlNodeTag(node)
+
+            if tag == "t":
+                result += node.text if node.text is not None else ""
+            elif tag == "br" or tag == "tab":
+                result += " "
+
+            for childNode in node:
+                result += self._textCollect(childNode)
+
+            return result
+
+        def _blockTable(self, tableNode):
             resultList = []
 
-            presentationRootNode = self.office._xmlRootBuild("ppt/presentation.xml", zipFile)
+            for rowNode in tableNode:
+                if self.office._xmlNodeTag(rowNode) == "tr":
+                    cellList = []
 
-            pathObject = self._relationshipBuild(zipFile, "ppt/presentation.xml")
+                    for cellNode in rowNode:
+                        if self.office._xmlNodeTag(cellNode) == "tc":
+                            if cellNode.attrib.get("hMerge", "") == "1" or cellNode.attrib.get("vMerge", "") == "1":
+                                continue
 
-            if presentationRootNode is not None:
-                for node in presentationRootNode.iter(f"{{{self.namespaceMain}}}sldId"):
-                    relationshipId = node.attrib.get(f"{{{self.namespaceRelationship}}}id", "")
+                            textList = []
 
-                    if relationshipId in pathObject:
-                        resultList.append(pathObject[relationshipId]["path"])
+                            for paragraphNode in cellNode.iter(f"{{{self.namespaceDrawing}}}p"):
+                                text = self._paragraphText(paragraphNode)
+
+                                if len(text) > 0:
+                                    textList.append(text)
+
+                            cellList.append({
+                                "text": " ".join(textList),
+                                "rowSpan": int(cellNode.attrib.get("rowSpan", "1")),
+                                "columnSpan": int(cellNode.attrib.get("gridSpan", "1"))
+                            })
+
+                    resultList.append({"kind": "tableRow", "cellList": cellList})
 
             return resultList
 

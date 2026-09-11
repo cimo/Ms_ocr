@@ -43,31 +43,29 @@ class Recognition:
 
         return imageCrop
 
-    def _imageResize(self, image):
-        imageHeight, imageWidth = image.shape[0:2]
+    def _batchGroup(self, indexList, imageCropList):
+        resultList = []
 
-        ratioWidthHeight = max(self.imageWidthModel / float(self.imageHeightModel), imageWidth / float(imageHeight))
+        groupList = []
+        ratioStart = 0.0
 
-        widthTarget = int(self.imageHeightModel * ratioWidthHeight)
+        for a in range(len(indexList)):
+            ratio = imageCropList[indexList[a]].shape[1] / float(imageCropList[indexList[a]].shape[0])
 
-        if widthTarget > self.imageWidthMax:
-            widthTarget = self.imageWidthMax
-            widthResized = self.imageWidthMax
-        else:
-            widthResized = int(math.ceil(self.imageHeightModel * imageWidth / float(imageHeight)))
+            if len(groupList) >= self.sizeBatch or (len(groupList) > 0 and ratio > ratioStart * self.levelBatchRatio):
+                resultList.append(groupList)
 
-            if widthResized > widthTarget:
-                widthResized = widthTarget
+                groupList = []
 
-        imageResized = cv2.resize(image, (widthResized, self.imageHeightModel))
+            if len(groupList) == 0:
+                ratioStart = ratio
 
-        tensor = imageResized.astype(numpy.float32).transpose((2, 0, 1)) / 255.0
-        tensor = (tensor - 0.5) / 0.5
+            groupList.append(indexList[a])
 
-        tensorPadded = numpy.zeros((3, self.imageHeightModel, widthTarget), dtype=numpy.float32)
-        tensorPadded[:, :, 0:widthResized] = tensor
+        if len(groupList) > 0:
+            resultList.append(groupList)
 
-        return numpy.expand_dims(tensorPadded, axis=0)
+        return resultList
 
     def _textDecode(self, probability):
         indexList = probability.argmax(axis=-1)
@@ -97,43 +95,7 @@ class Recognition:
             "score": score
         }
 
-    def _batchGroup(self, indexList, imageCropList):
-        resultList = []
-
-        groupList = []
-        ratioStart = 0.0
-
-        for a in range(len(indexList)):
-            ratio = imageCropList[indexList[a]].shape[1] / float(imageCropList[indexList[a]].shape[0])
-
-            if len(groupList) >= self.sizeBatch or (len(groupList) > 0 and ratio > ratioStart * self.levelBatchRatio):
-                resultList.append(groupList)
-
-                groupList = []
-
-            if len(groupList) == 0:
-                ratioStart = ratio
-
-            groupList.append(indexList[a])
-
-        if len(groupList) > 0:
-            resultList.append(groupList)
-
-        return resultList
-
-    def execute(self, coordinateList, image):
-        imageCrop = self._imageCrop(coordinateList, image)
-
-        if imageCrop is None:
-            return {"text": "", "score": 0.0}
-
-        tensor = self._imageResize(imageCrop)
-
-        tensorOutputList = self.onnxSession.run(None, {"x": tensor})
-
-        return self._textDecode(tensorOutputList[0][0])
-
-    def executeBatch(self, coordinateItemList, image):
+    def execute(self, coordinateItemList, image):
         imageCropList = []
 
         for a in range(len(coordinateItemList)):
@@ -192,10 +154,9 @@ class Recognition:
         self.imageHeightModel = 48
         self.imageWidthModel = 320
         self.imageWidthMax = 3200
+        
         self.ratioRotate = 1.5
-
         self.sizeBatch = 16
-
         self.levelBatchRatio = 1.25
 
         self.characterList = ["blank"]

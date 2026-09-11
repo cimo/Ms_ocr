@@ -13,18 +13,12 @@ sys.dont_write_bytecode = True
 import engine
 
 class HandlerHttpRequest(BaseHTTPRequestHandler):
-    engineProcessor = engine.Processor()
+    engine = engine.Engine()
 
     def _routeEngine(self, text):
         payload = json.loads(text)
 
-        pathInput = payload.get("pathInput")
-        pathOutput = payload.get("pathOutput")
-        searchText = payload.get("searchText")
-
-        fileName = os.path.basename(pathInput)
-
-        return self.engineProcessor.execute(pathOutput, searchText, pathInput, fileName)
+        return self.engine.execute(payload["pathInput"], payload["pathOutput"], payload["searchText"])
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))

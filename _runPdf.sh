@@ -7,7 +7,7 @@ for a in $(seq 1 60); do
 done
 sleep 3
 IFS=$'\n'
-for pathFile in $(ls file/test/); do
+for pathFile in $(ls file/test/ | grep -iE "\.pdf$"); do
   nameFile="${pathFile%.*}"
   echo "=== $pathFile"
   curl -s -X POST -H "Content-Type: application/json" \

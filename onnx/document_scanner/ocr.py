@@ -6,59 +6,10 @@ sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-import test_detection
-import test_recognition
+import detection
+import recognition
 
 class Ocr:
-    def _coordinateCalculate(self, pointList):
-        xList = []
-        yList = []
-
-        for a in range(len(pointList)):
-            xList.append(pointList[a][0])
-            yList.append(pointList[a][1])
-
-        return [min(xList), min(yList), max(xList), max(yList)]
-
-    def _centerPointCalculate(self, coordinateList):
-        return {
-            "x": int(round((coordinateList[0] + coordinateList[2]) / 2)),
-            "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
-        }
-
-    def _edgeSplitCheck(self, coordinateList, edge, imageInk):
-        y0 = max(0, int(round(coordinateList[1])))
-        y1 = min(imageInk.shape[0], int(round(coordinateList[3])))
-
-        height = y1 - y0
-
-        if height <= 0:
-            return False
-
-        window = int(round(height * self.levelSplitMargin))
-
-        x0 = max(0, int(round(edge)) - window)
-        x1 = min(imageInk.shape[1], int(round(edge)) + window + 1)
-
-        ratioList = imageInk[y0:y1, x0:x1].sum(axis=0) / float(height)
-
-        gapMinimum = height * self.levelSplitGap
-        gapCount = 0
-
-        for a in range(len(ratioList)):
-            if ratioList[a] >= self.levelSplitLine:
-                return True
-
-            if ratioList[a] == 0.0:
-                gapCount += 1
-
-                if gapCount >= gapMinimum:
-                    return True
-            else:
-                gapCount = 0
-
-        return False
-
     def _edgeInsideCollect(self, tableList, pointList, imageInk):
         coordinateList = self._coordinateCalculate(pointList)
 
@@ -99,11 +50,48 @@ class Ocr:
 
         return resultList
 
-    def _pointInterpolate(self, pointStart, pointEnd, ratio):
-        return [
-            pointStart[0] + (pointEnd[0] - pointStart[0]) * ratio,
-            pointStart[1] + (pointEnd[1] - pointStart[1]) * ratio
-        ]
+    def _coordinateCalculate(self, pointList):
+        xList = []
+        yList = []
+
+        for a in range(len(pointList)):
+            xList.append(pointList[a][0])
+            yList.append(pointList[a][1])
+
+        return [min(xList), min(yList), max(xList), max(yList)]
+
+    def _edgeSplitCheck(self, coordinateList, edge, imageInk):
+        y0 = max(0, int(round(coordinateList[1])))
+        y1 = min(imageInk.shape[0], int(round(coordinateList[3])))
+
+        height = y1 - y0
+
+        if height <= 0:
+            return False
+
+        window = int(round(height * self.levelSplitMargin))
+
+        x0 = max(0, int(round(edge)) - window)
+        x1 = min(imageInk.shape[1], int(round(edge)) + window + 1)
+
+        ratioList = imageInk[y0:y1, x0:x1].sum(axis=0) / float(height)
+
+        gapMinimum = height * self.levelSplitGap
+        gapCount = 0
+
+        for a in range(len(ratioList)):
+            if ratioList[a] >= self.levelSplitLine:
+                return True
+
+            if ratioList[a] == 0.0:
+                gapCount += 1
+
+                if gapCount >= gapMinimum:
+                    return True
+            else:
+                gapCount = 0
+
+        return False
 
     def _quadSplit(self, pointList, edgeList):
         if len(edgeList) == 0:
@@ -130,6 +118,18 @@ class Ocr:
             ])
 
         return resultList
+
+    def _pointInterpolate(self, pointStart, pointEnd, ratio):
+        return [
+            pointStart[0] + (pointEnd[0] - pointStart[0]) * ratio,
+            pointStart[1] + (pointEnd[1] - pointStart[1]) * ratio
+        ]
+
+    def _centerPointCalculate(self, coordinateList):
+        return {
+            "x": int(round((coordinateList[0] + coordinateList[2]) / 2)),
+            "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
+        }
 
     def _debugText(self, image, coordinateItemList, pathOutput, numberPage):
         imageDebug = image.copy()
@@ -185,5 +185,5 @@ class Ocr:
         self.levelSplitLine = 0.8
         self.levelSplitGap = 0.4
 
-        self.detection = test_detection.Detection()
-        self.recognition = test_recognition.Recognition()
+        self.detection = detection.Detection()
+        self.recognition = recognition.Recognition()
