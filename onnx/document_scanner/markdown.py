@@ -154,6 +154,36 @@ class Markdown:
 
             return sorted(resultList, key=lambda lineObject: (lineObject["page"], lineObject["y1"]))
 
+        def _lineFlow(self, lineObject, layoutList):
+            x1Line = lineObject["itemList"][0]["bbox"][0]
+            x2Line = lineObject["itemList"][0]["bbox"][2]
+
+            for a in range(len(lineObject["itemList"])):
+                x1Line = min(x1Line, lineObject["itemList"][a]["bbox"][0])
+                x2Line = max(x2Line, lineObject["itemList"][a]["bbox"][2])
+
+            distanceBest = -1
+            flowResult = "main"
+
+            for a in range(len(layoutList)):
+                if layoutList[a]["page"] != lineObject["page"]:
+                    continue
+
+                bboxList = layoutList[a]["bbox"]
+
+                if min(x2Line, bboxList[2]) <= max(x1Line, bboxList[0]):
+                    continue
+
+                distance = max(bboxList[1] - lineObject["y2"], lineObject["y1"] - bboxList[3], 0)
+
+                if distanceBest >= 0 and distance >= distanceBest:
+                    continue
+
+                distanceBest = distance
+                flowResult = layoutList[a]["flow"]
+
+            return flowResult
+
         def _lineText(self, lineObject):
             itemSortedList = sorted(lineObject["itemList"], key=lambda itemObject: itemObject["bbox"][0])
 
@@ -327,7 +357,10 @@ class Markdown:
 
             for a in range(len(layoutList)):
                 while indexOrphan < len(lineOrphanList) and (lineOrphanList[indexOrphan]["page"], lineOrphanList[indexOrphan]["y1"]) < (layoutList[a]["page"], layoutList[a]["bbox"][1]):
-                    blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                    if self._lineFlow(lineOrphanList[indexOrphan], layoutList) == "main":
+                        blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                    else:
+                        secondaryList.append(self._lineText(lineOrphanList[indexOrphan]))
 
                     indexOrphan += 1
 
@@ -344,7 +377,10 @@ class Markdown:
                 blockList.append(block)
 
             while indexOrphan < len(lineOrphanList):
-                blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                if self._lineFlow(lineOrphanList[indexOrphan], layoutList) == "main":
+                    blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                else:
+                    secondaryList.append(self._lineText(lineOrphanList[indexOrphan]))
 
                 indexOrphan += 1
 

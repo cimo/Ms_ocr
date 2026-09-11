@@ -56,7 +56,9 @@ class Layout:
                 "score": score,
                 "bbox": [x1, y1, x2, y2],
                 "centerPoint": self._centerPointCalculate([x1, y1, x2, y2]),
-                "path": ""
+                "path": "",
+                "isAside": False,
+                "columnX1": 0
             })
 
         return self._boxContainedRemove(self._boxSuppression(resultList))
@@ -153,7 +155,7 @@ class Layout:
 
         return resultList
 
-    def _itemOrder(self, itemList, imageWidth):
+    def _itemOrder(self, itemList, imageWidth, imageHeight):
         itemHeaderList = []
         itemFooterList = []
         itemBodyList = []
@@ -180,24 +182,47 @@ class Layout:
 
                 continue
 
-            resultList = resultList + self._bandOrder(itemBandList)
+            resultList = resultList + self._bandOrder(itemBandList, imageHeight)
             resultList.append(itemSortedList[a])
 
             itemBandList = []
 
-        resultList = resultList + self._bandOrder(itemBandList)
+        resultList = resultList + self._bandOrder(itemBandList, imageHeight)
 
         return resultList + sorted(itemFooterList, key=lambda itemObject: itemObject["bbox"][1])
 
-    def _bandOrder(self, itemList):
+    def _bandOrder(self, itemList, imageHeight):
         resultList = []
 
         columnList = self._columnGroup(itemList)
 
+        y1Band = imageHeight
+        y2Band = 0
+
+        for a in range(len(itemList)):
+            y1Band = min(y1Band, itemList[a]["bbox"][1])
+            y2Band = max(y2Band, itemList[a]["bbox"][3])
+
+        isBandTall = (y2Band - y1Band) / float(imageHeight) >= self.levelBandAside
+
+        countFlowList = []
+        countFlowMain = 0
+
         for a in range(len(columnList)):
+            countFlowList.append(self._columnFlowCount(columnList[a]["itemList"]))
+
+            if countFlowList[a] > countFlowMain:
+                countFlowMain = countFlowList[a]
+
+        for a in range(len(columnList)):
+            isAside = isBandTall and countFlowMain > 0 and countFlowList[a] / float(countFlowMain) < self.levelColumnFlow
+
             itemColumnList = sorted(columnList[a]["itemList"], key=lambda itemObject: itemObject["bbox"][1])
 
             for b in range(len(itemColumnList)):
+                itemColumnList[b]["isAside"] = isAside
+                itemColumnList[b]["columnX1"] = columnList[a]["x1"]
+
                 resultList.append(itemColumnList[b])
 
         return resultList
@@ -236,34 +261,14 @@ class Layout:
 
         return sorted(resultList, key=lambda columnObject: columnObject["x1"])
 
-    def _itemFlow(self, itemObject, itemList):
-        if itemObject["label"] not in self.labelSecondaryList:
-            return "main"
+    def _columnFlowCount(self, itemList):
+        result = 0
 
-        if itemObject["label"] in self.labelFigureTitleList and self._figureNear(itemList, itemObject["bbox"]) == False:
-            return "main"
-
-        return "secondary"
-
-    def _figureNear(self, itemList, bboxList):
         for a in range(len(itemList)):
-            if itemList[a]["label"] not in self.labelFigureList:
-                continue
+            if itemList[a]["label"] in self.labelFlowList:
+                result += 1
 
-            bboxFigureList = itemList[a]["bbox"]
-
-            x1 = max(bboxList[0], bboxFigureList[0])
-            x2 = min(bboxList[2], bboxFigureList[2])
-
-            if x2 <= x1:
-                continue
-
-            if bboxList[1] - bboxFigureList[3] < 0 or bboxList[1] - bboxFigureList[3] > (bboxList[3] - bboxList[1]) * self.levelFigureGap:
-                continue
-
-            return True
-
-        return False
+        return result
 
     def _mediaWrite(self, itemList, image, numberPage, pathOutput):
         for a in range(len(itemList)):
@@ -325,6 +330,114 @@ class Layout:
 
         cv2.imwrite(f"{pathOutput}debug/layout/{numberPage}.jpg", imageDebug)
 
+    def _documentColumn(self, astPageList):
+        resultList = []
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemList"]
+
+            tolerance = astPageList[a]["width"] * self.levelColumnTolerance
+
+            for b in range(len(itemList)):
+                countFlow = 1 if itemList[b]["label"] in self.labelFlowList else 0
+
+                isAdded = False
+
+                for c in range(len(resultList)):
+                    if abs(resultList[c]["x1"] - itemList[b]["columnX1"]) > tolerance:
+                        continue
+
+                    resultList[c]["count"] += countFlow
+
+                    if itemList[b]["isAside"]:
+                        resultList[c]["isAside"] = True
+
+                    isAdded = True
+
+                    break
+
+                if isAdded == False:
+                    resultList.append({"x1": itemList[b]["columnX1"], "count": countFlow, "isAside": itemList[b]["isAside"]})
+
+        return resultList
+
+    def _columnFind(self, columnX1, columnList, tolerance):
+        for a in range(len(columnList)):
+            if abs(columnList[a]["x1"] - columnX1) <= tolerance:
+                return columnList[a]
+
+        return {"x1": columnX1, "count": 0, "isAside": False}
+
+    def _itemFlow(self, itemObject, itemList):
+        if itemObject["isAside"]:
+            return "secondary"
+
+        if itemObject["label"] not in self.labelSecondaryList:
+            return "main"
+
+        if itemObject["label"] in self.labelFigureTitleList and self._figureNear(itemList, itemObject["bbox"]) == False:
+            return "main"
+
+        return "secondary"
+
+    def _figureNear(self, itemList, bboxList):
+        for a in range(len(itemList)):
+            if itemList[a]["label"] not in self.labelFigureList:
+                continue
+
+            bboxFigureList = itemList[a]["bbox"]
+
+            x1 = max(bboxList[0], bboxFigureList[0])
+            x2 = min(bboxList[2], bboxFigureList[2])
+
+            if x2 <= x1:
+                continue
+
+            heightTitle = bboxList[3] - bboxList[1]
+            gapFigure = bboxList[1] - bboxFigureList[3]
+
+            if gapFigure < -heightTitle or gapFigure > heightTitle * self.levelFigureGap:
+                continue
+
+            return True
+
+        return False
+
+    def flowAssign(self, astPageList):
+        columnList = self._documentColumn(astPageList)
+
+        countMain = 0
+
+        for a in range(len(columnList)):
+            if columnList[a]["count"] > countMain:
+                countMain = columnList[a]["count"]
+
+        for a in range(len(astPageList)):
+            itemList = astPageList[a]["itemList"]
+
+            tolerance = astPageList[a]["width"] * self.levelColumnTolerance
+
+            itemMainList = []
+            itemSecondaryList = []
+
+            for b in range(len(itemList)):
+                columnObject = self._columnFind(itemList[b]["columnX1"], columnList, tolerance)
+
+                if columnObject["count"] >= countMain * self.levelColumnDocument:
+                    itemList[b]["isAside"] = False
+                elif columnObject["isAside"]:
+                    itemList[b]["isAside"] = True
+
+                if self._itemFlow(itemList[b], itemList) == "main":
+                    itemMainList.append(itemList[b])
+                else:
+                    itemSecondaryList.append(itemList[b])
+
+            astPageList[a]["itemMainList"] = itemMainList
+            astPageList[a]["itemSecondaryList"] = itemSecondaryList
+
+            del astPageList[a]["itemList"]
+
     def resultBuild(self, astPage, countStart):
         resultList = []
 
@@ -354,21 +467,12 @@ class Layout:
     def execute(self, pathOutput, image, numberPage):
         imageHeight, imageWidth = image.shape[0:2]
 
-        itemList = self._itemOrder(self._detect(image), imageWidth)
-
-        itemMainList = []
-        itemSecondaryList = []
-
-        for a in range(len(itemList)):
-            if self._itemFlow(itemList[a], itemList) == "main":
-                itemMainList.append(itemList[a])
-            else:
-                itemSecondaryList.append(itemList[a])
+        itemList = self._itemOrder(self._detect(image), imageWidth, imageHeight)
 
         self._mediaWrite(itemList, image, numberPage, pathOutput)
         self._debugBox(image, itemList, pathOutput, numberPage)
 
-        return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList}
+        return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemList": itemList}
 
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
@@ -378,6 +482,10 @@ class Layout:
 
         self.levelBoxContained = 0.9
         self.levelBoxNms = 0.5
+        self.levelBandAside = 0.5
+        self.levelColumnDocument = 0.25
+        self.levelColumnFlow = 0.5
+        self.levelColumnTolerance = 0.02
         self.levelColumnOverlap = 0.5
         self.levelFigureGap = 2.0
         self.levelFullWidth = 0.7
@@ -444,12 +552,14 @@ class Layout:
         }
 
         self.labelContainerList = ["table", "image", "chart"]
+        self.labelFlowList = ["doc_title", "paragraph_title", "text", "abstract", "content", "reference", "reference_content"]
         self.labelFigureList = ["image", "chart"]
         self.labelFigureTitleList = ["figure_title"]
         self.labelHeaderList = ["header"]
         self.labelFooterList = ["footer"]
         self.labelSecondaryList = [
             "image",
+            "number",
             "figure_title",
             "chart",
             "formula",

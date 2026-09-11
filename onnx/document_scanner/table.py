@@ -13,7 +13,7 @@ class Table:
     def _collect(self, astPage):
         resultList = []
 
-        itemList = astPage["itemMainList"] + astPage["itemSecondaryList"]
+        itemList = astPage["itemList"]
 
         for a in range(len(itemList)):
             if itemList[a]["label"] == "table":

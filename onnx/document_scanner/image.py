@@ -37,9 +37,13 @@ class Image:
 
             self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
 
-            layoutList = layoutList + self.layout.resultBuild(astPage, len(layoutList))
             tableList = tableList + self.table.resultBuild(tablePageList, len(tableList), pageList[a]["number"])
             itemList = itemList + itemPageList
+
+        self.layout.flowAssign(astPageList)
+
+        for a in range(len(astPageList)):
+            layoutList = layoutList + self.layout.resultBuild(astPageList[a], len(layoutList))
 
         self.layout.astWrite(pathOutput, astPageList)
 
