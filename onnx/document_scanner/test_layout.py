@@ -38,7 +38,9 @@ class Test:
             classId = int(value[0])
             score = float(value[1])
 
-            if score < self.scoreThreshold:
+            label = self.labelObject[classId] if classId in self.labelObject else str(classId)
+
+            if score < (self.scoreThresholdObject[label] if label in self.scoreThresholdObject else self.scoreThreshold):
                 continue
 
             x1 = max(0, min(int(round(float(value[2]))), imageWidth))
@@ -50,18 +52,48 @@ class Test:
                 continue
 
             resultList.append({
-                "label": self.labelObject[classId] if classId in self.labelObject else str(classId),
+                "label": label,
                 "score": score,
-                "coordinate": [x1, y1, x2, y2]
+                "bbox": [x1, y1, x2, y2],
+                "centerPoint": self._centerPointCalculate([x1, y1, x2, y2])
             })
 
         return self._boxContainedRemove(self._boxSuppression(resultList))
 
-    def _itemFlow(self, label):
-        if label in self.labelSecondaryList:
-            return "secondary"
+    def _centerPointCalculate(self, bboxList):
+        return {
+            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
+            "y": int(round((bboxList[1] + bboxList[3]) / 2))
+        }
 
-        return "main"
+    def _figureNear(self, bboxList, itemList):
+        for a in range(len(itemList)):
+            if itemList[a]["label"] not in self.labelFigureList:
+                continue
+
+            bboxFigureList = itemList[a]["bbox"]
+
+            x1 = max(bboxList[0], bboxFigureList[0])
+            x2 = min(bboxList[2], bboxFigureList[2])
+
+            if x2 <= x1:
+                continue
+
+            if max(bboxFigureList[1] - bboxList[3], bboxList[1] - bboxFigureList[3]) > (bboxList[3] - bboxList[1]) * self.levelFigureGap:
+                continue
+
+            return True
+
+        return False
+
+    def _itemFlow(self, itemObject, itemList):
+        if itemObject["label"] not in self.labelSecondaryList:
+            return "main"
+
+        if itemObject["label"] == self.labelFigureTitle and self._figureNear(itemObject["bbox"], itemList) == False:
+            return "main"
+
+        return "secondary"
 
     def _labelGroupGet(self, label):
         if label in self.labelGroupObject:
@@ -75,21 +107,21 @@ class Test:
         boxSortedList = sorted(boxList, key=lambda boxObject: (boxObject["label"] in self.labelContainerList, boxObject["score"]), reverse=True)
 
         for a in range(len(boxSortedList)):
-            coordinateList = boxSortedList[a]["coordinate"]
+            bboxList = boxSortedList[a]["bbox"]
 
-            area = (coordinateList[2] - coordinateList[0]) * (coordinateList[3] - coordinateList[1])
+            area = (bboxList[2] - bboxList[0]) * (bboxList[3] - bboxList[1])
 
             isKeep = True
 
             for b in range(len(resultList)):
-                coordinateKeptList = resultList[b]["coordinate"]
+                bboxKeptList = resultList[b]["bbox"]
 
-                areaKept = (coordinateKeptList[2] - coordinateKeptList[0]) * (coordinateKeptList[3] - coordinateKeptList[1])
+                areaKept = (bboxKeptList[2] - bboxKeptList[0]) * (bboxKeptList[3] - bboxKeptList[1])
 
-                x1 = max(coordinateList[0], coordinateKeptList[0])
-                y1 = max(coordinateList[1], coordinateKeptList[1])
-                x2 = min(coordinateList[2], coordinateKeptList[2])
-                y2 = min(coordinateList[3], coordinateKeptList[3])
+                x1 = max(bboxList[0], bboxKeptList[0])
+                y1 = max(bboxList[1], bboxKeptList[1])
+                x2 = min(bboxList[2], bboxKeptList[2])
+                y2 = min(bboxList[3], bboxKeptList[3])
 
                 if x2 <= x1 or y2 <= y1:
                     continue
@@ -114,9 +146,9 @@ class Test:
         resultList = []
 
         for a in range(len(boxList)):
-            coordinateList = boxList[a]["coordinate"]
+            bboxList = boxList[a]["bbox"]
 
-            area = (coordinateList[2] - coordinateList[0]) * (coordinateList[3] - coordinateList[1])
+            area = (bboxList[2] - bboxList[0]) * (bboxList[3] - bboxList[1])
 
             isContained = False
 
@@ -124,17 +156,17 @@ class Test:
                 if a == b:
                     continue
 
-                coordinateParentList = boxList[b]["coordinate"]
+                bboxParentList = boxList[b]["bbox"]
 
-                areaParent = (coordinateParentList[2] - coordinateParentList[0]) * (coordinateParentList[3] - coordinateParentList[1])
+                areaParent = (bboxParentList[2] - bboxParentList[0]) * (bboxParentList[3] - bboxParentList[1])
 
                 if areaParent <= area:
                     continue
 
-                x1 = max(coordinateList[0], coordinateParentList[0])
-                y1 = max(coordinateList[1], coordinateParentList[1])
-                x2 = min(coordinateList[2], coordinateParentList[2])
-                y2 = min(coordinateList[3], coordinateParentList[3])
+                x1 = max(bboxList[0], bboxParentList[0])
+                y1 = max(bboxList[1], bboxParentList[1])
+                x2 = min(bboxList[2], bboxParentList[2])
+                y2 = min(bboxList[3], bboxParentList[3])
 
                 if x2 <= x1 or y2 <= y1:
                     continue
@@ -149,27 +181,110 @@ class Test:
 
         return resultList
 
+    def _columnGroup(self, itemList):
+        resultList = []
+
+        itemSortedList = sorted(itemList, key=lambda itemObject: itemObject["bbox"][0])
+
+        for a in range(len(itemSortedList)):
+            bboxList = itemSortedList[a]["bbox"]
+
+            isAdded = False
+
+            for b in range(len(resultList)):
+                x1 = max(bboxList[0], resultList[b]["x1"])
+                x2 = min(bboxList[2], resultList[b]["x2"])
+
+                if x2 <= x1:
+                    continue
+
+                if (x2 - x1) / float(min(bboxList[2] - bboxList[0], resultList[b]["x2"] - resultList[b]["x1"])) < self.levelColumnOverlap:
+                    continue
+
+                resultList[b]["x1"] = min(resultList[b]["x1"], bboxList[0])
+                resultList[b]["x2"] = max(resultList[b]["x2"], bboxList[2])
+
+                resultList[b]["itemList"].append(itemSortedList[a])
+
+                isAdded = True
+
+                break
+
+            if isAdded == False:
+                resultList.append({"x1": bboxList[0], "x2": bboxList[2], "itemList": [itemSortedList[a]]})
+
+        return sorted(resultList, key=lambda columnObject: columnObject["x1"])
+
+    def _bandOrder(self, itemList):
+        resultList = []
+
+        columnList = self._columnGroup(itemList)
+
+        for a in range(len(columnList)):
+            itemColumnList = sorted(columnList[a]["itemList"], key=lambda itemObject: itemObject["bbox"][1])
+
+            for b in range(len(itemColumnList)):
+                resultList.append(itemColumnList[b])
+
+        return resultList
+
+    def _itemOrder(self, itemList, imageWidth):
+        itemHeaderList = []
+        itemFooterList = []
+        itemBodyList = []
+
+        for a in range(len(itemList)):
+            if itemList[a]["label"] in self.labelHeaderList:
+                itemHeaderList.append(itemList[a])
+            elif itemList[a]["label"] in self.labelFooterList:
+                itemFooterList.append(itemList[a])
+            else:
+                itemBodyList.append(itemList[a])
+
+        resultList = sorted(itemHeaderList, key=lambda itemObject: itemObject["bbox"][1])
+
+        itemSortedList = sorted(itemBodyList, key=lambda itemObject: itemObject["bbox"][1])
+
+        itemBandList = []
+
+        for a in range(len(itemSortedList)):
+            bboxList = itemSortedList[a]["bbox"]
+
+            if (bboxList[2] - bboxList[0]) / float(imageWidth) < self.levelFullWidth:
+                itemBandList.append(itemSortedList[a])
+
+                continue
+
+            resultList = resultList + self._bandOrder(itemBandList)
+            resultList.append(itemSortedList[a])
+
+            itemBandList = []
+
+        resultList = resultList + self._bandOrder(itemBandList)
+
+        return resultList + sorted(itemFooterList, key=lambda itemObject: itemObject["bbox"][1])
+
     def _debugLayout(self, image, layoutList, pathOutput, numberPage):
         imageDebug = image.copy()
 
         labelDrawnList = []
 
         for a in range(len(layoutList)):
-            coordinateList = layoutList[a]["coordinate"]
+            bboxList = layoutList[a]["bbox"]
 
             color = self.labelColorObject[layoutList[a]["label"]] if layoutList[a]["label"] in self.labelColorObject else self.colorLabel
 
-            boxRegion = imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]]
+            boxRegion = imageDebug[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
             boxOverlay = numpy.full(boxRegion.shape, color, dtype=numpy.uint8)
 
-            imageDebug[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
+            imageDebug[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
 
             text = f"{layoutList[a]['label']} {layoutList[a]['score']:.2f}"
 
             textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
 
-            x = coordinateList[0]
-            y = max(textHeight, coordinateList[1] - 6)
+            x = bboxList[0]
+            y = max(textHeight, bboxList[1] - 6)
 
             isOverlap = True
 
@@ -204,13 +319,13 @@ class Test:
 
         imageHeight, imageWidth = image.shape[0:2]
 
-        itemList = self._layoutDetect(image)
+        itemList = self._itemOrder(self._layoutDetect(image), imageWidth)
 
         itemMainList = []
         itemSecondaryList = []
 
         for a in range(len(itemList)):
-            if self._itemFlow(itemList[a]["label"]) == "main":
+            if self._itemFlow(itemList[a], itemList) == "main":
                 itemMainList.append(itemList[a])
             else:
                 itemSecondaryList.append(itemList[a])
@@ -238,9 +353,14 @@ class Test:
 
         self.levelBoxContained = 0.9
         self.levelBoxNms = 0.5
+        self.levelColumnOverlap = 0.5
+        self.levelFigureGap = 2.0
+        self.levelFullWidth = 0.7
         self.levelDebugOpacity = 0.2
 
         self.scoreThreshold = 0.3
+
+        self.scoreThresholdObject = {"table": 0.35}
 
         self.colorLabel = (0, 0, 0)
 
@@ -268,6 +388,14 @@ class Test:
         }
 
         self.labelContainerList = ["table", "image", "chart"]
+
+        self.labelFigureList = ["image", "chart"]
+
+        self.labelFigureTitle = "figure_title"
+
+        self.labelHeaderList = ["header"]
+
+        self.labelFooterList = ["footer"]
 
         self.labelSecondaryList = [
             "image",

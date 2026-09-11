@@ -242,7 +242,7 @@ class Test:
             if centerX < 0 or centerY < 0 or centerX > coordinateTableList[2] - coordinateTableList[0] or centerY > coordinateTableList[3] - coordinateTableList[1]:
                 continue
 
-            resultList.append(coordinateList)
+            resultList.append({"coordinate": coordinateList, "text": itemList[a]["text"]})
 
         return resultList
 
@@ -255,8 +255,10 @@ class Test:
             isText = False
 
             for b in range(len(textList)):
-                centerX = (textList[b][0] + textList[b][2]) / 2
-                centerY = (textList[b][1] + textList[b][3]) / 2
+                textCoordinateList = textList[b]["coordinate"]
+
+                centerX = (textCoordinateList[0] + textCoordinateList[2]) / 2
+                centerY = (textCoordinateList[1] + textCoordinateList[3]) / 2
 
                 if centerX >= coverageCoordinateList[0] and centerX <= coverageCoordinateList[2] and centerY >= coverageCoordinateList[1] and centerY <= coverageCoordinateList[3]:
                     isText = True
@@ -271,7 +273,7 @@ class Test:
         resultList = []
 
         for a in range(len(textList)):
-            coordinateList = textList[a]
+            coordinateList = textList[a]["coordinate"]
 
             margin = (coordinateList[2] - coordinateList[0]) * self.levelMarginText
 
@@ -398,6 +400,138 @@ class Test:
 
         return resultList
 
+    def _cellRecover(self, imageRgb, cellList):
+        coverageList = self._coverageCollect(imageRgb, cellList)
+
+        resultList = []
+
+        for a in range(len(cellList)):
+            resultList.append(cellList[a])
+
+        for a in range(len(coverageList)):
+            resultList.append({"score": self.scoreCellRecovered, "coordinate": coverageList[a]})
+
+        return resultList
+
+    def _positionCluster(self, valueList, tolerance):
+        resultList = []
+
+        valueSortedList = sorted(valueList)
+
+        for a in range(len(valueSortedList)):
+            if len(resultList) > 0 and valueSortedList[a] - resultList[len(resultList) - 1] <= tolerance:
+                continue
+
+            resultList.append(valueSortedList[a])
+
+        return resultList
+
+    def _positionFilter(self, positionList, valueList, tolerance):
+        countList = []
+
+        for a in range(len(positionList)):
+            count = 0
+
+            for b in range(len(valueList)):
+                if abs(valueList[b] - positionList[a]) <= tolerance:
+                    count += 1
+
+            countList.append(count)
+
+        countMinimum = max(countList) * self.levelGridSupport
+
+        resultList = []
+
+        for a in range(len(positionList)):
+            if countList[a] < countMinimum:
+                continue
+
+            resultList.append(positionList[a])
+
+        return resultList
+
+    def _positionIndex(self, value, positionList):
+        indexNearest = 0
+        distanceNearest = abs(value - positionList[0])
+
+        for a in range(1, len(positionList)):
+            distance = abs(value - positionList[a])
+
+            if distance >= distanceNearest:
+                continue
+
+            indexNearest = a
+            distanceNearest = distance
+
+        return indexNearest
+
+    def _gridBuild(self, cellList):
+        if len(cellList) == 0:
+            return cellList
+
+        widthList = []
+        heightList = []
+
+        xList = []
+        yList = []
+
+        for a in range(len(cellList)):
+            coordinateList = cellList[a]["coordinate"]
+
+            widthList.append(coordinateList[2] - coordinateList[0])
+            heightList.append(coordinateList[3] - coordinateList[1])
+
+            xList.append(coordinateList[0])
+            xList.append(coordinateList[2])
+
+            yList.append(coordinateList[1])
+            yList.append(coordinateList[3])
+
+        widthList.sort()
+        heightList.sort()
+
+        toleranceColumn = widthList[int(len(widthList) / 2)] * self.levelGridTolerance
+        toleranceRow = heightList[int(len(heightList) / 2)] * self.levelGridTolerance
+
+        columnPositionList = self._positionFilter(self._positionCluster(xList, toleranceColumn), xList, toleranceColumn)
+        rowPositionList = self._positionCluster(yList, toleranceRow)
+
+        for a in range(len(cellList)):
+            coordinateList = cellList[a]["coordinate"]
+
+            columnIndex = self._positionIndex(coordinateList[0], columnPositionList)
+            rowIndex = self._positionIndex(coordinateList[1], rowPositionList)
+
+            cellList[a]["rowIndex"] = rowIndex
+            cellList[a]["columnIndex"] = columnIndex
+            cellList[a]["rowSpan"] = max(1, self._positionIndex(coordinateList[3], rowPositionList) - rowIndex)
+            cellList[a]["columnSpan"] = max(1, self._positionIndex(coordinateList[2], columnPositionList) - columnIndex)
+
+        return sorted(cellList, key=lambda cellObject: (cellObject["rowIndex"], cellObject["columnIndex"]))
+
+    def _textJoin(self, textList, cellCoordinateList):
+        textInsideList = []
+
+        for a in range(len(textList)):
+            coordinateList = textList[a]["coordinate"]
+
+            centerX = (coordinateList[0] + coordinateList[2]) / 2
+            centerY = (coordinateList[1] + coordinateList[3]) / 2
+
+            if centerX < cellCoordinateList[0] or centerX > cellCoordinateList[2] or centerY < cellCoordinateList[1] or centerY > cellCoordinateList[3]:
+                continue
+
+            textInsideList.append(textList[a])
+
+        textSortedList = sorted(textInsideList, key=lambda textObject: (textObject["coordinate"][1], textObject["coordinate"][0]))
+
+        resultList = []
+
+        for a in range(len(textSortedList)):
+            resultList.append(textSortedList[a]["text"])
+
+        return self.separatorText.join(resultList)
+
     def _debugCell(self, image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, tableIndex, tableType):
         imageDebug = image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]].copy()
 
@@ -422,19 +556,32 @@ class Test:
         resultList = []
 
         for a in range(len(tableList)):
-            coordinateList = tableList[a]["coordinate"]
+            coordinateList = tableList[a]["bbox"]
 
             imageRgb = cv2.cvtColor(image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]], cv2.COLOR_BGR2RGB)
 
             typeObject = self._typeClassify(imageRgb)
 
+            cellList = self._cellDetect(imageRgb, typeObject["type"])
+            cellList = self._cellRecover(imageRgb, cellList)
+            cellList = self._gridBuild(cellList)
+
             resultList.append({
                 "coordinate": coordinateList,
                 "type": typeObject["type"],
-                "cellList": self._cellDetect(imageRgb, typeObject["type"])
+                "cellList": cellList
             })
 
         return resultList
+
+    def textAssign(self, tableList, itemList):
+        for a in range(len(tableList)):
+            textList = self._textCollect(itemList, tableList[a]["coordinate"])
+
+            cellList = tableList[a]["cellList"]
+
+            for b in range(len(cellList)):
+                cellList[b]["text"] = self._textJoin(textList, cellList[b]["coordinate"])
 
     def debugWrite(self, tableList, image, itemList, pathOutput, numberPage):
         for a in range(len(tableList)):
@@ -450,7 +597,7 @@ class Test:
 
             textCutList = self._textCutCollect(textList, cellList)
 
-            self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, a, tableList[a]["type"])
+            self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, a + 1, tableList[a]["type"])
 
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
@@ -487,6 +634,13 @@ class Test:
         self.sizeCoverageKernel = 3
 
         self.marginCoverage = 4
+
+        self.levelGridSupport = 0.25
+        self.levelGridTolerance = 0.3
+
+        self.separatorText = " "
+
+        self.scoreCellRecovered = 0.0
 
         self.colorCell = (0, 200, 0)
         self.colorCoverage = (0, 0, 255)

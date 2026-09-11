@@ -10,12 +10,13 @@ sys.dont_write_bytecode = True
 import test_layout
 import test_ocr
 import test_table
+import test_markdown
 
 class Processor:
-    def _centerPointCalculate(self, coordinateList):
+    def _centerPointCalculate(self, bboxList):
         return {
-            "x": int(round((coordinateList[0] + coordinateList[2]) / 2)),
-            "y": int(round((coordinateList[1] + coordinateList[3]) / 2))
+            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
+            "y": int(round((bboxList[1] + bboxList[3]) / 2))
         }
 
     def _outputBuild(self, pathOutput):
@@ -47,13 +48,55 @@ class Processor:
 
             for a in range(len(itemList)):
                 resultList.append({
+                    "id": len(resultList) + 1,
                     "page": astPage["number"],
                     "flow": flow,
                     "label": itemList[a]["label"],
                     "score": itemList[a]["score"],
-                    "bbox": itemList[a]["coordinate"],
-                    "centerPoint": self._centerPointCalculate(itemList[a]["coordinate"])
+                    "bbox": itemList[a]["bbox"],
+                    "centerPoint": itemList[a]["centerPoint"]
                 })
+
+        return resultList
+
+    def _tableBuild(self, tablePageList, numberPage):
+        resultList = []
+
+        for a in range(len(tablePageList)):
+            coordinateList = tablePageList[a]["coordinate"]
+
+            cellList = tablePageList[a]["cellList"]
+
+            cellResultList = []
+
+            for b in range(len(cellList)):
+                cellCoordinateList = cellList[b]["coordinate"]
+
+                bboxList = [
+                    cellCoordinateList[0] + coordinateList[0],
+                    cellCoordinateList[1] + coordinateList[1],
+                    cellCoordinateList[2] + coordinateList[0],
+                    cellCoordinateList[3] + coordinateList[1]
+                ]
+
+                cellResultList.append({
+                    "rowIndex": cellList[b]["rowIndex"],
+                    "columnIndex": cellList[b]["columnIndex"],
+                    "rowSpan": cellList[b]["rowSpan"],
+                    "columnSpan": cellList[b]["columnSpan"],
+                    "bbox": bboxList,
+                    "centerPoint": self._centerPointCalculate(bboxList),
+                    "text": cellList[b]["text"]
+                })
+
+            resultList.append({
+                "id": len(resultList) + 1,
+                "page": numberPage,
+                "type": tablePageList[a]["type"],
+                "bbox": coordinateList,
+                "centerPoint": self._centerPointCalculate(coordinateList),
+                "cellList": cellResultList
+            })
 
         return resultList
 
@@ -78,25 +121,29 @@ class Processor:
         pageList = self._pageBuild(pathImage, pathOutput)
 
         layoutList = []
+        tableList = []
         itemList = []
 
         for a in range(len(pageList)):
             astPage = self.testLayout.execute(pageList[a]["image"], pageList[a]["number"], pathOutput)
 
-            tableList = self.testTable.execute(self._tableCollect(astPage), pageList[a]["image"])
+            tablePageList = self.testTable.execute(self._tableCollect(astPage), pageList[a]["image"])
 
-            itemPageList = self.testOcr.execute(pageList[a]["image"], tableList, pageList[a]["number"], pathOutput)
+            itemPageList = self.testOcr.execute(pageList[a]["image"], tablePageList, pageList[a]["number"], pathOutput)
 
-            self.testTable.debugWrite(tableList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
+            self.testTable.textAssign(tablePageList, itemPageList)
+
+            self.testTable.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
 
             layoutList = layoutList + self._layoutBuild(astPage)
+            tableList = tableList + self._tableBuild(tablePageList, pageList[a]["number"])
             itemList = itemList + itemPageList
 
         with open(f"{pathOutput}{self.resultFileName}", "w", encoding="utf-8") as file:
-            json.dump({"layoutList": layoutList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
+            json.dump({"layoutList": layoutList, "tableList": tableList, "itemList": itemList}, file, ensure_ascii=False, indent=2)
 
         with open(f"{pathOutput}{self.markdownFileName}", "w", encoding="utf-8") as file:
-            file.write("")
+            file.write(self.testMarkdown.execute(layoutList, tableList, itemList))
 
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
@@ -116,6 +163,7 @@ class Processor:
         self.testLayout = test_layout.Test()
         self.testOcr = test_ocr.Test()
         self.testTable = test_table.Test()
+        self.testMarkdown = test_markdown.Test()
 
         cv2.setUseOptimized(True)
         cv2.setNumThreads(self.countThread)
