@@ -13,7 +13,7 @@ sys.dont_write_bytecode = True
 
 class Process:
     def _pageBuild(self, pathInput, pathOutput):
-        subprocess.run(["pdftoppm", "-jpeg", "-r", "150", pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
+        subprocess.run(["pdftoppm", "-jpeg", "-scale-to", "1755", pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
 
         pathFileList = glob.glob(f"{pathOutput}page/page-*.jpg")
 
