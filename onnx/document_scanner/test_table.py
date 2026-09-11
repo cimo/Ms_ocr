@@ -9,7 +9,7 @@ sys.path.append(f"{os.path.dirname(__file__)}/..")
 # Source
 from helper import onnxSessionBuild
 
-class Test:
+class Table:
     def _typeClassify(self, imageRgb):
         imageHeight, imageWidth = imageRgb.shape[0:2]
 
@@ -53,9 +53,13 @@ class Test:
             "scale_factor": numpy.array([[self.imageSizeCell / float(imageHeight), self.imageSizeCell / float(imageWidth)]], dtype=numpy.float32)
         }
 
-        tensorOutputList = self.onnxSessionCellObject[tableType].run(None, tensorFeedObject)
+        onnxSessionCell = self.onnxSessionCellWired if tableType == "wired" else self.onnxSessionCellWireless
+
+        tensorOutputList = onnxSessionCell.run(None, tensorFeedObject)
 
         boxCount = int(tensorOutputList[1][0])
+
+        scoreThreshold = self.scoreThresholdCellWired if tableType == "wired" else self.scoreThresholdCellWireless
 
         resultList = []
 
@@ -64,7 +68,7 @@ class Test:
 
             score = float(value[1])
 
-            if score < self.scoreThresholdCellObject[tableType]:
+            if score < scoreThreshold:
                 continue
 
             x1 = max(0, min(int(round(float(value[2]))), imageWidth))
@@ -530,7 +534,7 @@ class Test:
         for a in range(len(textSortedList)):
             resultList.append(textSortedList[a]["text"])
 
-        return self.separatorText.join(resultList)
+        return " ".join(resultList)
 
     def _debugCell(self, image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, tableIndex, tableType):
         imageDebug = image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]].copy()
@@ -552,24 +556,60 @@ class Test:
 
         cv2.imwrite(f"{pathOutput}debug/table/{numberPage}_table{tableIndex}_{tableType}.jpg", imageDebug)
 
-    def execute(self, tableList, image):
+    def _centerPointCalculate(self, bboxList):
+        return {
+            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
+            "y": int(round((bboxList[1] + bboxList[3]) / 2))
+        }
+
+    def _collect(self, astPage):
         resultList = []
 
-        for a in range(len(tableList)):
-            coordinateList = tableList[a]["bbox"]
+        itemList = astPage["itemMainList"] + astPage["itemSecondaryList"]
 
-            imageRgb = cv2.cvtColor(image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]], cv2.COLOR_BGR2RGB)
+        for a in range(len(itemList)):
+            if itemList[a]["label"] == "table":
+                resultList.append(itemList[a])
 
-            typeObject = self._typeClassify(imageRgb)
+        return resultList
 
-            cellList = self._cellDetect(imageRgb, typeObject["type"])
-            cellList = self._cellRecover(imageRgb, cellList)
-            cellList = self._gridBuild(cellList)
+    def resultBuild(self, tablePageList, numberPage):
+        resultList = []
+
+        for a in range(len(tablePageList)):
+            coordinateList = tablePageList[a]["coordinate"]
+
+            cellList = tablePageList[a]["cellList"]
+
+            cellResultList = []
+
+            for b in range(len(cellList)):
+                cellCoordinateList = cellList[b]["coordinate"]
+
+                bboxList = [
+                    cellCoordinateList[0] + coordinateList[0],
+                    cellCoordinateList[1] + coordinateList[1],
+                    cellCoordinateList[2] + coordinateList[0],
+                    cellCoordinateList[3] + coordinateList[1]
+                ]
+
+                cellResultList.append({
+                    "rowIndex": cellList[b]["rowIndex"],
+                    "columnIndex": cellList[b]["columnIndex"],
+                    "rowSpan": cellList[b]["rowSpan"],
+                    "columnSpan": cellList[b]["columnSpan"],
+                    "bbox": bboxList,
+                    "centerPoint": self._centerPointCalculate(bboxList),
+                    "text": cellList[b]["text"]
+                })
 
             resultList.append({
-                "coordinate": coordinateList,
-                "type": typeObject["type"],
-                "cellList": cellList
+                "id": len(resultList) + 1,
+                "page": numberPage,
+                "type": tablePageList[a]["type"],
+                "bbox": coordinateList,
+                "centerPoint": self._centerPointCalculate(coordinateList),
+                "cellList": cellResultList
             })
 
         return resultList
@@ -599,13 +639,40 @@ class Test:
 
             self._debugCell(image, coordinateList, cellList, coverageList, textCutList, pathOutput, numberPage, a + 1, tableList[a]["type"])
 
+    def execute(self, astPage, image):
+        resultList = []
+
+        tableList = self._collect(astPage)
+
+        for a in range(len(tableList)):
+            coordinateList = tableList[a]["bbox"]
+
+            imageRgb = cv2.cvtColor(image[coordinateList[1]:coordinateList[3], coordinateList[0]:coordinateList[2]], cv2.COLOR_BGR2RGB)
+
+            typeObject = self._typeClassify(imageRgb)
+
+            cellList = self._cellDetect(imageRgb, typeObject["type"])
+            cellList = self._cellRecover(imageRgb, cellList)
+            cellList = self._gridBuild(cellList)
+
+            resultList.append({
+                "coordinate": coordinateList,
+                "type": typeObject["type"],
+                "cellList": cellList
+            })
+
+        return resultList
+
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
         self.pathModelClassification = f"{self.osPathDirName}model/pp-lcNet_x1_0_table_cls.onnx"
-        self.pathModelCellObject = {
-            "wired": f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx",
-            "wireless": f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
-        }
+        self.pathModelCellWired = f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx"
+        self.pathModelCellWireless = f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
+
+        self.countContainedMinimum = 2
+        self.sizeCoverageKernel = 3
+        self.marginCoverage = 4
+
         self.imageSizeCell = 640
         self.imageSizeShort = 256
         self.imageSizeCrop = 224
@@ -623,23 +690,11 @@ class Test:
         self.levelMarginCoverage = 0.02
         self.levelMarginText = 0.15
         self.levelOverlapText = 0.5
-
-        self.scoreThresholdCellObject = {
-            "wired": 0.3,
-            "wireless": 0.15
-        }
-
-        self.countContainedMinimum = 2
-
-        self.sizeCoverageKernel = 3
-
-        self.marginCoverage = 4
-
         self.levelGridSupport = 0.25
         self.levelGridTolerance = 0.3
 
-        self.separatorText = " "
-
+        self.scoreThresholdCellWired = 0.3
+        self.scoreThresholdCellWireless = 0.15
         self.scoreCellRecovered = 0.0
 
         self.colorCell = (0, 200, 0)
@@ -650,8 +705,5 @@ class Test:
         self.labelList = ["wired", "wireless"]
 
         self.onnxSessionClassification = onnxSessionBuild(self.pathModelClassification)
-
-        self.onnxSessionCellObject = {}
-
-        for a in range(len(self.labelList)):
-            self.onnxSessionCellObject[self.labelList[a]] = onnxSessionBuild(self.pathModelCellObject[self.labelList[a]])
+        self.onnxSessionCellWired = onnxSessionBuild(self.pathModelCellWired)
+        self.onnxSessionCellWireless = onnxSessionBuild(self.pathModelCellWireless)

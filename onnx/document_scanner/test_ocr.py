@@ -6,10 +6,10 @@ sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-import detection
-import recognition
+import test_detection
+import test_recognition
 
-class Test:
+class Ocr:
     def _coordinateCalculate(self, pointList):
         xList = []
         yList = []
@@ -137,7 +137,7 @@ class Test:
         for a in range(len(coordinateItemList)):
             coordinateList = coordinateItemList[a]
 
-            cv2.rectangle(imageDebug, (coordinateList[0], coordinateList[1]), (coordinateList[2], coordinateList[3]), self.colorText, 1)
+            cv2.rectangle(imageDebug, (coordinateList[0], coordinateList[1]), (coordinateList[2], coordinateList[3]), (0, 200, 0), 1)
 
         cv2.imwrite(f"{pathOutput}debug/ocr/{numberPage}.jpg", imageDebug)
 
@@ -185,7 +185,5 @@ class Test:
         self.levelSplitLine = 0.8
         self.levelSplitGap = 0.4
 
-        self.colorText = (0, 200, 0)
-
-        self.detection = detection.Detection()
-        self.recognition = recognition.Recognition()
+        self.detection = test_detection.Detection()
+        self.recognition = test_recognition.Recognition()

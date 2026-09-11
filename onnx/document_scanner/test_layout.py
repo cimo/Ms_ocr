@@ -3,6 +3,7 @@ import os
 import cv2
 import numpy
 import json
+import time
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
@@ -10,8 +11,8 @@ sys.path.append(f"{os.path.dirname(__file__)}/..")
 # Source
 from helper import onnxSessionBuild
 
-class Test:
-    def _layoutDetect(self, image):
+class Layout:
+    def _detect(self, image):
         imageHeight, imageWidth = image.shape[0:2]
 
         imageRgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -55,7 +56,8 @@ class Test:
                 "label": label,
                 "score": score,
                 "bbox": [x1, y1, x2, y2],
-                "centerPoint": self._centerPointCalculate([x1, y1, x2, y2])
+                "centerPoint": self._centerPointCalculate([x1, y1, x2, y2]),
+                "path": ""
             })
 
         return self._boxContainedRemove(self._boxSuppression(resultList))
@@ -66,7 +68,7 @@ class Test:
             "y": int(round((bboxList[1] + bboxList[3]) / 2))
         }
 
-    def _figureNear(self, bboxList, itemList):
+    def _figureNear(self, itemList, bboxList):
         for a in range(len(itemList)):
             if itemList[a]["label"] not in self.labelFigureList:
                 continue
@@ -90,7 +92,7 @@ class Test:
         if itemObject["label"] not in self.labelSecondaryList:
             return "main"
 
-        if itemObject["label"] == self.labelFigureTitle and self._figureNear(itemObject["bbox"], itemList) == False:
+        if itemObject["label"] in self.labelFigureTitleList and self._figureNear(itemList, itemObject["bbox"]) == False:
             return "main"
 
         return "secondary"
@@ -264,22 +266,39 @@ class Test:
 
         return resultList + sorted(itemFooterList, key=lambda itemObject: itemObject["bbox"][1])
 
-    def _debugLayout(self, image, layoutList, pathOutput, numberPage):
+    def _mediaWrite(self, itemList, image, numberPage, pathOutput):
+        for a in range(len(itemList)):
+            if itemList[a]["label"] not in self.labelFigureList:
+                continue
+
+            bboxList = itemList[a]["bbox"]
+
+            imageCrop = image[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
+
+            fileName = f"{numberPage}_{a + 1}.jpg"
+
+            os.makedirs(f"{pathOutput}media/", exist_ok=True)
+
+            cv2.imwrite(f"{pathOutput}media/{fileName}", imageCrop)
+
+            itemList[a]["path"] = f"media/{fileName}"
+
+    def _debugBox(self, image, itemList, pathOutput, numberPage):
         imageDebug = image.copy()
 
         labelDrawnList = []
 
-        for a in range(len(layoutList)):
-            bboxList = layoutList[a]["bbox"]
+        for a in range(len(itemList)):
+            bboxList = itemList[a]["bbox"]
 
-            color = self.labelColorObject[layoutList[a]["label"]] if layoutList[a]["label"] in self.labelColorObject else self.colorLabel
+            color = self.labelColorObject[itemList[a]["label"]] if itemList[a]["label"] in self.labelColorObject else (0, 0, 0)
 
             boxRegion = imageDebug[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
             boxOverlay = numpy.full(boxRegion.shape, color, dtype=numpy.uint8)
 
             imageDebug[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]] = cv2.addWeighted(boxOverlay, self.levelDebugOpacity, boxRegion, 1 - self.levelDebugOpacity, 0)
 
-            text = f"{layoutList[a]['label']} {layoutList[a]['score']:.2f}"
+            text = f"{itemList[a]['label']} {itemList[a]['score']:.2f}"
 
             textWidth, textHeight = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
 
@@ -307,19 +326,38 @@ class Test:
 
         cv2.imwrite(f"{pathOutput}debug/layout/{numberPage}.jpg", imageDebug)
 
-    def _astWrite(self, pathOutput):
-        with open(f"{pathOutput}debug/layout/{self.astFileName}", "w", encoding="utf-8") as file:
-            json.dump({"pageList": self.astPageList}, file, ensure_ascii=False, indent=4)
+    def astWrite(self, pathOutput, astPageList):
+        with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+            json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
 
-    def execute(self, image, numberPage, pathOutput):
-        if pathOutput != self.pathOutputCurrent:
-            self.pathOutputCurrent = pathOutput
+    def resultBuild(self, astPage):
+        resultList = []
 
-            self.astPageList = []
+        flowObject = {"main": astPage["itemMainList"], "secondary": astPage["itemSecondaryList"]}
+
+        for flow in flowObject:
+            itemList = flowObject[flow]
+
+            for a in range(len(itemList)):
+                resultList.append({
+                    "id": len(resultList) + 1,
+                    "page": astPage["number"],
+                    "flow": flow,
+                    "label": itemList[a]["label"],
+                    "score": itemList[a]["score"],
+                    "bbox": itemList[a]["bbox"],
+                    "centerPoint": itemList[a]["centerPoint"],
+                    "path": itemList[a]["path"]
+                })
+
+        return resultList
+
+    def execute(self, pathOutput, image, numberPage):
+        timeStart = time.perf_counter()
 
         imageHeight, imageWidth = image.shape[0:2]
 
-        itemList = self._itemOrder(self._layoutDetect(image), imageWidth)
+        itemList = self._itemOrder(self._detect(image), imageWidth)
 
         itemMainList = []
         itemSecondaryList = []
@@ -330,24 +368,18 @@ class Test:
             else:
                 itemSecondaryList.append(itemList[a])
 
-        astPage = {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList}
+        self._mediaWrite(itemList, image, numberPage, pathOutput)
+        self._debugBox(image, itemList, pathOutput, numberPage)
 
-        self.astPageList.append(astPage)
+        timeEnd = time.perf_counter() - timeStart
 
-        self._debugLayout(image, itemList, pathOutput, numberPage)
-        self._astWrite(pathOutput)
+        print(f"\ntest_layout.py - Time: {round(timeEnd, 3)} - Page: {numberPage}")
 
-        return astPage
+        return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList}
 
     def __init__(self):
         self.osPathDirName = f"{os.path.dirname(__file__)}/"
         self.pathModelLayout = f"{self.osPathDirName}model/pp-docLayout_plus-l.onnx"
-
-        self.astFileName = "ast.json"
-
-        self.astPageList = []
-
-        self.pathOutputCurrent = ""
 
         self.imageSizeLayout = 800
 
@@ -359,10 +391,7 @@ class Test:
         self.levelDebugOpacity = 0.2
 
         self.scoreThreshold = 0.3
-
         self.scoreThresholdObject = {"table": 0.35}
-
-        self.colorLabel = (0, 0, 0)
 
         self.labelObject = {
             12: "header",
@@ -386,29 +415,6 @@ class Test:
             3: "number",
             15: "seal"
         }
-
-        self.labelContainerList = ["table", "image", "chart"]
-
-        self.labelFigureList = ["image", "chart"]
-
-        self.labelFigureTitle = "figure_title"
-
-        self.labelHeaderList = ["header"]
-
-        self.labelFooterList = ["footer"]
-
-        self.labelSecondaryList = [
-            "image",
-            "figure_title",
-            "chart",
-            "formula",
-            "formula_number",
-            "algorithm",
-            "aside_text",
-            "footnote",
-            "seal"
-        ]
-
         self.labelGroupObject = {
             "text": "text",
             "header": "text",
@@ -421,7 +427,6 @@ class Test:
             "paragraph_title": "text",
             "figure_title": "text"
         }
-
         self.labelColorObject = {
             "header": (128, 128, 128),
             "doc_title": (255, 0, 0),
@@ -444,5 +449,22 @@ class Test:
             "number": (128, 128, 128),
             "seal": (128, 128, 128)
         }
+
+        self.labelContainerList = ["table", "image", "chart"]
+        self.labelFigureList = ["image", "chart"]
+        self.labelFigureTitleList = ["figure_title"]
+        self.labelHeaderList = ["header"]
+        self.labelFooterList = ["footer"]
+        self.labelSecondaryList = [
+            "image",
+            "figure_title",
+            "chart",
+            "formula",
+            "formula_number",
+            "algorithm",
+            "aside_text",
+            "footnote",
+            "seal"
+        ]
 
         self.onnxSessionLayout = onnxSessionBuild(self.pathModelLayout)
