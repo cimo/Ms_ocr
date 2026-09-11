@@ -80,7 +80,7 @@ class Layout:
             if x2 <= x1:
                 continue
 
-            if max(bboxFigureList[1] - bboxList[3], bboxList[1] - bboxFigureList[3]) > (bboxList[3] - bboxList[1]) * self.levelFigureGap:
+            if bboxList[1] - bboxFigureList[3] < 0 or bboxList[1] - bboxFigureList[3] > (bboxList[3] - bboxList[1]) * self.levelFigureGap:
                 continue
 
             return True

@@ -6,8 +6,11 @@ sys.dont_write_bytecode = True
 import test_office
 
 class Markdown:
+    def _textEscape(self, text):
+        return text.replace(self.characterTag, self.characterTagEscaped)
+
     def _cellEscape(self, text):
-        return text.replace(self.separatorCell, self.separatorCellEscaped).strip()
+        return self._textEscape(text.replace(self.separatorCell, self.separatorCellEscaped).strip())
 
     def _rowWrite(self, textList):
         return f"{self.separatorCell} {f' {self.separatorCell} '.join(textList)} {self.separatorCell}"
@@ -64,6 +67,9 @@ class Markdown:
         self.separatorCell = "|"
         self.separatorCellEscaped = "\\|"
 
+        self.characterTag = "<"
+        self.characterTagEscaped = "\\<"
+
         self.textCellEmpty = "​"
         self.textSecondaryTitle = "> **SECONDARY ELEMENT**"
         self.textCellSeparator = "---"
@@ -114,7 +120,7 @@ class Markdown:
             for a in range(len(itemSortedList)):
                 textList.append(itemSortedList[a]["text"])
 
-            return self.markdown.separatorText.join(textList)
+            return self.markdown._textEscape(self.markdown.separatorText.join(textList))
 
         def _itemOrphanCollect(self, itemList, layoutList):
             resultList = []
@@ -413,14 +419,16 @@ class Markdown:
                 if item == None:
                     continue
 
+                text = self.markdown._textEscape(item["text"])
+
                 if item["label"] == "doc_title":
-                    resultList.append(f"# {item['text']}")
+                    resultList.append(f"# {text}")
                 elif item["label"] == "paragraph_title":
-                    resultList.append(f"{self._headingHash(item['level'])} {item['text']}")
+                    resultList.append(f"{self._headingHash(item['level'])} {text}")
                 elif "isList" in item and item["isList"]:
-                    resultList.append(f"- {item['text']}")
+                    resultList.append(f"- {text}")
                 else:
-                    resultList.append(item["text"])
+                    resultList.append(text)
 
             return resultList
 
@@ -433,7 +441,7 @@ class Markdown:
 
                     continue
 
-                text = itemList[a]["text"]
+                text = self.markdown._textEscape(itemList[a]["text"])
 
                 if len(text) == 0:
                     resultList.append(f"[{itemList[a]['label']}]")
@@ -488,7 +496,7 @@ class Markdown:
 
                 for b in range(len(astPage["itemMainList"])):
                     if astPage["itemMainList"][b]["label"] == "sheetName":
-                        blockList.append(f"# {astPage['itemMainList'][b]['text']}")
+                        blockList.append(f"# {self.markdown._textEscape(astPage['itemMainList'][b]['text'])}")
 
                 secondaryList = secondaryList + self._secondaryBuild(astPage["itemSecondaryList"])
 

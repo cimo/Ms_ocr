@@ -4,7 +4,6 @@ import unicodedata
 import cv2
 import json
 import time
-import shutil
 
 sys.dont_write_bytecode = True
 
