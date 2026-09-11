@@ -176,7 +176,7 @@ class Markdown:
                 if tableObject != None:
                     return self._tableWrite(tableObject, itemList)
 
-            text = self._textBuild(itemList, layoutObject["bbox"])
+            text = self._textBuild(itemList, layoutObject["page"], layoutObject["bbox"])
 
             if len(text) == 0:
                 return ""
@@ -215,7 +215,7 @@ class Markdown:
                 rowIndex = cellList[a]["rowIndex"]
 
                 if cellList[a]["rowSpan"] > 1:
-                    rowIndex = self._rowIndexAnchor(cellList[a], itemList, rowRangeObject)
+                    rowIndex = self._rowIndexAnchor(cellList[a], itemList, tableObject["page"], rowRangeObject)
 
                 gridList[rowIndex][cellList[a]["columnIndex"]] = text
 
@@ -247,13 +247,16 @@ class Markdown:
 
             return resultObject
 
-        def _rowIndexAnchor(self, cellObject, itemList, rowRangeObject):
+        def _rowIndexAnchor(self, cellObject, itemList, numberPage, rowRangeObject):
             bboxList = cellObject["bbox"]
 
             y1List = []
             y2List = []
 
             for a in range(len(itemList)):
+                if itemList[a]["page"] != numberPage:
+                    continue
+
                 centerPointObject = itemList[a]["centerPoint"]
 
                 if centerPointObject["x"] < bboxList[0] or centerPointObject["x"] > bboxList[2]:
@@ -284,10 +287,13 @@ class Markdown:
 
             return rowIndexBest
 
-        def _textBuild(self, itemList, bboxList):
+        def _textBuild(self, itemList, numberPage, bboxList):
             itemInsideList = []
 
             for a in range(len(itemList)):
+                if itemList[a]["page"] != numberPage:
+                    continue
+
                 centerPointObject = itemList[a]["centerPoint"]
 
                 if centerPointObject["x"] < bboxList[0] or centerPointObject["x"] > bboxList[2]:
