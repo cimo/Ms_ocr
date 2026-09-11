@@ -71,15 +71,13 @@ class Engine:
 
         if extension in self.extensionObject["image"]:
             resultObject = self.image.execute(pathInput, pathOutput)
-
-            resultObject["markdown"] = self.markdownImage.execute(resultObject["layoutList"], resultObject["tableList"], resultObject["itemList"])
         elif extension in self.extensionObject["pdf"]:
             # to do
             return
         elif extension in self.extensionObject["office"]:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
 
-            resultObject["markdown"] = self.markdownOffice.execute(resultObject["astPageList"], resultObject["tableList"], extension)
+        resultObject["markdown"] = self.markdown.execute(resultObject, extension)
 
         self._matchAssign(resultObject["itemList"], searchText)
 
@@ -103,12 +101,12 @@ class Engine:
         self.debugNameList = ["layout", "table", "ocr"]
 
         self.image = test_image.Image()
-        self.markdownImage = test_markdown.Markdown.Image()
 
         # to do pdf
 
         self.office = test_office.Office()
-        self.markdownOffice = test_markdown.Markdown.Office()
+
+        self.markdown = test_markdown.Markdown(self.extensionObject)
 
         cv2.setUseOptimized(True)
         cv2.setNumThreads(self.countThread)

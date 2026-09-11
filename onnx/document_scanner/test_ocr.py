@@ -154,7 +154,7 @@ class Ocr:
             for b in range(len(quadList)):
                 quadPageList.append(quadList[b])
 
-        recognitionList = self.recognition.executeBatch(quadPageList, image)
+        recognitionList = self.recognition.execute(quadPageList, image)
 
         itemList = []
         coordinateItemList = []

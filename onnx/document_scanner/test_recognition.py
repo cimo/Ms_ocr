@@ -43,32 +43,6 @@ class Recognition:
 
         return imageCrop
 
-    def _imageResize(self, image):
-        imageHeight, imageWidth = image.shape[0:2]
-
-        ratioWidthHeight = max(self.imageWidthModel / float(self.imageHeightModel), imageWidth / float(imageHeight))
-
-        widthTarget = int(self.imageHeightModel * ratioWidthHeight)
-
-        if widthTarget > self.imageWidthMax:
-            widthTarget = self.imageWidthMax
-            widthResized = self.imageWidthMax
-        else:
-            widthResized = int(math.ceil(self.imageHeightModel * imageWidth / float(imageHeight)))
-
-            if widthResized > widthTarget:
-                widthResized = widthTarget
-
-        imageResized = cv2.resize(image, (widthResized, self.imageHeightModel))
-
-        tensor = imageResized.astype(numpy.float32).transpose((2, 0, 1)) / 255.0
-        tensor = (tensor - 0.5) / 0.5
-
-        tensorPadded = numpy.zeros((3, self.imageHeightModel, widthTarget), dtype=numpy.float32)
-        tensorPadded[:, :, 0:widthResized] = tensor
-
-        return numpy.expand_dims(tensorPadded, axis=0)
-
     def _textDecode(self, probability):
         indexList = probability.argmax(axis=-1)
         valueList = probability.max(axis=-1)
@@ -121,19 +95,7 @@ class Recognition:
 
         return resultList
 
-    def execute(self, coordinateList, image):
-        imageCrop = self._imageCrop(coordinateList, image)
-
-        if imageCrop is None:
-            return {"text": "", "score": 0.0}
-
-        tensor = self._imageResize(imageCrop)
-
-        tensorOutputList = self.onnxSession.run(None, {"x": tensor})
-
-        return self._textDecode(tensorOutputList[0][0])
-
-    def executeBatch(self, coordinateItemList, image):
+    def execute(self, coordinateItemList, image):
         imageCropList = []
 
         for a in range(len(coordinateItemList)):
@@ -192,10 +154,9 @@ class Recognition:
         self.imageHeightModel = 48
         self.imageWidthModel = 320
         self.imageWidthMax = 3200
+        
         self.ratioRotate = 1.5
-
         self.sizeBatch = 16
-
         self.levelBatchRatio = 1.25
 
         self.characterList = ["blank"]

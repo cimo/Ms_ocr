@@ -1,5 +1,4 @@
 import sys
-import os
 import cv2
 
 sys.dont_write_bytecode = True

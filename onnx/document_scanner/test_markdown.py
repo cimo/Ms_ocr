@@ -7,7 +7,7 @@ import test_office
 
 class Markdown:
     def _textEscape(self, text):
-        return text.replace(self.characterTag, self.characterTagEscaped)
+        return text.replace("<", "\\<")
 
     def _cellEscape(self, text):
         return self._textEscape(text.replace(self.separatorCell, self.separatorCellEscaped).strip())
@@ -45,13 +45,13 @@ class Markdown:
         if len(secondaryList) == 0:
             return blockList
 
-        return blockList + [self.textSecondaryTitle] + secondaryList
+        return blockList + ["> **SECONDARY ELEMENT**"] + secondaryList
 
     def _tableWrite(self, headerList, gridList):
         separatorList = []
 
         for a in range(len(headerList)):
-            separatorList.append(self.textCellSeparator)
+            separatorList.append("---")
 
         lineList = [self._rowWrite(headerList), self._rowWrite(separatorList)]
 
@@ -60,19 +60,29 @@ class Markdown:
 
         return self.separatorLine.join(lineList)
 
-    def __init__(self):
+    def execute(self, resultObject, extension):
+        return self.builderObject[extension].execute(resultObject, extension)
+
+    def __init__(self, extensionObject):
         self.separatorText = " "
         self.separatorLine = "\n"
         self.separatorBlock = "\n\n"
         self.separatorCell = "|"
         self.separatorCellEscaped = "\\|"
-
-        self.characterTag = "<"
-        self.characterTagEscaped = "\\<"
-
+        
         self.textCellEmpty = "​"
-        self.textSecondaryTitle = "> **SECONDARY ELEMENT**"
-        self.textCellSeparator = "---"
+
+        self.builderObject = {}
+
+        builderImage = self.Image(self)
+
+        for a in range(len(extensionObject["image"])):
+            self.builderObject[extensionObject["image"][a]] = builderImage
+
+        builderOffice = self.Office(self)
+
+        for a in range(len(extensionObject["office"])):
+            self.builderObject[extensionObject["office"][a]] = builderOffice
 
     class Image:
         def _lineGroup(self, itemList):
@@ -294,7 +304,11 @@ class Markdown:
 
             return f"{prefix}{text}"
 
-        def execute(self, layoutList, tableList, itemList):
+        def execute(self, resultObject, extension):
+            layoutList = resultObject["layoutList"]
+            tableList = resultObject["tableList"]
+            itemList = resultObject["itemList"]
+
             blockList = []
             secondaryList = []
 
@@ -327,7 +341,7 @@ class Markdown:
 
             return self.markdown.separatorBlock.join(self.markdown._secondaryAppend(blockList, secondaryList))
 
-        def __init__(self):
+        def __init__(self, markdown):
             self.levelLineOverlap = 0.5
 
             self.labelPrefixObject = {
@@ -337,7 +351,7 @@ class Markdown:
 
             self.labelPlaceholderList = ["image", "chart"]
 
-            self.markdown = Markdown()
+            self.markdown = markdown
 
     class Office:
         def _headingHash(self, level):
@@ -463,17 +477,17 @@ class Markdown:
             lineList = [textList[0]]
 
             for a in range(1, len(textList)):
-                lineList.append(f"{self.prefixItem}{textList[a]}")
+                lineList.append(f"- {textList[a]}")
 
             return self.markdown.separatorLine.join(lineList)
 
         def _itemChildWrite(self, text):
             textList = text.split(self.markdown.separatorLine)
 
-            lineList = [f"{self.prefixItemChild}{textList[0]}"]
+            lineList = [f"  - {textList[0]}"]
 
             for a in range(1, len(textList)):
-                lineList.append(f"{self.prefixItemChildContinue}{textList[a]}")
+                lineList.append(f"    {textList[a]}")
 
             return self.markdown.separatorLine.join(lineList)
 
@@ -529,22 +543,18 @@ class Markdown:
 
             return self.markdown.separatorBlock.join(self.markdown._secondaryAppend(blockList, secondaryList))
 
-        def execute(self, astPageList, tableList, extension):
+        def execute(self, resultObject, extension):
             buildObject = {
                 ".docx": self._docxBuild,
                 ".xlsx": self._xlsxBuild,
                 ".pptx": self._pptxBuild
             }
 
-            return buildObject[extension](astPageList, tableList)
+            return buildObject[extension](resultObject["astPageList"], resultObject["tableList"])
 
-        def __init__(self):
+        def __init__(self, markdown):
             self.levelHeadingMax = 6
 
-            self.prefixItem = "- "
-            self.prefixItemChild = "  - "
-            self.prefixItemChildContinue = "    "
+            self.markdown = markdown
 
             self.office = test_office.Office()
-
-            self.markdown = Markdown()

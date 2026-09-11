@@ -752,7 +752,6 @@ class Table:
         self.levelCoverageArea = 0.005
         self.levelCoverageKernel = 0.4
         self.levelCoverageSize = 0.4
-        self.levelDebugOpacity = 0.2
         self.levelMarginCoverage = 0.02
         self.levelMarginText = 0.15
         self.levelOverlapLine = 0.5
