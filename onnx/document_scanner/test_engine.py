@@ -63,9 +63,6 @@ class Engine:
     def execute(self, pathInput, pathOutput, searchText):
         timeStart = time.perf_counter()
 
-        if os.path.isdir(pathOutput):
-            shutil.rmtree(pathOutput)
-
         for a in range(len(self.debugNameList)):
             os.makedirs(f"{pathOutput}debug/{self.debugNameList[a]}/", exist_ok=True)
 

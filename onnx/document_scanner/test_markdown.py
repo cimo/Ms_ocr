@@ -435,12 +435,29 @@ class Markdown:
 
                 text = itemList[a]["text"]
 
-                if itemList[a]["label"] == "chart" or len(text) == 0:
-                    text = f"[{itemList[a]['label']}]"
+                if len(text) == 0:
+                    resultList.append(f"[{itemList[a]['label']}]")
+
+                    continue
+
+                if itemList[a]["label"] == "chart":
+                    resultList.append(self._chartWrite(text))
+
+                    continue
 
                 resultList.append(text)
 
             return resultList
+
+        def _chartWrite(self, text):
+            textList = text.split(self.markdown.separatorLine)
+
+            lineList = [textList[0]]
+
+            for a in range(1, len(textList)):
+                lineList.append(f"{self.prefixItem}{textList[a]}")
+
+            return self.markdown.separatorLine.join(lineList)
 
         def _itemChildWrite(self, text):
             textList = text.split(self.markdown.separatorLine)
@@ -516,6 +533,7 @@ class Markdown:
         def __init__(self):
             self.levelHeadingMax = 6
 
+            self.prefixItem = "- "
             self.prefixItemChild = "  - "
             self.prefixItemChildContinue = "    "
 
