@@ -513,8 +513,8 @@ class Table:
 
         return sorted(cellList, key=lambda cellObject: (cellObject["rowIndex"], cellObject["columnIndex"]))
 
-    def _textJoin(self, textList, cellCoordinateList):
-        textInsideList = []
+    def _textInsideCollect(self, textList, cellCoordinateList):
+        resultList = []
 
         for a in range(len(textList)):
             coordinateList = textList[a]["coordinate"]
@@ -525,9 +525,69 @@ class Table:
             if centerX < cellCoordinateList[0] or centerX > cellCoordinateList[2] or centerY < cellCoordinateList[1] or centerY > cellCoordinateList[3]:
                 continue
 
-            textInsideList.append(textList[a])
+            resultList.append(textList[a])
 
-        textSortedList = sorted(textInsideList, key=lambda textObject: (textObject["coordinate"][1], textObject["coordinate"][0]))
+        return resultList
+
+    def _lineGroup(self, textList):
+        resultList = []
+
+        textSortedList = sorted(textList, key=lambda textObject: textObject["coordinate"][1])
+
+        for a in range(len(textSortedList)):
+            coordinateList = textSortedList[a]["coordinate"]
+
+            isAdded = False
+
+            for b in range(len(resultList)):
+                y1 = max(coordinateList[1], resultList[b]["y1"])
+                y2 = min(coordinateList[3], resultList[b]["y2"])
+
+                if y2 <= y1:
+                    continue
+
+                if (y2 - y1) / float(min(coordinateList[3] - coordinateList[1], resultList[b]["y2"] - resultList[b]["y1"])) < self.levelOverlapLine:
+                    continue
+
+                resultList[b]["y1"] = min(resultList[b]["y1"], coordinateList[1])
+                resultList[b]["y2"] = max(resultList[b]["y2"], coordinateList[3])
+
+                isAdded = True
+
+                break
+
+            if isAdded == False:
+                resultList.append({"y1": coordinateList[1], "y2": coordinateList[3]})
+
+        return sorted(resultList, key=lambda lineObject: lineObject["y1"])
+
+    def _cellSplit(self, cellList, textList):
+        resultList = []
+
+        for a in range(len(cellList)):
+            coordinateList = cellList[a]["coordinate"]
+
+            lineList = self._lineGroup(self._textInsideCollect(textList, coordinateList))
+
+            if len(lineList) < 2:
+                resultList.append(cellList[a])
+
+                continue
+
+            positionList = [coordinateList[1]]
+
+            for b in range(len(lineList) - 1):
+                positionList.append(int(round((lineList[b]["y2"] + lineList[b + 1]["y1"]) / 2)))
+
+            positionList.append(coordinateList[3])
+
+            for b in range(len(positionList) - 1):
+                resultList.append({"score": cellList[a]["score"], "coordinate": [coordinateList[0], positionList[b], coordinateList[2], positionList[b + 1]]})
+
+        return resultList
+
+    def _textJoin(self, textList, cellCoordinateList):
+        textSortedList = sorted(self._textInsideCollect(textList, cellCoordinateList), key=lambda textObject: (textObject["coordinate"][1], textObject["coordinate"][0]))
 
         resultList = []
 
@@ -614,6 +674,12 @@ class Table:
 
         return resultList
 
+    def cellRefine(self, tableList, itemList):
+        for a in range(len(tableList)):
+            textList = self._textCollect(itemList, tableList[a]["coordinate"])
+
+            tableList[a]["cellList"] = self._gridBuild(self._cellSplit(tableList[a]["cellList"], textList))
+
     def textAssign(self, tableList, itemList):
         for a in range(len(tableList)):
             textList = self._textCollect(itemList, tableList[a]["coordinate"])
@@ -689,6 +755,7 @@ class Table:
         self.levelDebugOpacity = 0.2
         self.levelMarginCoverage = 0.02
         self.levelMarginText = 0.15
+        self.levelOverlapLine = 0.5
         self.levelOverlapText = 0.5
         self.levelGridSupport = 0.25
         self.levelGridTolerance = 0.3

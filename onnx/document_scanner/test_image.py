@@ -37,6 +37,8 @@ class Image:
 
             itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, pageList[a]["number"], pathOutput)
 
+            self.table.cellRefine(tablePageList, itemPageList)
+
             self.table.textAssign(tablePageList, itemPageList)
 
             self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
