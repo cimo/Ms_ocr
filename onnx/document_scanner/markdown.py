@@ -1,5 +1,5 @@
 import sys
-import unicodedata
+import icu
 
 sys.dont_write_bytecode = True
 
@@ -16,7 +16,7 @@ class Markdown:
 
                 continue
 
-            if self._wideCheck(result[-1:]) and self._wideCheck(textList[a][0:1]):
+            if self._spacelessCheck(result[-1:]) and self._spacelessCheck(textList[a][0:1]):
                 result += textList[a]
 
                 continue
@@ -25,8 +25,17 @@ class Markdown:
 
         return result
 
+    def _spacelessCheck(self, character):
+        if self._wideCheck(character):
+            return True
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
+
     def _wideCheck(self, character):
-        return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
+        if character == "":
+            return False
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
 
     def _textEscape(self, text):
         return text.replace("<", "\\<")
@@ -86,6 +95,9 @@ class Markdown:
         return self.builderObject[extension].execute(resultObject, extension)
 
     def __init__(self, extensionObject):
+        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
+        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
+
         self.separatorText = " "
         self.separatorLine = "\n"
         self.separatorBlock = "\n\n"
@@ -139,13 +151,15 @@ class Markdown:
 
             return resultList
 
-        def _lineGroup(self, itemList):
+        def _lineGroup(self, itemList, directionObject):
             resultList = []
 
-            itemSortedList = sorted(itemList, key=lambda itemObject: (itemObject["page"], itemObject["centerPoint"]["y"]))
+            itemSortedList = sorted(itemList, key=lambda itemObject: (itemObject["page"], self._lineFlowKey(itemObject["bbox"], directionObject[itemObject["page"]])))
 
             for a in range(len(itemSortedList)):
                 bboxList = itemSortedList[a]["bbox"]
+
+                crossList = self._crossRange(bboxList, directionObject[itemSortedList[a]["page"]])
 
                 isAdded = False
 
@@ -153,17 +167,19 @@ class Markdown:
                     if resultList[b]["page"] != itemSortedList[a]["page"]:
                         continue
 
-                    y1 = max(bboxList[1], resultList[b]["y1"])
-                    y2 = min(bboxList[3], resultList[b]["y2"])
+                    cross1 = max(crossList[0], resultList[b]["cross1"])
+                    cross2 = min(crossList[1], resultList[b]["cross2"])
 
-                    if y2 <= y1:
+                    if cross2 <= cross1:
                         continue
 
-                    if (y2 - y1) / float(min(bboxList[3] - bboxList[1], resultList[b]["y2"] - resultList[b]["y1"])) < self.levelLineOverlap:
+                    if (cross2 - cross1) / float(min(crossList[1] - crossList[0], resultList[b]["cross2"] - resultList[b]["cross1"])) < self.levelLineOverlap:
                         continue
 
-                    resultList[b]["y1"] = min(resultList[b]["y1"], bboxList[1])
-                    resultList[b]["y2"] = max(resultList[b]["y2"], bboxList[3])
+                    resultList[b]["cross1"] = min(resultList[b]["cross1"], crossList[0])
+                    resultList[b]["cross2"] = max(resultList[b]["cross2"], crossList[1])
+
+                    resultList[b]["bbox"] = self._bboxExpand(resultList[b]["bbox"], bboxList)
 
                     resultList[b]["itemList"].append(itemSortedList[a])
 
@@ -172,17 +188,41 @@ class Markdown:
                     break
 
                 if isAdded == False:
-                    resultList.append({"page": itemSortedList[a]["page"], "y1": bboxList[1], "y2": bboxList[3], "itemList": [itemSortedList[a]]})
+                    resultList.append({"page": itemSortedList[a]["page"], "cross1": crossList[0], "cross2": crossList[1], "bbox": list(bboxList), "itemList": [itemSortedList[a]]})
 
-            return sorted(resultList, key=lambda lineObject: (lineObject["page"], lineObject["y1"]))
+            return sorted(resultList, key=lambda lineObject: (lineObject["page"], self._lineFlowKey(lineObject["bbox"], directionObject[lineObject["page"]])))
 
-        def _lineFlow(self, lineObject, layoutList):
-            x1Line = lineObject["itemList"][0]["bbox"][0]
-            x2Line = lineObject["itemList"][0]["bbox"][2]
+        def _lineFlowKey(self, bboxList, directionPageObject):
+            if directionPageObject["isVertical"]:
+                return -bboxList[2]
 
-            for a in range(len(lineObject["itemList"])):
-                x1Line = min(x1Line, lineObject["itemList"][a]["bbox"][0])
-                x2Line = max(x2Line, lineObject["itemList"][a]["bbox"][2])
+            return bboxList[1]
+
+        def _crossRange(self, bboxList, directionPageObject):
+            if directionPageObject["isVertical"]:
+                return [bboxList[0], bboxList[2]]
+
+            return [bboxList[1], bboxList[3]]
+
+        def _columnRange(self, bboxList, directionPageObject):
+            if directionPageObject["isVertical"]:
+                return [bboxList[1], bboxList[3]]
+
+            return [bboxList[0], bboxList[2]]
+
+        def _bboxExpand(self, bboxList, bboxOtherList):
+            return [
+                min(bboxList[0], bboxOtherList[0]),
+                min(bboxList[1], bboxOtherList[1]),
+                max(bboxList[2], bboxOtherList[2]),
+                max(bboxList[3], bboxOtherList[3])
+            ]
+
+        def _lineFlow(self, lineObject, layoutList, directionObject):
+            directionPageObject = directionObject[lineObject["page"]]
+
+            columnLineList = self._columnRange(lineObject["bbox"], directionPageObject)
+            crossLineList = self._crossRange(lineObject["bbox"], directionPageObject)
 
             distanceBest = -1
             flowResult = "main"
@@ -191,12 +231,14 @@ class Markdown:
                 if layoutList[a]["page"] != lineObject["page"]:
                     continue
 
-                bboxList = layoutList[a]["bbox"]
+                columnList = self._columnRange(layoutList[a]["bbox"], directionPageObject)
 
-                if min(x2Line, bboxList[2]) <= max(x1Line, bboxList[0]):
+                if min(columnLineList[1], columnList[1]) <= max(columnLineList[0], columnList[0]):
                     continue
 
-                distance = max(bboxList[1] - lineObject["y2"], lineObject["y1"] - bboxList[3], 0)
+                crossList = self._crossRange(layoutList[a]["bbox"], directionPageObject)
+
+                distance = max(crossList[0] - crossLineList[1], crossLineList[0] - crossList[1], 0)
 
                 if distanceBest >= 0 and distance >= distanceBest:
                     continue
@@ -206,17 +248,52 @@ class Markdown:
 
             return flowResult
 
-        def _lineText(self, lineObject):
-            itemSortedList = sorted(lineObject["itemList"], key=lambda itemObject: itemObject["bbox"][0])
+        def _lineText(self, lineObject, directionObject):
+            directionPageObject = directionObject[lineObject["page"]]
 
-            textList = []
+            itemSortedList = sorted(lineObject["itemList"], key=lambda itemObject: self._itemOrderKey(itemObject["bbox"], directionPageObject))
+
+            result = ""
 
             for a in range(len(itemSortedList)):
-                textList.append(itemSortedList[a]["text"])
+                if len(result) == 0:
+                    result = itemSortedList[a]["text"]
 
-            return self.markdown._textEscape(self.markdown._textJoin(textList))
+                    continue
 
-        def _blockWrite(self, layoutObject, tableList, itemList):
+                if self._spaceCheck(itemSortedList[a - 1]["bbox"], itemSortedList[a]["bbox"], result, itemSortedList[a]["text"], directionPageObject):
+                    result += self.markdown.separatorText
+
+                result += itemSortedList[a]["text"]
+
+            return self.markdown._textEscape(result)
+
+        def _spaceCheck(self, bboxPreviousList, bboxList, textPrevious, text, directionPageObject):
+            if directionPageObject["isVertical"]:
+                gap = bboxList[1] - bboxPreviousList[3]
+                size = min(bboxPreviousList[2] - bboxPreviousList[0], bboxList[2] - bboxList[0])
+            elif directionPageObject["isRightToLeft"]:
+                gap = bboxPreviousList[0] - bboxList[2]
+                size = min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
+            else:
+                gap = bboxList[0] - bboxPreviousList[2]
+                size = min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
+
+            if self.markdown._wideCheck(textPrevious[-1:]) and self.markdown._wideCheck(text[0:1]):
+                return False
+
+            return gap >= size * self.levelSpaceGap
+
+        def _itemOrderKey(self, bboxList, directionPageObject):
+            if directionPageObject["isVertical"]:
+                return bboxList[1]
+
+            if directionPageObject["isRightToLeft"]:
+                return -bboxList[2]
+
+            return bboxList[0]
+
+        def _blockWrite(self, layoutObject, tableList, itemList, directionObject):
             label = layoutObject["label"]
 
             if label in self.labelPlaceholderList:
@@ -226,9 +303,9 @@ class Markdown:
                 tableObject = self._tableFind(tableList, layoutObject)
 
                 if tableObject != None:
-                    return self._tableWrite(tableObject, itemList)
+                    return self._tableWrite(tableObject, itemList, directionObject)
 
-            text = self._textBuild(itemList, layoutObject["page"], layoutObject["bbox"])
+            text = self._textBuild(itemList, layoutObject["page"], layoutObject["bbox"], directionObject)
 
             if len(text) == 0:
                 return ""
@@ -249,7 +326,7 @@ class Markdown:
 
             return None
 
-        def _tableWrite(self, tableObject, itemList):
+        def _tableWrite(self, tableObject, itemList, directionObject):
             cellList = tableObject["cellList"]
 
             sizeObject = self.markdown._gridSize(cellList)
@@ -270,6 +347,12 @@ class Markdown:
                     rowIndex = self._rowIndexAnchor(cellList[a], itemList, tableObject["page"], rowRangeObject)
 
                 gridList[rowIndex][cellList[a]["columnIndex"]] = text
+
+            directionPageObject = directionObject[tableObject["page"]]
+
+            if directionPageObject["isVertical"] or directionPageObject["isRightToLeft"]:
+                for a in range(len(gridList)):
+                    gridList[a].reverse()
 
             headerList = []
 
@@ -339,7 +422,7 @@ class Markdown:
 
             return rowIndexBest
 
-        def _textBuild(self, itemList, numberPage, bboxList):
+        def _textBuild(self, itemList, numberPage, bboxList, directionObject):
             itemInsideList = []
 
             for a in range(len(itemList)):
@@ -356,37 +439,134 @@ class Markdown:
 
                 itemInsideList.append(itemList[a])
 
-            lineList = self._lineGroup(itemInsideList)
+            lineList = self._lineGroup(itemInsideList, directionObject)
 
             textList = []
 
             for a in range(len(lineList)):
-                textList.append(self._lineText(lineList[a]))
+                textList.append(self._lineText(lineList[a], directionObject))
 
             return self.markdown._textJoin(textList)
+
+        def _blockJoinable(self, layoutObject):
+            label = layoutObject["label"]
+
+            if label in self.labelPlaceholderList or label in self.labelBarrierList:
+                return False
+
+            return label not in self.labelPrefixObject
+
+        def _blockMerge(self, blockList, directionObject):
+            resultList = []
+
+            for a in range(len(blockList)):
+                if len(resultList) > 0:
+                    blockPrevious = resultList[len(resultList) - 1]
+
+                    if blockPrevious["isJoinable"] and blockList[a]["isJoinable"] and self._pageBreakCheck(blockPrevious, blockList[a], directionObject) and self._sentenceEndCheck(blockPrevious["text"]) == False:
+                        blockPrevious["text"] = self.markdown._textJoin([blockPrevious["text"], blockList[a]["text"]])
+                        blockPrevious["page"] = blockList[a]["page"]
+                        blockPrevious["bbox"] = blockList[a]["bbox"]
+
+                        continue
+
+                resultList.append(blockList[a])
+
+            textList = []
+
+            for a in range(len(resultList)):
+                textList.append(resultList[a]["text"])
+
+            return textList
+
+        def _pageBreakCheck(self, blockPrevious, blockObject, directionObject):
+            if blockPrevious["page"] + 1 != blockObject["page"]:
+                return False
+
+            columnPreviousList = self._columnRange(blockPrevious["bbox"], directionObject[blockPrevious["page"]])
+            columnList = self._columnRange(blockObject["bbox"], directionObject[blockObject["page"]])
+
+            column1 = max(columnPreviousList[0], columnList[0])
+            column2 = min(columnPreviousList[1], columnList[1])
+
+            if column2 <= column1:
+                return False
+
+            sizeMinimum = min(columnPreviousList[1] - columnPreviousList[0], columnList[1] - columnList[0])
+
+            return (column2 - column1) / float(sizeMinimum) >= self.levelColumnOverlap
+
+        def _sentenceEndCheck(self, text):
+            textClean = self._sentenceTailStrip(text)
+
+            return len(textClean) > 0 and icu.Char.hasBinaryProperty(textClean[-1:], icu.UProperty.S_TERM)
+
+        def _sentenceTailStrip(self, text):
+            result = text.strip()
+
+            while len(result) > 0:
+                character = result[-1:]
+
+                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION:
+                    indexOpen = self._groupOpenIndex(result)
+
+                    result = result[0:indexOpen] if indexOpen >= 0 else result[0:-1]
+
+                    continue
+
+                if icu.Char.charType(character) == icu.UCharCategory.FINAL_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.QUOTATION_MARK) or icu.Char.isUWhiteSpace(character):
+                    result = result[0:-1]
+
+                    continue
+
+                break
+
+            return result
+
+        def _groupOpenIndex(self, text):
+            for a in range(len(text) - 2, len(text) - 2 - self.levelReferenceLength, -1):
+                if a < 0:
+                    break
+
+                character = text[a]
+
+                if icu.Char.charType(character) == icu.UCharCategory.START_PUNCTUATION:
+                    return a
+
+                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.S_TERM):
+                    break
+
+            return -1
 
         def execute(self, resultObject, extension):
             layoutList = resultObject["layoutList"]
             tableList = resultObject["tableList"]
             itemList = resultObject["itemList"]
 
+            directionObject = {}
+
+            for a in range(len(resultObject["directionList"])):
+                directionObject[resultObject["directionList"][a]["page"]] = resultObject["directionList"][a]
+
             blockList = []
             secondaryList = []
 
-            lineOrphanList = self._lineGroup(self._itemOrphanCollect(itemList, layoutList))
+            lineOrphanList = self._lineGroup(self._itemOrphanCollect(itemList, layoutList), directionObject)
 
             indexOrphan = 0
 
             for a in range(len(layoutList)):
-                while indexOrphan < len(lineOrphanList) and (lineOrphanList[indexOrphan]["page"], lineOrphanList[indexOrphan]["y1"]) < (layoutList[a]["page"], layoutList[a]["bbox"][1]):
-                    if self._lineFlow(lineOrphanList[indexOrphan], layoutList) == "main":
-                        blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                flowBlock = self._lineFlowKey(layoutList[a]["bbox"], directionObject[layoutList[a]["page"]])
+
+                while indexOrphan < len(lineOrphanList) and (lineOrphanList[indexOrphan]["page"], self._lineFlowKey(lineOrphanList[indexOrphan]["bbox"], directionObject[lineOrphanList[indexOrphan]["page"]])) < (layoutList[a]["page"], flowBlock):
+                    if self._lineFlow(lineOrphanList[indexOrphan], layoutList, directionObject) == "main":
+                        blockList.append({"text": self._lineText(lineOrphanList[indexOrphan], directionObject), "isJoinable": False, "page": lineOrphanList[indexOrphan]["page"], "bbox": None})
                     else:
-                        secondaryList.append(self._lineText(lineOrphanList[indexOrphan]))
+                        secondaryList.append(self._lineText(lineOrphanList[indexOrphan], directionObject))
 
                     indexOrphan += 1
 
-                block = self._blockWrite(layoutList[a], tableList, itemList)
+                block = self._blockWrite(layoutList[a], tableList, itemList, directionObject)
 
                 if len(block) == 0:
                     continue
@@ -396,20 +576,24 @@ class Markdown:
 
                     continue
 
-                blockList.append(block)
+                blockList.append({"text": block, "isJoinable": self._blockJoinable(layoutList[a]), "page": layoutList[a]["page"], "bbox": layoutList[a]["bbox"]})
 
             while indexOrphan < len(lineOrphanList):
-                if self._lineFlow(lineOrphanList[indexOrphan], layoutList) == "main":
-                    blockList.append(self._lineText(lineOrphanList[indexOrphan]))
+                if self._lineFlow(lineOrphanList[indexOrphan], layoutList, directionObject) == "main":
+                    blockList.append({"text": self._lineText(lineOrphanList[indexOrphan], directionObject), "isJoinable": False, "page": lineOrphanList[indexOrphan]["page"], "bbox": None})
                 else:
-                    secondaryList.append(self._lineText(lineOrphanList[indexOrphan]))
+                    secondaryList.append(self._lineText(lineOrphanList[indexOrphan], directionObject))
 
                 indexOrphan += 1
 
-            return self.markdown.separatorBlock.join(self.markdown._secondaryAppend(blockList, secondaryList))
+            return self.markdown.separatorBlock.join(self.markdown._secondaryAppend(self._blockMerge(blockList, directionObject), secondaryList))
 
         def __init__(self, markdown):
             self.levelLineOverlap = 0.5
+            self.levelColumnOverlap = 0.5
+            self.levelSpaceGap = 0.15
+
+            self.levelReferenceLength = 20
 
             self.labelPrefixObject = {
                 "doc_title": "# ",
@@ -417,6 +601,8 @@ class Markdown:
             }
 
             self.labelPlaceholderList = ["image", "chart"]
+
+            self.labelBarrierList = ["table", "header", "footer"]
 
             self.markdown = markdown
 
@@ -445,17 +631,21 @@ class Markdown:
 
             indexTable = 0
             isRow = False
+            directionObject = None
 
             for a in range(len(itemList) + 1):
                 item = itemList[a] if a < len(itemList) else None
 
                 if item != None and item["label"] == "tableRow":
+                    if isRow == False:
+                        directionObject = item["direction"]
+
                     isRow = True
 
                     continue
 
                 if isRow:
-                    resultList.append(self._tableWrite(tablePageList[indexTable]))
+                    resultList.append(self._tableWrite(tablePageList[indexTable], directionObject))
 
                     indexTable += 1
                     isRow = False
@@ -476,8 +666,12 @@ class Markdown:
 
             return resultList
 
-        def _tableWrite(self, tableObject):
+        def _tableWrite(self, tableObject, directionObject):
             gridList = self._gridFill(tableObject["cellList"])
+
+            if directionObject["isVertical"] or directionObject["isRightToLeft"]:
+                for a in range(len(gridList)):
+                    gridList[a].reverse()
 
             headerList = []
 
@@ -568,10 +762,18 @@ class Markdown:
                 if astPage["itemMainList"][a]["label"] == "tableRow":
                     rowNumberList.append(str(astPage["itemMainList"][a]["number"]))
 
-            headerList = ["row"]
+            columnList = []
 
             for a in range(len(gridList[0])):
-                headerList.append(self.office.gridColumnLetter(a))
+                columnList.append(self.office.gridColumnLetter(a))
+
+            if astPage["direction"]["isRightToLeft"]:
+                columnList.reverse()
+
+                for a in range(len(gridList)):
+                    gridList[a].reverse()
+
+            headerList = ["row"] + columnList
 
             for a in range(len(gridList)):
                 gridList[a].insert(0, rowNumberList[a])

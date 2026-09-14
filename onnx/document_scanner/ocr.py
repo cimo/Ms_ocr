@@ -10,29 +10,46 @@ import detection
 import recognition
 
 class Ocr:
-    def _edgeInsideCollect(self, tableList, pointList, imageInk):
+    def _verticalCheck(self, detectionList):
+        countVertical = 0
+        countHorizontal = 0
+
+        for a in range(len(detectionList)):
+            coordinateList = self._coordinateCalculate(detectionList[a]["coordinate"])
+
+            if coordinateList[3] - coordinateList[1] >= (coordinateList[2] - coordinateList[0]) * self.levelVerticalRatio:
+                countVertical += 1
+            else:
+                countHorizontal += 1
+
+        return countVertical > countHorizontal
+
+    def _edgeInsideCollect(self, tableList, pointList, imageInk, isVertical):
         coordinateList = self._coordinateCalculate(pointList)
 
-        centerY = (coordinateList[1] + coordinateList[3]) / 2
+        indexCross = 0 if isVertical else 1
+        indexFlow = 1 if isVertical else 0
 
-        margin = (coordinateList[3] - coordinateList[1]) * self.levelSplitMargin
+        center = (coordinateList[indexCross] + coordinateList[indexCross + 2]) / 2
+
+        margin = (coordinateList[indexCross + 2] - coordinateList[indexCross]) * self.levelSplitMargin
 
         edgeList = []
 
         for a in range(len(tableList)):
-            offsetX = tableList[a]["coordinate"][0]
-            offsetY = tableList[a]["coordinate"][1]
+            offsetCross = tableList[a]["coordinate"][indexCross]
+            offsetFlow = tableList[a]["coordinate"][indexFlow]
 
             cellList = tableList[a]["cellList"]
 
             for b in range(len(cellList)):
-                if centerY < cellList[b]["coordinate"][1] + offsetY or centerY > cellList[b]["coordinate"][3] + offsetY:
+                if center < cellList[b]["coordinate"][indexCross] + offsetCross or center > cellList[b]["coordinate"][indexCross + 2] + offsetCross:
                     continue
 
-                edgeCellList = [cellList[b]["coordinate"][0] + offsetX, cellList[b]["coordinate"][2] + offsetX]
+                edgeCellList = [cellList[b]["coordinate"][indexFlow] + offsetFlow, cellList[b]["coordinate"][indexFlow + 2] + offsetFlow]
 
                 for c in range(len(edgeCellList)):
-                    if edgeCellList[c] > coordinateList[0] + margin and edgeCellList[c] < coordinateList[2] - margin:
+                    if edgeCellList[c] > coordinateList[indexFlow] + margin and edgeCellList[c] < coordinateList[indexFlow + 2] - margin:
                         edgeList.append(edgeCellList[c])
 
         edgeList.sort()
@@ -43,7 +60,7 @@ class Ocr:
             if len(resultList) > 0 and edgeList[a] - resultList[len(resultList) - 1] <= margin:
                 continue
 
-            if self._edgeSplitCheck(coordinateList, edgeList[a], imageInk) == False:
+            if self._edgeSplitCheck(coordinateList, edgeList[a], imageInk, isVertical) == False:
                 continue
 
             resultList.append(edgeList[a])
@@ -60,23 +77,28 @@ class Ocr:
 
         return [min(xList), min(yList), max(xList), max(yList)]
 
-    def _edgeSplitCheck(self, coordinateList, edge, imageInk):
-        y0 = max(0, int(round(coordinateList[1])))
-        y1 = min(imageInk.shape[0], int(round(coordinateList[3])))
+    def _edgeSplitCheck(self, coordinateList, edge, imageInk, isVertical):
+        indexCross = 0 if isVertical else 1
 
-        height = y1 - y0
+        cross0 = max(0, int(round(coordinateList[indexCross])))
+        cross1 = min(imageInk.shape[1 if isVertical else 0], int(round(coordinateList[indexCross + 2])))
 
-        if height <= 0:
+        size = cross1 - cross0
+
+        if size <= 0:
             return False
 
-        window = int(round(height * self.levelSplitMargin))
+        window = int(round(size * self.levelSplitMargin))
 
-        x0 = max(0, int(round(edge)) - window)
-        x1 = min(imageInk.shape[1], int(round(edge)) + window + 1)
+        flow0 = max(0, int(round(edge)) - window)
+        flow1 = min(imageInk.shape[0 if isVertical else 1], int(round(edge)) + window + 1)
 
-        ratioList = imageInk[y0:y1, x0:x1].sum(axis=0) / float(height)
+        if isVertical:
+            ratioList = imageInk[flow0:flow1, cross0:cross1].sum(axis=1) / float(size)
+        else:
+            ratioList = imageInk[cross0:cross1, flow0:flow1].sum(axis=0) / float(size)
 
-        gapMinimum = height * self.levelSplitGap
+        gapMinimum = size * self.levelSplitGap
         gapCount = 0
 
         for a in range(len(ratioList)):
@@ -93,23 +115,37 @@ class Ocr:
 
         return False
 
-    def _quadSplit(self, pointList, edgeList):
+    def _quadSplit(self, pointList, edgeList, isVertical):
         if len(edgeList) == 0:
             return [pointList]
 
-        xLeft = min(pointList[0][0], pointList[3][0])
-        xRight = max(pointList[1][0], pointList[2][0])
+        if isVertical:
+            flowStart = min(pointList[0][1], pointList[1][1])
+            flowEnd = max(pointList[3][1], pointList[2][1])
+        else:
+            flowStart = min(pointList[0][0], pointList[3][0])
+            flowEnd = max(pointList[1][0], pointList[2][0])
 
         ratioList = [0.0]
 
         for a in range(len(edgeList)):
-            ratioList.append((edgeList[a] - xLeft) / (xRight - xLeft))
+            ratioList.append((edgeList[a] - flowStart) / (flowEnd - flowStart))
 
         ratioList.append(1.0)
 
         resultList = []
 
         for a in range(len(ratioList) - 1):
+            if isVertical:
+                resultList.append([
+                    self._pointInterpolate(pointList[0], pointList[3], ratioList[a]),
+                    self._pointInterpolate(pointList[1], pointList[2], ratioList[a]),
+                    self._pointInterpolate(pointList[1], pointList[2], ratioList[a + 1]),
+                    self._pointInterpolate(pointList[0], pointList[3], ratioList[a + 1])
+                ])
+
+                continue
+
             resultList.append([
                 self._pointInterpolate(pointList[0], pointList[1], ratioList[a]),
                 self._pointInterpolate(pointList[0], pointList[1], ratioList[a + 1]),
@@ -146,10 +182,12 @@ class Ocr:
 
         imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
+        isVertical = self._verticalCheck(detectionList)
+
         quadPageList = []
 
         for a in range(len(detectionList)):
-            quadList = self._quadSplit(detectionList[a]["coordinate"], self._edgeInsideCollect(tableList, detectionList[a]["coordinate"], imageInk))
+            quadList = self._quadSplit(detectionList[a]["coordinate"], self._edgeInsideCollect(tableList, detectionList[a]["coordinate"], imageInk, isVertical), isVertical)
 
             for b in range(len(quadList)):
                 quadPageList.append(quadList[b])
@@ -181,6 +219,8 @@ class Ocr:
         return itemList
 
     def __init__(self):
+        self.levelVerticalRatio = 2.0
+
         self.levelSplitMargin = 0.5
         self.levelSplitLine = 0.8
         self.levelSplitGap = 0.4

@@ -1,10 +1,10 @@
 import sys
 import os
 import re
+import icu
 import json
 import zipfile
 import datetime
-import unicodedata
 import xml.etree.ElementTree
 
 sys.dont_write_bytecode = True
@@ -365,7 +365,7 @@ class Office:
                     nameNode = styleNode.find(f"{{{self.namespaceMain}}}name")
 
                     if nameNode is not None:
-                        name = self.office._xmlNodeValue(nameNode, self.namespaceMain).lower()
+                        name = self.office._xmlNodeValue(nameNode, self.namespaceMain)
 
                     resultObject[styleId] = {"outlineLevel": outlineLevel, "name": name}
 
@@ -540,6 +540,24 @@ class Office:
 
             return resultList
 
+        def _tableDirection(self, tableNode):
+            isVertical = False
+            isRightToLeft = False
+
+            for node in tableNode:
+                if self.office._xmlNodeTag(node) != "tblPr":
+                    continue
+
+                for propertyNode in node:
+                    tag = self.office._xmlNodeTag(propertyNode)
+
+                    if tag == "bidiVisual" and propertyNode.attrib.get(f"{{{self.namespaceMain}}}val", "1") not in self.valueFalseList:
+                        isRightToLeft = True
+                    elif tag == "textDirection" and propertyNode.attrib.get(f"{{{self.namespaceMain}}}val", "")[0:4] == self.valueTextDirectionVertical:
+                        isVertical = True
+
+            return {"isVertical": isVertical, "isRightToLeft": isRightToLeft}
+
         def _blockWrapped(self, containerNode, styleObject, sizeDocument):
             blockList = []
 
@@ -569,7 +587,7 @@ class Office:
                     if previous["kind"] == "paragraph" and previous["isWrapped"]:
                         isMerge = True
 
-                        separator = "" if self._wideCheck(previous["text"][-1:]) and self._wideCheck(block["text"][0:1]) else " "
+                        separator = "" if self._spacelessCheck(previous["text"][-1:]) and self._spacelessCheck(block["text"][0:1]) else " "
 
                         previous["text"] = f"{previous['text']}{separator}{block['text']}"
 
@@ -584,6 +602,8 @@ class Office:
 
         def _blockTable(self, tableNode, styleObject, sizeDocument):
             resultList = []
+
+            directionObject = self._tableDirection(tableNode)
 
             rowNodeList = []
 
@@ -649,7 +669,7 @@ class Office:
 
             if isData:
                 for a in range(len(rowCellList)):
-                    resultList.append({"kind": "tableRow", "cellList": rowCellList[a]})
+                    resultList.append({"kind": "tableRow", "cellList": rowCellList[a], "direction": directionObject})
             else:
                 for a in range(len(rowNodeList)):
                     for node in rowNodeList[a]:
@@ -688,8 +708,17 @@ class Office:
 
             return value if value != "" else "continue"
 
+        def _spacelessCheck(self, character):
+            if self._wideCheck(character):
+                return True
+
+            return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
+
         def _wideCheck(self, character):
-            return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
+            if character == "":
+                return False
+
+            return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
 
         def _asideMark(self, blockList):
             runIndexList = []
@@ -725,11 +754,33 @@ class Office:
             result = False
 
             if block["kind"] == "paragraph" and block["outlineLevel"] == -1 and block["isList"] == False:
-                if block["style"] != "Title" and block["styleName"] != "title" and re.match(r"Heading(\d)", block["style"]) is None:
-                    if "caption" not in block["styleName"] and "Caption" not in block["style"] and "didascalia" not in block["styleName"]:
+                if self._styleCheck(block, self.styleTitleList) == False and self._styleHeadingLevel(block) < 0:
+                    if self._styleCheck(block, self.styleCaptionList) == False:
                         result = True
 
             return result
+
+        def _styleCheck(self, block, styleNameList):
+            return self._styleKey(block["style"]) in styleNameList or self._styleKey(block["styleName"]) in styleNameList
+
+        def _styleKey(self, text):
+            result = ""
+
+            textNormalized = icu.Normalizer2.getNFKCCasefoldInstance().normalize(text)
+
+            for a in range(len(textNormalized)):
+                if icu.Char.isUWhiteSpace(textNormalized[a]) == False:
+                    result += textNormalized[a]
+
+            return result
+
+        def _styleHeadingLevel(self, block):
+            match = re.match(self.patternStyleHeading, self._styleKey(block["style"]))
+
+            if match is None:
+                match = re.match(self.patternStyleHeading, self._styleKey(block["styleName"]))
+
+            return int(match.group(1)) if match is not None else -1
 
         def _continuationCheck(self, previous, block):
             result = False
@@ -741,10 +792,55 @@ class Office:
 
             return result
 
-        def _sentenceEndCheck(self, text):
-            textClean = re.sub(r"(\s*\[[^\[\]]{1,20}\]|[)\]}\"'”’»›])+$", "", text.strip())
+        def _sentenceStartCheck(self, text):
+            character = text[0:1]
 
-            return len(textClean) > 0 and textClean[-1:] in self.sentenceEndList
+            if icu.Char.hasBinaryProperty(character, icu.UProperty.CASED) == False:
+                return False
+
+            return icu.Char.hasBinaryProperty(character, icu.UProperty.LOWERCASE) == False
+
+        def _sentenceEndCheck(self, text):
+            textClean = self._sentenceTailStrip(text)
+
+            return len(textClean) > 0 and icu.Char.hasBinaryProperty(textClean[-1:], icu.UProperty.S_TERM)
+
+        def _sentenceTailStrip(self, text):
+            result = text.strip()
+
+            while len(result) > 0:
+                character = result[-1:]
+
+                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION:
+                    indexOpen = self._groupOpenIndex(result)
+
+                    result = result[0:indexOpen] if indexOpen >= 0 else result[0:-1]
+
+                    continue
+
+                if icu.Char.charType(character) == icu.UCharCategory.FINAL_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.QUOTATION_MARK) or icu.Char.isUWhiteSpace(character):
+                    result = result[0:-1]
+
+                    continue
+
+                break
+
+            return result
+
+        def _groupOpenIndex(self, text):
+            for a in range(len(text) - 2, len(text) - 2 - self.levelReferenceLength, -1):
+                if a < 0:
+                    break
+
+                character = text[a]
+
+                if icu.Char.charType(character) == icu.UCharCategory.START_PUNCTUATION:
+                    return a
+
+                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.S_TERM):
+                    break
+
+            return -1
 
         def _asideRunFlush(self, runIndexList, blockList):
             if len(runIndexList) >= self.levelAsideCount:
@@ -767,7 +863,7 @@ class Office:
 
                                 isChained = True
 
-                    if isChained == False and (len(block["text"]) <= self.levelAsideLength or block["text"][0:1].islower()):
+                    if isChained == False and (len(block["text"]) <= self.levelAsideLength or self._sentenceStartCheck(block["text"]) == False):
                         previous = self._previousParagraph(a, blockList)
 
                         if self._continuationCheck(previous, block):
@@ -844,15 +940,15 @@ class Office:
         def _itemLabel(self, block, titleSizeList, isDocTitleFound):
             resultObject = {"label": "text", "level": 0}
 
-            styleMatch = re.match(r"Heading(\d)", block["style"])
+            styleLevel = self._styleHeadingLevel(block)
 
-            if block["style"] == "Title" or block["styleName"] == "title":
+            if self._styleCheck(block, self.styleTitleList):
                 resultObject["label"] = "doc_title"
-            elif "Caption" in block["style"] or "caption" in block["styleName"] or "didascalia" in block["styleName"]:
+            elif self._styleCheck(block, self.styleCaptionList):
                 resultObject["label"] = "figure_title"
-            elif styleMatch is not None:
+            elif styleLevel >= 0:
                 resultObject["label"] = "paragraph_title"
-                resultObject["level"] = int(styleMatch.group(1)) + 1
+                resultObject["level"] = styleLevel + 1
             elif block["outlineLevel"] >= 0:
                 resultObject["label"] = "paragraph_title"
                 resultObject["level"] = block["outlineLevel"] + 2
@@ -927,7 +1023,7 @@ class Office:
                     for b in range(len(block["cellList"])):
                         textList.append(block["cellList"][b]["text"])
 
-                    itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"]})
+                    itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"], "direction": block["direction"]})
                 elif block["kind"] == "image":
                     item = {"label": "image", "text": ""}
 
@@ -954,7 +1050,7 @@ class Office:
                 elif block["isContinuation"] and len(itemMainList) > 0:
                     itemPrevious = itemMainList[len(itemMainList) - 1]
 
-                    if self._wideCheck(itemPrevious["text"][-1:]) and self._wideCheck(block["text"][0:1]):
+                    if self._spacelessCheck(itemPrevious["text"][-1:]) and self._spacelessCheck(block["text"][0:1]):
                         itemPrevious["text"] += block["text"]
                     else:
                         itemPrevious["text"] += f" {block['text']}"
@@ -1007,12 +1103,23 @@ class Office:
             self.namespaceRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
 
+            self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
+            self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
+
+            self.valueFalseList = ["0", "false"]
+            self.valueTextDirectionVertical = "tbRl"
+
+            self.styleTitleList = ["title"]
+            self.styleCaptionList = ["caption"]
+
+            self.patternStyleHeading = r"heading(\d)$"
+
             self.levelTitleSize = 1.15
             self.levelTitleLength = 120
             self.levelAsideLength = 60
             self.levelAsideCount = 4
 
-            self.sentenceEndList = [".", "!", "?", "…", ";", ":", "。", "！", "？", "；", "："]
+            self.levelReferenceLength = 20
 
     class Xlsx:
         def _sharedStringBuild(self, sharedStringRootNode):
@@ -1036,6 +1143,17 @@ class Office:
                     result += self._stringText(childNode)
 
             return result
+
+        def _sheetDirection(self, sheetRootNode):
+            isRightToLeft = False
+
+            if sheetRootNode is not None:
+                viewNode = sheetRootNode.find(f"{{{self.namespaceMain}}}sheetViews/{{{self.namespaceMain}}}sheetView")
+
+                if viewNode is not None and viewNode.attrib.get("rightToLeft", "0") == "1":
+                    isRightToLeft = True
+
+            return {"isVertical": False, "isRightToLeft": isRightToLeft}
 
         def _dateStyleBuild(self, styleRootNode):
             resultList = []
@@ -1067,9 +1185,22 @@ class Office:
             return resultList
 
         def _dateFormatCheck(self, formatCode):
-            formatClean = re.sub(r"\"[^\"]*\"|\[[^\]]*\]|\\.", "", formatCode)
+            formatClean = re.sub(self.patternFormatLiteral, "", formatCode).strip()
 
-            return re.search(r"[dmyhs]", formatClean, re.IGNORECASE) is not None
+            if formatClean == "" or formatClean.casefold() == self.textFormatGeneral:
+                return False
+
+            if re.search(self.patternFormatNumber, formatClean) is not None:
+                return False
+
+            return self._letterCheck(formatClean)
+
+        def _letterCheck(self, text):
+            for a in range(len(text)):
+                if icu.Char.isalpha(text[a]):
+                    return True
+
+            return False
 
         def _sheetBuild(self, zipFile):
             resultList = []
@@ -1364,6 +1495,8 @@ class Office:
                 rowList = self._rowCollect(sheetRootNode, sharedStringList, dateStyleList, pivotRangeList) if sheetRootNode is not None else []
                 mergeList = self._mergeCollect(sheetRootNode) if sheetRootNode is not None else []
 
+                directionObject = self._sheetDirection(sheetRootNode)
+
                 itemMainList = [{"label": "sheetName", "text": sheetList[a]["name"]}]
 
                 for b in range(len(rowList)):
@@ -1379,7 +1512,7 @@ class Office:
                     itemSecondaryList[b]["flow"] = "secondary"
                     itemSecondaryList[b]["order"] = b + 1
 
-                pageList.append({"number": a + 1, "mergeList": mergeList, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList})
+                pageList.append({"number": a + 1, "direction": directionObject, "mergeList": mergeList, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList})
 
                 rowCount += len(rowList)
 
@@ -1402,6 +1535,11 @@ class Office:
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
 
             self.numberFormatDateList = [14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]
+
+            self.patternFormatLiteral = r"\"[^\"]*\"|\[[^\]]*\]|\\."
+            self.patternFormatNumber = r"[0#?]"
+
+            self.textFormatGeneral = "general"
 
     class Pptx:
         def _slideBuild(self, zipFile):
@@ -1510,6 +1648,8 @@ class Office:
         def _blockTable(self, tableNode):
             resultList = []
 
+            directionObject = self._tableDirection(tableNode)
+
             for rowNode in tableNode:
                 if self.office._xmlNodeTag(rowNode) == "tr":
                     cellList = []
@@ -1533,9 +1673,18 @@ class Office:
                                 "columnSpan": int(cellNode.attrib.get("gridSpan", "1"))
                             })
 
-                    resultList.append({"kind": "tableRow", "cellList": cellList})
+                    resultList.append({"kind": "tableRow", "cellList": cellList, "direction": directionObject})
 
             return resultList
+
+        def _tableDirection(self, tableNode):
+            isRightToLeft = False
+
+            for node in tableNode:
+                if self.office._xmlNodeTag(node) == "tblPr" and node.attrib.get("rtl", "0") == "1":
+                    isRightToLeft = True
+
+            return {"isVertical": False, "isRightToLeft": isRightToLeft}
 
         def _notesText(self, pathObject, zipFile):
             result = ""
@@ -1604,7 +1753,7 @@ class Office:
                         for c in range(len(block["cellList"])):
                             textList.append(block["cellList"][c]["text"])
 
-                        itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"]})
+                        itemMainList.append({"label": "tableRow", "text": " | ".join(textList), "cellList": block["cellList"], "direction": block["direction"]})
                     elif block["kind"] == "chart":
                         item = {"label": "chart", "text": ""}
 

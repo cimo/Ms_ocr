@@ -2,7 +2,7 @@ import sys
 import os
 import cv2
 import numpy
-import unicodedata
+import icu
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
@@ -468,27 +468,34 @@ class Table:
 
         return resultList
 
-    def _cellSplit(self, cellList, textList):
+    def _cellSplit(self, cellList, textList, directionObject):
         resultList = []
+
+        indexCross = 0 if directionObject["isVertical"] else 1
 
         for a in range(len(cellList)):
             coordinateList = cellList[a]["coordinate"]
 
-            lineList = self._lineGroup(self._textInsideCollect(textList, coordinateList))
+            lineList = self._lineGroup(self._textInsideCollect(textList, coordinateList), directionObject)
 
             if len(lineList) < 2:
                 resultList.append(cellList[a])
 
                 continue
 
-            positionList = [coordinateList[1]]
+            positionList = [coordinateList[indexCross]]
 
             for b in range(len(lineList) - 1):
-                positionList.append(int(round((lineList[b]["y2"] + lineList[b + 1]["y1"]) / 2)))
+                positionList.append(int(round((lineList[b]["cross2"] + lineList[b + 1]["cross1"]) / 2)))
 
-            positionList.append(coordinateList[3])
+            positionList.append(coordinateList[indexCross + 2])
 
             for b in range(len(positionList) - 1):
+                if directionObject["isVertical"]:
+                    resultList.append({"score": cellList[a]["score"], "coordinate": [positionList[b], coordinateList[1], positionList[b + 1], coordinateList[3]]})
+
+                    continue
+
                 resultList.append({"score": cellList[a]["score"], "coordinate": [coordinateList[0], positionList[b], coordinateList[2], positionList[b + 1]]})
 
         return resultList
@@ -509,40 +516,45 @@ class Table:
 
         return resultList
 
-    def _lineGroup(self, textList):
+    def _lineGroup(self, textList, directionObject):
         resultList = []
 
-        textSortedList = sorted(textList, key=lambda textObject: textObject["coordinate"][1])
+        indexCross = 0 if directionObject["isVertical"] else 1
+
+        textSortedList = sorted(textList, key=lambda textObject: textObject["coordinate"][indexCross])
 
         for a in range(len(textSortedList)):
             coordinateList = textSortedList[a]["coordinate"]
 
+            cross1Text = coordinateList[indexCross]
+            cross2Text = coordinateList[indexCross + 2]
+
             isAdded = False
 
             for b in range(len(resultList)):
-                y1 = max(coordinateList[1], resultList[b]["y1"])
-                y2 = min(coordinateList[3], resultList[b]["y2"])
+                cross1 = max(cross1Text, resultList[b]["cross1"])
+                cross2 = min(cross2Text, resultList[b]["cross2"])
 
-                if y2 <= y1:
+                if cross2 <= cross1:
                     continue
 
-                if (y2 - y1) / float(min(coordinateList[3] - coordinateList[1], resultList[b]["y2"] - resultList[b]["y1"])) < self.levelOverlapLine:
+                if (cross2 - cross1) / float(min(cross2Text - cross1Text, resultList[b]["cross2"] - resultList[b]["cross1"])) < self.levelOverlapLine:
                     continue
 
-                resultList[b]["y1"] = min(resultList[b]["y1"], coordinateList[1])
-                resultList[b]["y2"] = max(resultList[b]["y2"], coordinateList[3])
+                resultList[b]["cross1"] = min(resultList[b]["cross1"], cross1Text)
+                resultList[b]["cross2"] = max(resultList[b]["cross2"], cross2Text)
 
                 isAdded = True
 
                 break
 
             if isAdded == False:
-                resultList.append({"y1": coordinateList[1], "y2": coordinateList[3]})
+                resultList.append({"cross1": cross1Text, "cross2": cross2Text})
 
-        return sorted(resultList, key=lambda lineObject: lineObject["y1"])
+        return sorted(resultList, key=lambda lineObject: lineObject["cross1"])
 
-    def _textJoin(self, textList, cellCoordinateList):
-        textSortedList = sorted(self._textInsideCollect(textList, cellCoordinateList), key=lambda textObject: (textObject["coordinate"][1], textObject["coordinate"][0]))
+    def _textJoin(self, textList, cellCoordinateList, directionObject):
+        textSortedList = sorted(self._textInsideCollect(textList, cellCoordinateList), key=lambda textObject: self._textOrderKey(textObject, directionObject))
 
         result = ""
 
@@ -552,17 +564,57 @@ class Table:
 
                 continue
 
-            if self._wideCheck(result[-1:]) and self._wideCheck(textSortedList[a]["text"][0:1]):
-                result += textSortedList[a]["text"]
+            if self._spaceCheck(textSortedList[a - 1]["coordinate"], textSortedList[a]["coordinate"], result, textSortedList[a]["text"], directionObject):
+                result += " "
 
-                continue
-
-            result += f" {textSortedList[a]['text']}"
+            result += textSortedList[a]["text"]
 
         return result
 
+    def _spaceCheck(self, coordinatePreviousList, coordinateList, textPrevious, text, directionObject):
+        if directionObject["isVertical"]:
+            cross1 = max(coordinatePreviousList[0], coordinateList[0])
+            cross2 = min(coordinatePreviousList[2], coordinateList[2])
+
+            gap = coordinateList[1] - coordinatePreviousList[3]
+            size = min(coordinatePreviousList[2] - coordinatePreviousList[0], coordinateList[2] - coordinateList[0])
+        else:
+            cross1 = max(coordinatePreviousList[1], coordinateList[1])
+            cross2 = min(coordinatePreviousList[3], coordinateList[3])
+
+            gap = coordinatePreviousList[0] - coordinateList[2] if directionObject["isRightToLeft"] else coordinateList[0] - coordinatePreviousList[2]
+            size = min(coordinatePreviousList[3] - coordinatePreviousList[1], coordinateList[3] - coordinateList[1])
+
+        if self._wideCheck(textPrevious[-1:]) and self._wideCheck(text[0:1]):
+            return False
+
+        if cross2 <= cross1:
+            return self._spacelessCheck(textPrevious[-1:]) == False or self._spacelessCheck(text[0:1]) == False
+
+        return gap >= size * self.levelSpaceGap
+
+    def _spacelessCheck(self, character):
+        if self._wideCheck(character):
+            return True
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
+
     def _wideCheck(self, character):
-        return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
+        if character == "":
+            return False
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
+
+    def _textOrderKey(self, textObject, directionObject):
+        coordinateList = textObject["coordinate"]
+
+        if directionObject["isVertical"]:
+            return (-coordinateList[2], coordinateList[1])
+
+        if directionObject["isRightToLeft"]:
+            return (coordinateList[1], -coordinateList[2])
+
+        return (coordinateList[1], coordinateList[0])
 
     def _coverageValidate(self, coverageList, textList):
         resultList = []
@@ -647,20 +699,31 @@ class Table:
             "y": int(round((bboxList[1] + bboxList[3]) / 2))
         }
 
-    def cellRefine(self, tableList, itemList):
+    def orderAssign(self, astPage, tableList):
+        itemList = astPage["itemList"]
+
+        indexObject = {}
+
+        for a in range(len(itemList)):
+            if itemList[a]["label"] == "table":
+                indexObject[tuple(itemList[a]["bbox"])] = a
+
+        tableList.sort(key=lambda tableObject: indexObject[tuple(tableObject["coordinate"])])
+
+    def cellRefine(self, tableList, itemList, directionObject):
         for a in range(len(tableList)):
             textList = self._textCollect(itemList, tableList[a]["coordinate"])
 
-            tableList[a]["cellList"] = self._gridBuild(self._cellSplit(tableList[a]["cellList"], textList))
+            tableList[a]["cellList"] = self._gridBuild(self._cellSplit(tableList[a]["cellList"], textList, directionObject))
 
-    def textAssign(self, tableList, itemList):
+    def textAssign(self, tableList, itemList, directionObject):
         for a in range(len(tableList)):
             textList = self._textCollect(itemList, tableList[a]["coordinate"])
 
             cellList = tableList[a]["cellList"]
 
             for b in range(len(cellList)):
-                cellList[b]["text"] = self._textJoin(textList, cellList[b]["coordinate"])
+                cellList[b]["text"] = self._textJoin(textList, cellList[b]["coordinate"], directionObject)
 
     def debugWrite(self, tableList, image, itemList, pathOutput, numberPage, countStart):
         for a in range(len(tableList)):
@@ -749,6 +812,9 @@ class Table:
         self.pathModelCellWired = f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx"
         self.pathModelCellWireless = f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
 
+        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
+        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
+
         self.countContainedMinimum = 2
         self.sizeCoverageKernel = 3
         self.marginCoverage = 4
@@ -769,6 +835,7 @@ class Table:
         self.levelMarginCoverage = 0.02
         self.levelMarginText = 0.15
         self.levelOverlapLine = 0.5
+        self.levelSpaceGap = 0.15
         self.levelOverlapText = 0.5
         self.levelGridSupport = 0.25
         self.levelGridTolerance = 0.3

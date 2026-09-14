@@ -102,6 +102,7 @@ RUN cd ~ \
     && apt-get update && apt-get install -y \
     python3-venv \
     python3-pip \
+    python3-icu \
     # Wslg
     && (getent group render >/dev/null || groupadd -g 110 render) \
     && (getent group video >/dev/null || groupadd -g 44 video) \

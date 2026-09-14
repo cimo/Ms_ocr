@@ -15,7 +15,7 @@ pathEnv="${PATH_ROOT}.venv/"
 
 if [ ! -d "${pathEnv}" ]
 then
-    python3 -m venv "${pathEnv}"
+    python3 -m venv --system-site-packages "${pathEnv}"
 fi
 
 . "${pathEnv}bin/activate"

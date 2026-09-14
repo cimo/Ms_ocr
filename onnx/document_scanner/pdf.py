@@ -1,10 +1,11 @@
 import sys
 import os
+import icu
 import glob
+import fontTools.agl
 import subprocess
 import cv2
 import math
-import unicodedata
 import zlib
 import codecs
 import re
@@ -99,9 +100,15 @@ class Process:
 
             self._debugText(pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
 
-            self.table.cellRefine(tablePageList, itemPageList)
+            self.layout.itemOrder(astPage, itemPageList)
 
-            self.table.textAssign(tablePageList, itemPageList)
+            self.table.orderAssign(astPage, tablePageList)
+
+            self.layout.mediaWrite(astPage, pageList[a]["image"], pathOutput)
+
+            self.table.cellRefine(tablePageList, itemPageList, astPage["direction"])
+
+            self.table.textAssign(tablePageList, itemPageList, astPage["direction"])
 
             self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
 
@@ -117,6 +124,7 @@ class Process:
 
         return {
             "pageCount": len(pageList),
+            "directionList": self.layout.directionBuild(astPageList),
             "layoutList": layoutList,
             "tableList": tableList,
             "itemList": itemList
@@ -875,7 +883,7 @@ class Reader:
 
         codecName = self._codecGet(encoding) if subtype == "Type0" else ""
 
-        isBold = "bold" in baseFont.lower()
+        isBold = self._boldCheck(entryObject)
         byteLength = 2 if subtype == "Type0" else 1
 
         result = {
@@ -928,6 +936,34 @@ class Reader:
                     result["widthScale"] = self._numberValue(matrixNode["itemList"][0] if len(matrixNode["itemList"]) > 0 else None)
 
         return result
+
+    def _boldCheck(self, entryObject):
+        descriptorNode = self._resolve(entryObject.get("FontDescriptor"))
+
+        if descriptorNode is None:
+            descendantNode = self._resolve(entryObject.get("DescendantFonts"))
+
+            if descendantNode is None or descendantNode["kind"] != "array" or len(descendantNode["itemList"]) == 0:
+                return False
+
+            descendantFontNode = self._resolve(descendantNode["itemList"][0])
+
+            if descendantFontNode is None or descendantFontNode.get("entryObject") is None:
+                return False
+
+            descriptorNode = self._resolve(descendantFontNode["entryObject"].get("FontDescriptor"))
+
+        if descriptorNode is None or descriptorNode.get("entryObject") is None:
+            return False
+
+        flagNode = self._resolve(descriptorNode["entryObject"].get("Flags"))
+
+        if flagNode is not None and flagNode["kind"] == "number" and int(flagNode["value"]) & self.flagForceBold:
+            return True
+
+        weightNode = self._resolve(descriptorNode["entryObject"].get("FontWeight"))
+
+        return weightNode is not None and weightNode["kind"] == "number" and float(weightNode["value"]) >= self.levelFontWeightBold
 
     def _codecGet(self, encoding):
         for a in range(len(self.codecList)):
@@ -982,19 +1018,10 @@ class Reader:
         return resultObject
 
     def _glyphUnicode(self, name):
-        if name[0:3] == "uni" and len(name) >= 7:
-            return chr(int(name[3:7], 16))
-
-        if name[0:1] == "u" and len(name) >= 5 and len(name) <= 7:
-            return chr(int(name[1:], 16))
-
         if len(name) == 1:
             return name
 
-        if name in self.glyphObject:
-            return self.glyphObject[name]
-
-        return ""
+        return fontTools.agl.toUnicode(name)
 
     def _buildToUnicode(self, content):
         resultObject = {}
@@ -1462,6 +1489,18 @@ class Reader:
                                 "uri": uri
                             })
 
+    def _spacelessCheck(self, character):
+        if self._wideCheck(character):
+            return True
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
+
+    def _wideCheck(self, character):
+        if character == "":
+            return False
+
+        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
+
     def _mergeText(self, elementList):
         resultList = []
 
@@ -1492,7 +1531,7 @@ class Reader:
                     elementText = element["text"] if element.get("text") is not None else ""
                     isSpace = gap > size * 0.15 and previousText[-1:] != " " and elementText[0:1] != " "
 
-                    if self._wideCheck(previousText[-1:]) and self._wideCheck(elementText[0:1]):
+                    if self._spacelessCheck(previousText[-1:]) and self._spacelessCheck(elementText[0:1]):
                         isSpace = False
 
                     current["text"] = f"{previousText} {elementText}" if isSpace else f"{previousText}{elementText}"
@@ -1516,9 +1555,6 @@ class Reader:
 
         return resultList
 
-    def _wideCheck(self, character):
-        return character != "" and unicodedata.east_asian_width(character) in ("W", "F")
-
     def execute(self, pathInput):
         with open(pathInput, "rb") as file:
             self.byteList = bytes(file.read())
@@ -1536,6 +1572,12 @@ class Reader:
         return self._buildPage()
 
     def __init__(self):
+        self.flagForceBold = 1 << 18
+        self.levelFontWeightBold = 600
+
+        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
+        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
+
         self.delimiterSet = set(ord(value) for value in "()<>[]{}/%")
         self.whitespaceSet = set([0, 9, 10, 12, 13, 32])
 
@@ -1584,37 +1626,3 @@ class Reader:
         self.graphicsStateList = []
 
         self.indirectObject = {}
-        self.glyphObject = {
-            "space": " ", "exclam": "!", "quotedbl": '"', "numbersign": "#", "dollar": "$", "percent": "%", "ampersand": "&",
-            "quotesingle": "'", "parenleft": "(", "parenright": ")", "asterisk": "*", "plus": "+", "comma": ",", "hyphen": "-",
-            "period": ".", "slash": "/", "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
-            "seven": "7", "eight": "8", "nine": "9", "colon": ":", "semicolon": ";", "less": "<", "equal": "=", "greater": ">",
-            "question": "?", "at": "@", "bracketleft": "[", "backslash": "\\", "bracketright": "]", "asciicircum": "^",
-            "underscore": "_", "grave": "`", "braceleft": "{", "bar": "|", "braceright": "}", "asciitilde": "~",
-            "quoteleft": "\u2018", "quoteright": "\u2019", "quotedblleft": "\u201c", "quotedblright": "\u201d",
-            "quotesinglbase": "\u201a", "quotedblbase": "\u201e", "endash": "\u2013", "emdash": "\u2014", "bullet": "\u2022",
-            "ellipsis": "\u2026", "dagger": "\u2020", "daggerdbl": "\u2021", "perthousand": "\u2030", "fi": "\ufb01",
-            "fl": "\ufb02", "degree": "\u00b0", "middot": "\u00b7", "trademark": "\u2122", "copyright": "\u00a9",
-            "registered": "\u00ae", "euro": "\u20ac", "yen": "\u00a5", "sterling": "\u00a3", "section": "\u00a7",
-            "paragraph": "\u00b6", "guillemotleft": "\u00ab", "guillemotright": "\u00bb", "minus": "\u2212",
-            "Agrave": "\u00c0", "Aacute": "\u00c1", "Acircumflex": "\u00c2", "Atilde": "\u00c3", "Adieresis": "\u00c4", "Aring": "\u00c5",
-            "AE": "\u00c6", "Ccedilla": "\u00c7", "Egrave": "\u00c8", "Eacute": "\u00c9", "Ecircumflex": "\u00ca", "Edieresis": "\u00cb",
-            "Igrave": "\u00cc", "Iacute": "\u00cd", "Icircumflex": "\u00ce", "Idieresis": "\u00cf", "Eth": "\u00d0", "Ntilde": "\u00d1",
-            "Ograve": "\u00d2", "Oacute": "\u00d3", "Ocircumflex": "\u00d4", "Otilde": "\u00d5", "Odieresis": "\u00d6", "multiply": "\u00d7",
-            "Oslash": "\u00d8", "Ugrave": "\u00d9", "Uacute": "\u00da", "Ucircumflex": "\u00db", "Udieresis": "\u00dc", "Yacute": "\u00dd",
-            "Thorn": "\u00de", "germandbls": "\u00df", "agrave": "\u00e0", "aacute": "\u00e1", "acircumflex": "\u00e2", "atilde": "\u00e3",
-            "adieresis": "\u00e4", "aring": "\u00e5", "ae": "\u00e6", "ccedilla": "\u00e7", "egrave": "\u00e8", "eacute": "\u00e9",
-            "ecircumflex": "\u00ea", "edieresis": "\u00eb", "igrave": "\u00ec", "iacute": "\u00ed", "icircumflex": "\u00ee",
-            "idieresis": "\u00ef", "eth": "\u00f0", "ntilde": "\u00f1", "ograve": "\u00f2", "oacute": "\u00f3", "ocircumflex": "\u00f4",
-            "otilde": "\u00f5", "odieresis": "\u00f6", "divide": "\u00f7", "oslash": "\u00f8", "ugrave": "\u00f9", "uacute": "\u00fa",
-            "ucircumflex": "\u00fb", "udieresis": "\u00fc", "yacute": "\u00fd", "thorn": "\u00fe", "ydieresis": "\u00ff",
-            "exclamdown": "\u00a1", "cent": "\u00a2", "currency": "\u00a4", "brokenbar": "\u00a6", "dieresis": "\u00a8",
-            "ordfeminine": "\u00aa", "logicalnot": "\u00ac", "macron": "\u00af", "plusminus": "\u00b1", "twosuperior": "\u00b2",
-            "threesuperior": "\u00b3", "acute": "\u00b4", "mu": "\u00b5", "periodcentered": "\u00b7", "cedilla": "\u00b8",
-            "onesuperior": "\u00b9", "ordmasculine": "\u00ba", "onequarter": "\u00bc", "onehalf": "\u00bd", "threequarters": "\u00be",
-            "questiondown": "\u00bf", "Scaron": "\u0160", "scaron": "\u0161", "Zcaron": "\u017d", "zcaron": "\u017e", "OE": "\u0152",
-            "oe": "\u0153", "Ydieresis": "\u0178", "florin": "\u0192", "circumflex": "\u02c6", "tilde": "\u02dc", "dotlessi": "\u0131",
-            "Lslash": "\u0141", "lslash": "\u0142", "Aogonek": "\u0104", "aogonek": "\u0105", "Cacute": "\u0106", "cacute": "\u0107",
-            "Eogonek": "\u0118", "eogonek": "\u0119", "Nacute": "\u0143", "nacute": "\u0144", "Sacute": "\u015a", "sacute": "\u015b",
-            "Zacute": "\u0179", "zacute": "\u017a", "Zdotaccent": "\u017b", "zdotaccent": "\u017c"
-        }

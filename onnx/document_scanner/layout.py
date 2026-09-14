@@ -1,6 +1,7 @@
 import sys
 import os
 import cv2
+import icu
 import numpy
 import json
 
@@ -155,6 +156,41 @@ class Layout:
 
         return resultList
 
+    def _directionDetect(self, itemList):
+        countRightToLeft = 0
+        countLeftToRight = 0
+        countVertical = 0
+        countHorizontal = 0
+
+        for a in range(len(itemList)):
+            bboxList = itemList[a]["bbox"]
+
+            if bboxList[3] - bboxList[1] >= (bboxList[2] - bboxList[0]) * self.levelVerticalRatio:
+                countVertical += 1
+            else:
+                countHorizontal += 1
+
+            text = itemList[a]["text"]
+
+            for b in range(len(text)):
+                direction = icu.Char.charDirection(text[b])
+
+                if direction == icu.UCharDirection.RIGHT_TO_LEFT or direction == icu.UCharDirection.RIGHT_TO_LEFT_ARABIC:
+                    countRightToLeft += 1
+                elif direction == icu.UCharDirection.LEFT_TO_RIGHT:
+                    countLeftToRight += 1
+
+        return {"isVertical": countVertical > countHorizontal, "isRightToLeft": countRightToLeft > countLeftToRight}
+
+    def _bboxProject(self, bboxList, imageWidth, directionObject):
+        if directionObject["isVertical"]:
+            return [bboxList[1], imageWidth - bboxList[2], bboxList[3], imageWidth - bboxList[0]]
+
+        if directionObject["isRightToLeft"]:
+            return [imageWidth - bboxList[2], bboxList[1], imageWidth - bboxList[0], bboxList[3]]
+
+        return bboxList
+
     def _itemOrder(self, itemList, imageWidth, imageHeight):
         itemHeaderList = []
         itemFooterList = []
@@ -168,14 +204,14 @@ class Layout:
             else:
                 itemBodyList.append(itemList[a])
 
-        resultList = sorted(itemHeaderList, key=lambda itemObject: itemObject["bbox"][1])
+        resultList = sorted(itemHeaderList, key=lambda itemObject: itemObject["bboxOrder"][1])
 
-        itemSortedList = sorted(itemBodyList, key=lambda itemObject: itemObject["bbox"][1])
+        itemSortedList = sorted(itemBodyList, key=lambda itemObject: itemObject["bboxOrder"][1])
 
         itemBandList = []
 
         for a in range(len(itemSortedList)):
-            bboxList = itemSortedList[a]["bbox"]
+            bboxList = itemSortedList[a]["bboxOrder"]
 
             if (bboxList[2] - bboxList[0]) / float(imageWidth) < self.levelFullWidth:
                 itemBandList.append(itemSortedList[a])
@@ -189,7 +225,7 @@ class Layout:
 
         resultList = resultList + self._bandOrder(itemBandList, imageHeight)
 
-        return resultList + sorted(itemFooterList, key=lambda itemObject: itemObject["bbox"][1])
+        return resultList + sorted(itemFooterList, key=lambda itemObject: itemObject["bboxOrder"][1])
 
     def _bandOrder(self, itemList, imageHeight):
         resultList = []
@@ -200,8 +236,8 @@ class Layout:
         y2Band = 0
 
         for a in range(len(itemList)):
-            y1Band = min(y1Band, itemList[a]["bbox"][1])
-            y2Band = max(y2Band, itemList[a]["bbox"][3])
+            y1Band = min(y1Band, itemList[a]["bboxOrder"][1])
+            y2Band = max(y2Band, itemList[a]["bboxOrder"][3])
 
         isBandTall = (y2Band - y1Band) / float(imageHeight) >= self.levelBandAside
 
@@ -217,7 +253,7 @@ class Layout:
         for a in range(len(columnList)):
             isAside = isBandTall and countFlowMain > 0 and countFlowList[a] / float(countFlowMain) < self.levelColumnFlow
 
-            itemColumnList = sorted(columnList[a]["itemList"], key=lambda itemObject: itemObject["bbox"][1])
+            itemColumnList = sorted(columnList[a]["itemList"], key=lambda itemObject: itemObject["bboxOrder"][1])
 
             for b in range(len(itemColumnList)):
                 itemColumnList[b]["isAside"] = isAside
@@ -230,10 +266,10 @@ class Layout:
     def _columnGroup(self, itemList):
         resultList = []
 
-        itemSortedList = sorted(itemList, key=lambda itemObject: itemObject["bbox"][0])
+        itemSortedList = sorted(itemList, key=lambda itemObject: itemObject["bboxOrder"][0])
 
         for a in range(len(itemSortedList)):
-            bboxList = itemSortedList[a]["bbox"]
+            bboxList = itemSortedList[a]["bboxOrder"]
 
             isAdded = False
 
@@ -269,23 +305,6 @@ class Layout:
                 result += 1
 
         return result
-
-    def _mediaWrite(self, itemList, image, numberPage, pathOutput):
-        for a in range(len(itemList)):
-            if itemList[a]["label"] not in self.labelFigureList:
-                continue
-
-            bboxList = itemList[a]["bbox"]
-
-            imageCrop = image[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
-
-            fileName = f"{numberPage}_{a + 1}.jpg"
-
-            os.makedirs(f"{pathOutput}media/", exist_ok=True)
-
-            cv2.imwrite(f"{pathOutput}media/{fileName}", imageCrop)
-
-            itemList[a]["path"] = f"media/{fileName}"
 
     def _debugBox(self, image, itemList, pathOutput, numberPage):
         imageDebug = image.copy()
@@ -368,33 +387,35 @@ class Layout:
 
         return {"x1": columnX1, "count": 0, "isAside": False}
 
-    def _itemFlow(self, itemObject, itemList):
+    def _itemFlow(self, itemObject, itemList, imageWidth, directionObject):
         if itemObject["isAside"]:
             return "secondary"
 
         if itemObject["label"] not in self.labelSecondaryList:
             return "main"
 
-        if itemObject["label"] in self.labelFigureTitleList and self._figureNear(itemList, itemObject["bbox"]) == False:
+        if itemObject["label"] in self.labelFigureTitleList and self._figureNear(itemList, itemObject["bbox"], imageWidth, directionObject) == False:
             return "main"
 
         return "secondary"
 
-    def _figureNear(self, itemList, bboxList):
+    def _figureNear(self, itemList, bboxList, imageWidth, directionObject):
+        bboxOrderList = self._bboxProject(bboxList, imageWidth, directionObject)
+
         for a in range(len(itemList)):
             if itemList[a]["label"] not in self.labelFigureList:
                 continue
 
-            bboxFigureList = itemList[a]["bbox"]
+            bboxFigureList = self._bboxProject(itemList[a]["bbox"], imageWidth, directionObject)
 
-            x1 = max(bboxList[0], bboxFigureList[0])
-            x2 = min(bboxList[2], bboxFigureList[2])
+            x1 = max(bboxOrderList[0], bboxFigureList[0])
+            x2 = min(bboxOrderList[2], bboxFigureList[2])
 
             if x2 <= x1:
                 continue
 
-            heightTitle = bboxList[3] - bboxList[1]
-            gapFigure = bboxList[1] - bboxFigureList[3]
+            heightTitle = bboxOrderList[3] - bboxOrderList[1]
+            gapFigure = bboxOrderList[1] - bboxFigureList[3]
 
             if gapFigure < -heightTitle or gapFigure > heightTitle * self.levelFigureGap:
                 continue
@@ -402,6 +423,42 @@ class Layout:
             return True
 
         return False
+
+    def itemOrder(self, astPage, itemPageList):
+        directionObject = self._directionDetect(itemPageList)
+
+        itemList = astPage["itemList"]
+
+        for a in range(len(itemList)):
+            itemList[a]["bboxOrder"] = self._bboxProject(itemList[a]["bbox"], astPage["width"], directionObject)
+
+        imageWidth = astPage["height"] if directionObject["isVertical"] else astPage["width"]
+        imageHeight = astPage["width"] if directionObject["isVertical"] else astPage["height"]
+
+        astPage["direction"] = directionObject
+        astPage["itemList"] = self._itemOrder(itemList, imageWidth, imageHeight)
+
+        for a in range(len(astPage["itemList"])):
+            del astPage["itemList"][a]["bboxOrder"]
+
+    def mediaWrite(self, astPage, image, pathOutput):
+        itemList = astPage["itemList"]
+
+        for a in range(len(itemList)):
+            if itemList[a]["label"] not in self.labelFigureList:
+                continue
+
+            bboxList = itemList[a]["bbox"]
+
+            imageCrop = image[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
+
+            fileName = f"{astPage['number']}_{a + 1}.jpg"
+
+            os.makedirs(f"{pathOutput}media/", exist_ok=True)
+
+            cv2.imwrite(f"{pathOutput}media/{fileName}", imageCrop)
+
+            itemList[a]["path"] = f"media/{fileName}"
 
     def flowAssign(self, astPageList):
         columnList = self._documentColumn(astPageList)
@@ -428,7 +485,7 @@ class Layout:
                 elif columnObject["isAside"]:
                     itemList[b]["isAside"] = True
 
-                if self._itemFlow(itemList[b], itemList) == "main":
+                if self._itemFlow(itemList[b], itemList, astPageList[a]["width"], astPageList[a]["direction"]) == "main":
                     itemMainList.append(itemList[b])
                 else:
                     itemSecondaryList.append(itemList[b])
@@ -460,6 +517,18 @@ class Layout:
 
         return resultList
 
+    def directionBuild(self, astPageList):
+        resultList = []
+
+        for a in range(len(astPageList)):
+            resultList.append({
+                "page": astPageList[a]["number"],
+                "isVertical": astPageList[a]["direction"]["isVertical"],
+                "isRightToLeft": astPageList[a]["direction"]["isRightToLeft"]
+            })
+
+        return resultList
+
     def astWrite(self, pathOutput, astPageList):
         with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
             json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
@@ -467,9 +536,8 @@ class Layout:
     def execute(self, pathOutput, image, numberPage):
         imageHeight, imageWidth = image.shape[0:2]
 
-        itemList = self._itemOrder(self._detect(image), imageWidth, imageHeight)
+        itemList = self._detect(image)
 
-        self._mediaWrite(itemList, image, numberPage, pathOutput)
         self._debugBox(image, itemList, pathOutput, numberPage)
 
         return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemList": itemList}
@@ -483,6 +551,7 @@ class Layout:
         self.levelBoxContained = 0.9
         self.levelBoxNms = 0.5
         self.levelBandAside = 0.5
+        self.levelVerticalRatio = 2.0
         self.levelColumnDocument = 0.25
         self.levelColumnFlow = 0.5
         self.levelColumnTolerance = 0.02

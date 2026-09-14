@@ -31,9 +31,15 @@ class Image:
 
             itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, len(itemList), pageList[a]["number"], pathOutput)
 
-            self.table.cellRefine(tablePageList, itemPageList)
+            self.layout.itemOrder(astPage, itemPageList)
 
-            self.table.textAssign(tablePageList, itemPageList)
+            self.table.orderAssign(astPage, tablePageList)
+
+            self.layout.mediaWrite(astPage, pageList[a]["image"], pathOutput)
+
+            self.table.cellRefine(tablePageList, itemPageList, astPage["direction"])
+
+            self.table.textAssign(tablePageList, itemPageList, astPage["direction"])
 
             self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
 
@@ -49,6 +55,7 @@ class Image:
 
         return {
             "pageCount": len(pageList),
+            "directionList": self.layout.directionBuild(astPageList),
             "layoutList": layoutList,
             "tableList": tableList,
             "itemList": itemList

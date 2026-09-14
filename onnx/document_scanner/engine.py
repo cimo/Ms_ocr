@@ -1,6 +1,6 @@
 import sys
 import os
-import unicodedata
+import icu
 import cv2
 import json
 import time
@@ -25,10 +25,20 @@ class Engine:
         if searchText == "" or value == "":
             return False
 
-        text = unicodedata.normalize("NFKC", value).strip().casefold().replace(" ", "")
-        textSearch = unicodedata.normalize("NFKC", searchText).strip().casefold().replace(" ", "")
+        return self._matchNormalize(searchText) in self._matchNormalize(value)
 
-        return textSearch in text
+    def _matchNormalize(self, text):
+        result = ""
+
+        textNormalized = icu.Normalizer2.getNFKCCasefoldInstance().normalize(text)
+
+        for a in range(len(textNormalized)):
+            if icu.Char.isUWhiteSpace(textNormalized[a]) or icu.Char.hasBinaryProperty(textNormalized[a], icu.UProperty.DEFAULT_IGNORABLE_CODE_POINT):
+                continue
+
+            result += textNormalized[a]
+
+        return result
 
     def _extensionAllowed(self):
         resultObject = {"image": [], "pdf": [], "office": []}
