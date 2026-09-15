@@ -3,7 +3,7 @@ import { Cr } from "@cimo/request/dist/src/Main.js";
 // Source
 import * as helperSrc from "./HelperSrc.js";
 
-export const api = new Cr(helperSrc.URL_API_ONNX_DS);
+export const api = new Cr(helperSrc.URL_API_ONNX);
 
 api.setRequestInterceptor((config: RequestInit) => {
     return {

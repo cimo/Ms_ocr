@@ -44,8 +44,8 @@ file/output/*
 log/*
 !log/.gitkeep
 node_modules
-onnx/*/model/*
-!onnx/*/model/.gitkeep
+onnx/model/*
+!onnx/model/.gitkeep
 public/file/*
 !public/file/.gitkeep
 public/asset/js/*

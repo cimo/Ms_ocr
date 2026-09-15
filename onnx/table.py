@@ -4,10 +4,9 @@ import cv2
 import numpy
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import onnxSessionBuild, spacelessCheck, whitespaceCheck, wideCheck, centerPointCalculate, boxArea, boxIntersection, boxContainedRemove
+from helper import onnxSessionBuild, tensorNormalize, detrDetect, spacelessCheck, spaceSkipCheck, centerPointCalculate, boxCenterInsideCheck, boxArea, boxIntersection, boxIou, boxContainedRemove, rangeOverlapRatio, flowGapCalculate
 
 class Table:
     def _collect(self, astPage):
@@ -35,10 +34,7 @@ class Table:
 
         imageCrop = imageResized[cropY:cropY + self.imageSizeCrop, cropX:cropX + self.imageSizeCrop]
 
-        tensor = imageCrop.astype(numpy.float32) / 255.0
-        tensor = (tensor - self.normalizeMeanList) / self.normalizeStdList
-
-        tensor = numpy.expand_dims(tensor.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
+        tensor = tensorNormalize(imageCrop, self.normalizeMeanList, self.normalizeStdList)
 
         tensorOutputList = self.onnxSessionClassification.run(None, {"x": tensor})
 
@@ -52,47 +48,21 @@ class Table:
         }
 
     def _cellDetect(self, imageRgb, tableType):
-        imageHeight, imageWidth = imageRgb.shape[0:2]
-
-        imageResized = cv2.resize(imageRgb, (self.imageSizeCell, self.imageSizeCell), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
-
-        tensor = numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
-
-        tensorFeedObject = {
-            "image": tensor,
-            "im_shape": numpy.array([[self.imageSizeCell, self.imageSizeCell]], dtype=numpy.float32),
-            "scale_factor": numpy.array([[self.imageSizeCell / float(imageHeight), self.imageSizeCell / float(imageWidth)]], dtype=numpy.float32)
-        }
-
         onnxSessionCell = self.onnxSessionCellWired if tableType == "wired" else self.onnxSessionCellWireless
 
-        tensorOutputList = onnxSessionCell.run(None, tensorFeedObject)
-
-        boxCount = int(tensorOutputList[1][0])
+        detectionList = detrDetect(imageRgb, self.imageSizeCell, onnxSessionCell)
 
         scoreThreshold = self.scoreThresholdCellWired if tableType == "wired" else self.scoreThresholdCellWireless
 
         resultList = []
 
-        for a in range(boxCount):
-            value = tensorOutputList[0][a]
-
-            score = float(value[1])
-
-            if score < scoreThreshold:
-                continue
-
-            x1 = max(0, min(int(round(float(value[2]))), imageWidth))
-            y1 = max(0, min(int(round(float(value[3]))), imageHeight))
-            x2 = max(0, min(int(round(float(value[4]))), imageWidth))
-            y2 = max(0, min(int(round(float(value[5]))), imageHeight))
-
-            if x2 <= x1 or y2 <= y1:
+        for a in range(len(detectionList)):
+            if detectionList[a]["score"] < scoreThreshold:
                 continue
 
             resultList.append({
-                "score": score,
-                "coordinate": [x1, y1, x2, y2]
+                "score": detectionList[a]["score"],
+                "coordinate": detectionList[a]["bbox"]
             })
 
         cellList = self._boxSuppression(resultList)
@@ -107,19 +77,10 @@ class Table:
         boxSortedList = sorted(boxList, key=lambda boxObject: boxObject["score"], reverse=True)
 
         for a in range(len(boxSortedList)):
-            area = boxArea(boxSortedList[a]["coordinate"])
-
             isOverlapped = False
 
             for b in range(len(resultList)):
-                areaKept = boxArea(resultList[b]["coordinate"])
-
-                areaIntersection = boxIntersection(boxSortedList[a]["coordinate"], resultList[b]["coordinate"])
-
-                if areaIntersection == 0:
-                    continue
-
-                if areaIntersection / float(area + areaKept - areaIntersection) >= self.levelBoxNms:
+                if boxIou(boxSortedList[a]["coordinate"], resultList[b]["coordinate"]) >= self.levelBoxNms:
                     isOverlapped = True
 
                     break
@@ -168,6 +129,11 @@ class Table:
 
         return resultList
 
+    def _medianValue(self, valueList):
+        valueSortedList = sorted(valueList)
+
+        return valueSortedList[int(len(valueSortedList) / 2)]
+
     def _cellRecover(self, imageRgb, cellList):
         coverageList = self._coverageCollect(imageRgb, cellList)
 
@@ -198,9 +164,7 @@ class Table:
 
             heightList.append(coordinateList[3] - coordinateList[1])
 
-        heightList.sort()
-
-        sizeKernel = max(self.sizeCoverageKernel, int(round(heightList[int(len(heightList) / 2)] * self.levelCoverageKernel)))
+        sizeKernel = max(self.sizeCoverageKernel, int(round(self._medianValue(heightList) * self.levelCoverageKernel)))
 
         imageMask = cv2.morphologyEx(imageMask, cv2.MORPH_OPEN, numpy.ones((sizeKernel, sizeKernel), dtype=numpy.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0)
 
@@ -262,11 +226,8 @@ class Table:
             widthList.append(coordinateList[2] - coordinateList[0])
             heightList.append(coordinateList[3] - coordinateList[1])
 
-        widthList.sort()
-        heightList.sort()
-
-        widthMinimum = widthList[int(len(widthList) / 2)] * self.levelCoverageSize
-        heightMinimum = heightList[int(len(heightList) / 2)] * self.levelCoverageSize
+        widthMinimum = self._medianValue(widthList) * self.levelCoverageSize
+        heightMinimum = self._medianValue(heightList) * self.levelCoverageSize
 
         resultList = []
 
@@ -300,11 +261,8 @@ class Table:
             yList.append(coordinateList[1])
             yList.append(coordinateList[3])
 
-        widthList.sort()
-        heightList.sort()
-
-        toleranceColumn = widthList[int(len(widthList) / 2)] * self.levelGridTolerance
-        toleranceRow = heightList[int(len(heightList) / 2)] * self.levelGridTolerance
+        toleranceColumn = self._medianValue(widthList) * self.levelGridTolerance
+        toleranceRow = self._medianValue(heightList) * self.levelGridTolerance
 
         columnPositionList = self._positionFilter(self._positionCluster(xList, toleranceColumn), xList, toleranceColumn)
         rowPositionList = self._positionCluster(yList, toleranceRow)
@@ -385,10 +343,7 @@ class Table:
                 itemList[a]["bbox"][3] - coordinateTableList[1]
             ]
 
-            centerX = (coordinateList[0] + coordinateList[2]) / 2
-            centerY = (coordinateList[1] + coordinateList[3]) / 2
-
-            if centerX < 0 or centerY < 0 or centerX > coordinateTableList[2] - coordinateTableList[0] or centerY > coordinateTableList[3] - coordinateTableList[1]:
+            if boxCenterInsideCheck(coordinateList, [0, 0, coordinateTableList[2] - coordinateTableList[0], coordinateTableList[3] - coordinateTableList[1]]) == False:
                 continue
 
             resultList.append({"coordinate": coordinateList, "text": itemList[a]["text"]})
@@ -431,12 +386,7 @@ class Table:
         resultList = []
 
         for a in range(len(textList)):
-            coordinateList = textList[a]["coordinate"]
-
-            centerX = (coordinateList[0] + coordinateList[2]) / 2
-            centerY = (coordinateList[1] + coordinateList[3]) / 2
-
-            if centerX < cellCoordinateList[0] or centerX > cellCoordinateList[2] or centerY < cellCoordinateList[1] or centerY > cellCoordinateList[3]:
+            if boxCenterInsideCheck(textList[a]["coordinate"], cellCoordinateList) == False:
                 continue
 
             resultList.append(textList[a])
@@ -459,13 +409,7 @@ class Table:
             isAdded = False
 
             for b in range(len(resultList)):
-                cross1 = max(cross1Text, resultList[b]["cross1"])
-                cross2 = min(cross2Text, resultList[b]["cross2"])
-
-                if cross2 <= cross1:
-                    continue
-
-                if (cross2 - cross1) / float(min(cross2Text - cross1Text, resultList[b]["cross2"] - resultList[b]["cross1"])) < self.levelOverlapLine:
+                if rangeOverlapRatio(cross1Text, cross2Text, resultList[b]["cross1"], resultList[b]["cross2"]) < self.levelOverlapLine:
                     continue
 
                 resultList[b]["cross1"] = min(resultList[b]["cross1"], cross1Text)
@@ -499,29 +443,17 @@ class Table:
         return result
 
     def _spaceCheck(self, coordinatePreviousList, coordinateList, textPrevious, text, directionObject):
-        if whitespaceCheck(textPrevious[-1:]) or whitespaceCheck(text[0:1]):
+        if spaceSkipCheck(textPrevious, text):
             return False
 
-        if directionObject["isVertical"]:
-            cross1 = max(coordinatePreviousList[0], coordinateList[0])
-            cross2 = min(coordinatePreviousList[2], coordinateList[2])
+        indexCross = 0 if directionObject["isVertical"] else 1
 
-            gap = coordinateList[1] - coordinatePreviousList[3]
-            size = min(coordinatePreviousList[2] - coordinatePreviousList[0], coordinateList[2] - coordinateList[0])
-        else:
-            cross1 = max(coordinatePreviousList[1], coordinateList[1])
-            cross2 = min(coordinatePreviousList[3], coordinateList[3])
-
-            gap = coordinatePreviousList[0] - coordinateList[2] if directionObject["isRightToLeft"] else coordinateList[0] - coordinatePreviousList[2]
-            size = min(coordinatePreviousList[3] - coordinatePreviousList[1], coordinateList[3] - coordinateList[1])
-
-        if wideCheck(textPrevious[-1:]) and wideCheck(text[0:1]):
-            return False
-
-        if cross2 <= cross1:
+        if min(coordinatePreviousList[indexCross + 2], coordinateList[indexCross + 2]) <= max(coordinatePreviousList[indexCross], coordinateList[indexCross]):
             return spacelessCheck(textPrevious[-1:]) == False or spacelessCheck(text[0:1]) == False
 
-        return gap >= size * self.levelSpaceGap
+        gapObject = flowGapCalculate(coordinatePreviousList, coordinateList, directionObject)
+
+        return gapObject["gap"] >= gapObject["size"] * self.levelSpaceGap
 
     def _textOrderKey(self, textObject, directionObject):
         coordinateList = textObject["coordinate"]
@@ -543,12 +475,7 @@ class Table:
             isText = False
 
             for b in range(len(textList)):
-                textCoordinateList = textList[b]["coordinate"]
-
-                centerX = (textCoordinateList[0] + textCoordinateList[2]) / 2
-                centerY = (textCoordinateList[1] + textCoordinateList[3]) / 2
-
-                if centerX >= coverageCoordinateList[0] and centerX <= coverageCoordinateList[2] and centerY >= coverageCoordinateList[1] and centerY <= coverageCoordinateList[3]:
+                if boxCenterInsideCheck(textList[b]["coordinate"], coverageCoordinateList):
                     isText = True
 
                     break
@@ -766,10 +693,9 @@ class Table:
         return resultList
 
     def __init__(self):
-        self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathModelClassification = f"{self.osPathDirName}model/pp-lcNet_x1_0_table_cls.onnx"
-        self.pathModelCellWired = f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx"
-        self.pathModelCellWireless = f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
+        self.pathModelClassification = f"{os.path.dirname(__file__)}/model/pp-lcNet_x1_0_table_cls.onnx"
+        self.pathModelCellWired = f"{os.path.dirname(__file__)}/model/rt-detr-l_wired_table_cell_det.onnx"
+        self.pathModelCellWireless = f"{os.path.dirname(__file__)}/model/rt-detr-l_wireless_table_cell_det.onnx"
 
         self.countContainedMinimum = 2
         self.sizeCoverageKernel = 3

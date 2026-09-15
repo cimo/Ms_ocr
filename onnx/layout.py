@@ -3,60 +3,32 @@ import os
 import cv2
 import icu
 import numpy
-import json
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import onnxSessionBuild, centerPointCalculate, boxArea, boxIntersection, boxContainedRemove
+from helper import onnxSessionBuild, detrDetect, centerPointCalculate, boxArea, boxIntersection, boxIou, boxContainedRemove, rangeOverlapRatio
 
 class Layout:
     def _detect(self, image):
-        imageHeight, imageWidth = image.shape[0:2]
-
-        imageRgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        imageResized = cv2.resize(imageRgb, (self.imageSizeLayout, self.imageSizeLayout), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
-
-        tensor = numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
-
-        tensorFeedObject = {
-            "image": tensor,
-            "im_shape": numpy.array([[self.imageSizeLayout, self.imageSizeLayout]], dtype=numpy.float32),
-            "scale_factor": numpy.array([[self.imageSizeLayout / float(imageHeight), self.imageSizeLayout / float(imageWidth)]], dtype=numpy.float32)
-        }
-
-        tensorOutputList = self.onnxSessionLayout.run(None, tensorFeedObject)
-
-        boxCount = int(tensorOutputList[1][0])
+        detectionList = detrDetect(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), self.imageSizeLayout, self.onnxSessionLayout)
 
         resultList = []
 
-        for a in range(boxCount):
-            value = tensorOutputList[0][a]
-
-            classId = int(value[0])
-            score = float(value[1])
+        for a in range(len(detectionList)):
+            classId = detectionList[a]["classId"]
+            score = detectionList[a]["score"]
 
             label = self.labelObject[classId] if classId in self.labelObject else str(classId)
 
             if score < (self.scoreThresholdObject[label] if label in self.scoreThresholdObject else self.scoreThreshold):
                 continue
 
-            x1 = max(0, min(int(round(float(value[2]))), imageWidth))
-            y1 = max(0, min(int(round(float(value[3]))), imageHeight))
-            x2 = max(0, min(int(round(float(value[4]))), imageWidth))
-            y2 = max(0, min(int(round(float(value[5]))), imageHeight))
-
-            if x2 <= x1 or y2 <= y1:
-                continue
-
             resultList.append({
                 "label": label,
                 "score": score,
-                "bbox": [x1, y1, x2, y2],
-                "centerPoint": centerPointCalculate([x1, y1, x2, y2]),
+                "bbox": detectionList[a]["bbox"],
+                "centerPoint": centerPointCalculate(detectionList[a]["bbox"]),
                 "path": "",
                 "isAside": False,
                 "columnX1": 0
@@ -75,15 +47,13 @@ class Layout:
             isKeep = True
 
             for b in range(len(resultList)):
-                areaKept = boxArea(resultList[b]["bbox"])
-
                 areaIntersection = boxIntersection(boxSortedList[a]["bbox"], resultList[b]["bbox"])
 
                 if areaIntersection == 0:
                     continue
 
-                isSameRegion = areaIntersection / float(area + areaKept - areaIntersection) >= self.levelBoxNms
-                isInside = areaIntersection / float(min(area, areaKept)) >= self.levelBoxContained
+                isSameRegion = boxIou(boxSortedList[a]["bbox"], resultList[b]["bbox"]) >= self.levelBoxNms
+                isInside = areaIntersection / float(min(area, boxArea(resultList[b]["bbox"]))) >= self.levelBoxContained
                 isSameGroup = self._labelGroupGet(boxSortedList[a]["label"]) == self._labelGroupGet(resultList[b]["label"])
 
                 if isSameRegion or (isInside and isSameGroup):
@@ -220,13 +190,7 @@ class Layout:
             isAdded = False
 
             for b in range(len(resultList)):
-                x1 = max(bboxList[0], resultList[b]["x1"])
-                x2 = min(bboxList[2], resultList[b]["x2"])
-
-                if x2 <= x1:
-                    continue
-
-                if (x2 - x1) / float(min(bboxList[2] - bboxList[0], resultList[b]["x2"] - resultList[b]["x1"])) < self.levelColumnOverlap:
+                if rangeOverlapRatio(bboxList[0], bboxList[2], resultList[b]["x1"], resultList[b]["x2"]) < self.levelColumnOverlap:
                     continue
 
                 resultList[b]["x1"] = min(resultList[b]["x1"], bboxList[0])
@@ -354,10 +318,7 @@ class Layout:
 
             bboxFigureList = self._bboxProject(itemList[a]["bbox"], imageWidth, directionObject)
 
-            x1 = max(bboxOrderList[0], bboxFigureList[0])
-            x2 = min(bboxOrderList[2], bboxFigureList[2])
-
-            if x2 <= x1:
+            if min(bboxOrderList[2], bboxFigureList[2]) <= max(bboxOrderList[0], bboxFigureList[0]):
                 continue
 
             heightTitle = bboxOrderList[3] - bboxOrderList[1]
@@ -475,10 +436,6 @@ class Layout:
 
         return resultList
 
-    def astWrite(self, pathOutput, astPageList):
-        with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
-            json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
-
     def execute(self, pathOutput, image, numberPage):
         imageHeight, imageWidth = image.shape[0:2]
 
@@ -489,8 +446,7 @@ class Layout:
         return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemList": itemList}
 
     def __init__(self):
-        self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathModelLayout = f"{self.osPathDirName}model/pp-docLayout_plus-l.onnx"
+        self.pathModelLayout = f"{os.path.dirname(__file__)}/model/pp-docLayout_plus-l.onnx"
 
         self.imageSizeLayout = 800
 

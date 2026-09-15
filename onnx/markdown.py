@@ -1,11 +1,9 @@
 import sys
-import os
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import spacelessCheck, whitespaceCheck, wideCheck, sentenceEndCheck
+from helper import spacelessCheck, whitespaceCheck, spaceSkipCheck, sentenceEndCheck, boxCenterInsideCheck, rangeOverlapRatio, flowGapCalculate
 
 class Markdown:
     def _textJoin(self, textList):
@@ -99,38 +97,31 @@ class Markdown:
 
         self.builderObject = {}
 
-        builderImage = self.Image(self)
+        builderRaster = self.Raster(self)
 
         for a in range(len(extensionObject["image"])):
-            self.builderObject[extensionObject["image"][a]] = builderImage
+            self.builderObject[extensionObject["image"][a]] = builderRaster
 
         for a in range(len(extensionObject["pdf"])):
-            self.builderObject[extensionObject["pdf"][a]] = builderImage
+            self.builderObject[extensionObject["pdf"][a]] = builderRaster
 
         builderOffice = self.Office(self, office)
 
         for a in range(len(extensionObject["office"])):
             self.builderObject[extensionObject["office"][a]] = builderOffice
 
-    class Image:
+    class Raster:
         def _itemOrphanCollect(self, itemList, layoutList):
             resultList = []
 
             for a in range(len(itemList)):
-                centerPointObject = itemList[a]["centerPoint"]
-
                 isInside = False
 
                 for b in range(len(layoutList)):
                     if layoutList[b]["page"] != itemList[a]["page"]:
                         continue
 
-                    bboxList = layoutList[b]["bbox"]
-
-                    if centerPointObject["x"] < bboxList[0] or centerPointObject["x"] > bboxList[2]:
-                        continue
-
-                    if centerPointObject["y"] < bboxList[1] or centerPointObject["y"] > bboxList[3]:
+                    if boxCenterInsideCheck(itemList[a]["bbox"], layoutList[b]["bbox"]) == False:
                         continue
 
                     isInside = True
@@ -158,13 +149,7 @@ class Markdown:
                     if resultList[b]["page"] != itemSortedList[a]["page"]:
                         continue
 
-                    cross1 = max(crossList[0], resultList[b]["cross1"])
-                    cross2 = min(crossList[1], resultList[b]["cross2"])
-
-                    if cross2 <= cross1:
-                        continue
-
-                    if (cross2 - cross1) / float(min(crossList[1] - crossList[0], resultList[b]["cross2"] - resultList[b]["cross1"])) < self.levelLineOverlap:
+                    if rangeOverlapRatio(crossList[0], crossList[1], resultList[b]["cross1"], resultList[b]["cross2"]) < self.levelLineOverlap:
                         continue
 
                     resultList[b]["cross1"] = min(resultList[b]["cross1"], crossList[0])
@@ -260,23 +245,12 @@ class Markdown:
             return self.markdown._textEscape(result)
 
         def _spaceCheck(self, bboxPreviousList, bboxList, textPrevious, text, directionPageObject):
-            if whitespaceCheck(textPrevious[-1:]) or whitespaceCheck(text[0:1]):
+            if spaceSkipCheck(textPrevious, text):
                 return False
 
-            if directionPageObject["isVertical"]:
-                gap = bboxList[1] - bboxPreviousList[3]
-                size = min(bboxPreviousList[2] - bboxPreviousList[0], bboxList[2] - bboxList[0])
-            elif directionPageObject["isRightToLeft"]:
-                gap = bboxPreviousList[0] - bboxList[2]
-                size = min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
-            else:
-                gap = bboxList[0] - bboxPreviousList[2]
-                size = min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
+            gapObject = flowGapCalculate(bboxPreviousList, bboxList, directionPageObject)
 
-            if wideCheck(textPrevious[-1:]) and wideCheck(text[0:1]):
-                return False
-
-            return gap >= size * self.levelSpaceGap
+            return gapObject["gap"] >= gapObject["size"] * self.levelSpaceGap
 
         def _itemOrderKey(self, bboxList, directionPageObject):
             if directionPageObject["isVertical"]:
@@ -386,12 +360,7 @@ class Markdown:
                 if itemList[a]["page"] != numberPage:
                     continue
 
-                centerPointObject = itemList[a]["centerPoint"]
-
-                if centerPointObject["x"] < bboxList[0] or centerPointObject["x"] > bboxList[2]:
-                    continue
-
-                if centerPointObject["y"] < bboxList[1] or centerPointObject["y"] > bboxList[3]:
+                if boxCenterInsideCheck(itemList[a]["bbox"], bboxList) == False:
                     continue
 
                 y1List.append(itemList[a]["bbox"][1])
@@ -423,12 +392,7 @@ class Markdown:
                 if itemList[a]["page"] != numberPage:
                     continue
 
-                centerPointObject = itemList[a]["centerPoint"]
-
-                if centerPointObject["x"] < bboxList[0] or centerPointObject["x"] > bboxList[2]:
-                    continue
-
-                if centerPointObject["y"] < bboxList[1] or centerPointObject["y"] > bboxList[3]:
+                if boxCenterInsideCheck(itemList[a]["bbox"], bboxList) == False:
                     continue
 
                 itemInsideList.append(itemList[a])
@@ -480,15 +444,15 @@ class Markdown:
             columnPreviousList = self._columnRange(blockPrevious["bbox"], directionObject[blockPrevious["page"]])
             columnList = self._columnRange(blockObject["bbox"], directionObject[blockObject["page"]])
 
-            column1 = max(columnPreviousList[0], columnList[0])
-            column2 = min(columnPreviousList[1], columnList[1])
+            return rangeOverlapRatio(columnPreviousList[0], columnPreviousList[1], columnList[0], columnList[1]) >= self.levelColumnOverlap
 
-            if column2 <= column1:
-                return False
+        def _orphanAppend(self, lineObject, layoutList, directionObject, blockList, secondaryList):
+            if self._lineFlow(lineObject, layoutList, directionObject) == "main":
+                blockList.append({"text": self._lineText(lineObject, directionObject), "isJoinable": False, "page": lineObject["page"], "bbox": None})
 
-            sizeMinimum = min(columnPreviousList[1] - columnPreviousList[0], columnList[1] - columnList[0])
+                return
 
-            return (column2 - column1) / float(sizeMinimum) >= self.levelColumnOverlap
+            secondaryList.append(self._lineText(lineObject, directionObject))
 
         def execute(self, resultObject, extension):
             layoutList = resultObject["layoutList"]
@@ -511,10 +475,7 @@ class Markdown:
                 flowBlock = self._lineFlowKey(layoutList[a]["bbox"], directionObject[layoutList[a]["page"]])
 
                 while indexOrphan < len(lineOrphanList) and (lineOrphanList[indexOrphan]["page"], self._lineFlowKey(lineOrphanList[indexOrphan]["bbox"], directionObject[lineOrphanList[indexOrphan]["page"]])) < (layoutList[a]["page"], flowBlock):
-                    if self._lineFlow(lineOrphanList[indexOrphan], layoutList, directionObject) == "main":
-                        blockList.append({"text": self._lineText(lineOrphanList[indexOrphan], directionObject), "isJoinable": False, "page": lineOrphanList[indexOrphan]["page"], "bbox": None})
-                    else:
-                        secondaryList.append(self._lineText(lineOrphanList[indexOrphan], directionObject))
+                    self._orphanAppend(lineOrphanList[indexOrphan], layoutList, directionObject, blockList, secondaryList)
 
                     indexOrphan += 1
 
@@ -531,10 +492,7 @@ class Markdown:
                 blockList.append({"text": block, "isJoinable": self._blockJoinable(layoutList[a]), "page": layoutList[a]["page"], "bbox": layoutList[a]["bbox"]})
 
             while indexOrphan < len(lineOrphanList):
-                if self._lineFlow(lineOrphanList[indexOrphan], layoutList, directionObject) == "main":
-                    blockList.append({"text": self._lineText(lineOrphanList[indexOrphan], directionObject), "isJoinable": False, "page": lineOrphanList[indexOrphan]["page"], "bbox": None})
-                else:
-                    secondaryList.append(self._lineText(lineOrphanList[indexOrphan], directionObject))
+                self._orphanAppend(lineOrphanList[indexOrphan], layoutList, directionObject, blockList, secondaryList)
 
                 indexOrphan += 1
 

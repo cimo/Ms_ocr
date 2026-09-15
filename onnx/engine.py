@@ -1,6 +1,5 @@
 import sys
 import os
-import icu
 import cv2
 import json
 import time
@@ -8,11 +7,12 @@ import time
 sys.dont_write_bytecode = True
 
 # Source
+from helper import textNormalize
+
 import layout
 import table
 import ocr
-import image
-import pdf
+import raster
 import office
 import markdown
 
@@ -32,20 +32,7 @@ class Engine:
         if searchText == "" or value == "":
             return False
 
-        return self._matchNormalize(searchText) in self._matchNormalize(value)
-
-    def _matchNormalize(self, text):
-        result = ""
-
-        textNormalized = icu.Normalizer2.getNFKCCasefoldInstance().normalize(text)
-
-        for a in range(len(textNormalized)):
-            if icu.Char.isUWhiteSpace(textNormalized[a]) or icu.Char.hasBinaryProperty(textNormalized[a], icu.UProperty.DEFAULT_IGNORABLE_CODE_POINT):
-                continue
-
-            result += textNormalized[a]
-
-        return result
+        return textNormalize(searchText) in textNormalize(value)
 
     def _extensionAllowed(self):
         resultObject = {"image": [], "pdf": [], "office": []}
@@ -96,9 +83,9 @@ class Engine:
         os.makedirs(f"{pathOutput}page/", exist_ok=True)
 
         if category == "image":
-            resultObject = self.image.execute(pathInput, pathOutput)
+            resultObject = self.raster.image.execute(pathInput, pathOutput)
         elif category == "pdf":
-            resultObject = self.pdf.execute(pathInput, pathOutput, password)
+            resultObject = self.raster.pdf.execute(pathInput, pathOutput, password)
         else:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
 
@@ -134,8 +121,7 @@ class Engine:
         self.layout = layout.Layout()
         self.table = table.Table()
         self.ocr = ocr.Ocr()
-        self.image = image.Image(self.layout, self.table, self.ocr)
-        self.pdf = pdf.Process(self.layout, self.table, self.ocr)
+        self.raster = raster.Raster(self.layout, self.table, self.ocr)
         self.office = office.Office()
         self.markdown = markdown.Markdown(self.extensionObject, self.office)
 

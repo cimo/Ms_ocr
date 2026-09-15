@@ -1,6 +1,8 @@
 import os
 import cv2
 import icu
+import json
+import numpy
 
 stderrFileDescriptor = os.dup(2)
 nullFileDescriptor = os.open(os.devnull, os.O_WRONLY)
@@ -48,8 +50,46 @@ def onnxSessionBuild(pathModel):
     return inference
 
 # Custom
-widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
-lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
+def tensorNormalize(image, meanList, standardList):
+    tensor = (image.astype(numpy.float32) / 255.0 - meanList) / standardList
+
+    return numpy.expand_dims(tensor.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
+
+def detrDetect(imageRgb, imageSize, onnxSession):
+    imageHeight, imageWidth = imageRgb.shape[0:2]
+
+    imageResized = cv2.resize(imageRgb, (imageSize, imageSize), interpolation=cv2.INTER_CUBIC).astype(numpy.float32) / 255.0
+
+    tensorFeedObject = {
+        "image": numpy.expand_dims(imageResized.transpose((2, 0, 1)), axis=0).astype(numpy.float32),
+        "im_shape": numpy.array([[imageSize, imageSize]], dtype=numpy.float32),
+        "scale_factor": numpy.array([[imageSize / float(imageHeight), imageSize / float(imageWidth)]], dtype=numpy.float32)
+    }
+
+    tensorOutputList = onnxSession.run(None, tensorFeedObject)
+
+    boxCount = int(tensorOutputList[1][0])
+
+    resultList = []
+
+    for a in range(boxCount):
+        value = tensorOutputList[0][a]
+
+        x1 = max(0, min(int(round(float(value[2]))), imageWidth))
+        y1 = max(0, min(int(round(float(value[3]))), imageHeight))
+        x2 = max(0, min(int(round(float(value[4]))), imageWidth))
+        y2 = max(0, min(int(round(float(value[5]))), imageHeight))
+
+        if x2 <= x1 or y2 <= y1:
+            continue
+
+        resultList.append({
+            "classId": int(value[0]),
+            "score": float(value[1]),
+            "bbox": [x1, y1, x2, y2]
+        })
+
+    return resultList
 
 def wideCheck(character):
     if character == "":
@@ -68,6 +108,25 @@ def whitespaceCheck(character):
         return False
 
     return icu.Char.isUWhiteSpace(character)
+
+def textNormalize(text):
+    result = ""
+
+    textNormalized = icu.Normalizer2.getNFKCCasefoldInstance().normalize(text)
+
+    for a in range(len(textNormalized)):
+        if icu.Char.isUWhiteSpace(textNormalized[a]) or icu.Char.hasBinaryProperty(textNormalized[a], icu.UProperty.DEFAULT_IGNORABLE_CODE_POINT):
+            continue
+
+        result += textNormalized[a]
+
+    return result
+
+def spaceSkipCheck(textPrevious, text):
+    if whitespaceCheck(textPrevious[-1:]) or whitespaceCheck(text[0:1]):
+        return True
+
+    return wideCheck(textPrevious[-1:]) and wideCheck(text[0:1])
 
 def sentenceEndCheck(text, levelReferenceLength):
     textClean = sentenceTailStrip(text, levelReferenceLength)
@@ -111,10 +170,47 @@ def groupOpenIndex(text, levelReferenceLength):
 
     return -1
 
+def boxFromPointList(pointList):
+    xList = []
+    yList = []
+
+    for a in range(len(pointList)):
+        xList.append(pointList[a][0])
+        yList.append(pointList[a][1])
+
+    return [min(xList), min(yList), max(xList), max(yList)]
+
 def centerPointCalculate(bboxList):
     return {
         "x": int(round((bboxList[0] + bboxList[2]) / 2)),
         "y": int(round((bboxList[1] + bboxList[3]) / 2))
+    }
+
+def boxCenterInsideCheck(bboxList, boxOuterList):
+    centerX = (bboxList[0] + bboxList[2]) / 2
+    centerY = (bboxList[1] + bboxList[3]) / 2
+
+    return centerX >= boxOuterList[0] and centerX <= boxOuterList[2] and centerY >= boxOuterList[1] and centerY <= boxOuterList[3]
+
+def rangeOverlapRatio(start, end, startOther, endOther):
+    startOverlap = max(start, startOther)
+    endOverlap = min(end, endOther)
+
+    if endOverlap <= startOverlap:
+        return 0.0
+
+    return (endOverlap - startOverlap) / float(min(end - start, endOther - startOther))
+
+def flowGapCalculate(bboxPreviousList, bboxList, directionObject):
+    if directionObject["isVertical"]:
+        return {
+            "gap": bboxList[1] - bboxPreviousList[3],
+            "size": min(bboxPreviousList[2] - bboxPreviousList[0], bboxList[2] - bboxList[0])
+        }
+
+    return {
+        "gap": bboxPreviousList[0] - bboxList[2] if directionObject["isRightToLeft"] else bboxList[0] - bboxPreviousList[2],
+        "size": min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
     }
 
 def boxIntersection(bboxList, bboxOtherList):
@@ -130,6 +226,14 @@ def boxIntersection(bboxList, bboxOtherList):
 
 def boxArea(bboxList):
     return (bboxList[2] - bboxList[0]) * (bboxList[3] - bboxList[1])
+
+def boxIou(bboxList, bboxOtherList):
+    areaIntersection = boxIntersection(bboxList, bboxOtherList)
+
+    if areaIntersection == 0:
+        return 0.0
+
+    return areaIntersection / float(boxArea(bboxList) + boxArea(bboxOtherList) - areaIntersection)
 
 def boxContainedRemove(boxList, nameKey, levelContained):
     resultList = []
@@ -159,6 +263,10 @@ def boxContainedRemove(boxList, nameKey, levelContained):
 def imageInkBuild(image):
     return cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
+def astWrite(pathOutput, astPageList):
+    with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
+        json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
+
 def boxDebugWrite(image, bboxList, pathFile):
     imageDebug = image.copy()
 
@@ -166,4 +274,7 @@ def boxDebugWrite(image, bboxList, pathFile):
         cv2.rectangle(imageDebug, (bboxList[a][0], bboxList[a][1]), (bboxList[a][2], bboxList[a][3]), (0, 200, 0), 1)
 
     cv2.imwrite(pathFile, imageDebug)
+
+widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
+lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
 # Custom

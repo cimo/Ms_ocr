@@ -5,10 +5,9 @@ import numpy
 import pyclipper
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import onnxSessionBuild
+from helper import onnxSessionBuild, tensorNormalize
 
 class Detection:
     def _imageResize(self, image):
@@ -102,8 +101,7 @@ class Detection:
         imageHeight, imageWidth = image.shape[0:2]
         imageResized = self._imageResize(image)
 
-        tensor = (imageResized.astype(numpy.float32) / 255.0 - self.meanList) / self.standardList
-        tensor = numpy.expand_dims(tensor.transpose((2, 0, 1)), axis=0).astype(numpy.float32)
+        tensor = tensorNormalize(imageResized, self.meanList, self.standardList)
 
         tensorOutputList = self.onnxSession.run(None, {"x": tensor})
 
@@ -113,7 +111,7 @@ class Detection:
         scaleWidth = imageWidth / float(bitmap.shape[1])
         scaleHeight = imageHeight / float(bitmap.shape[0])
 
-        contourList, hierarchy = cv2.findContours(bitmap * 255, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contourList = cv2.findContours(bitmap * 255, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
 
         for a in range(min(len(contourList), self.candidateMax)):
             pointList, sideLength = self._boxOrder(contourList[a])
@@ -147,8 +145,7 @@ class Detection:
         return self._boxSort(resultList)
 
     def __init__(self):
-        self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathModel = f"{self.osPathDirName}model/pp-ocrV6_medium_det.onnx"
+        self.pathModel = f"{os.path.dirname(__file__)}/model/pp-ocrV6_medium_det.onnx"
 
         self.limitSideLength = 960
         self.limitSideLengthMax = 4000
@@ -160,7 +157,5 @@ class Detection:
 
         self.meanList = numpy.array([0.485, 0.456, 0.406], dtype=numpy.float32)
         self.standardList = numpy.array([0.229, 0.224, 0.225], dtype=numpy.float32)
-
-        cv2.setUseOptimized(True)
 
         self.onnxSession = onnxSessionBuild(self.pathModel)

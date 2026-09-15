@@ -1,10 +1,5 @@
 import sys
-import os
-import icu
-import glob
 import fontTools.agl
-import subprocess
-import cv2
 import math
 import zlib
 import base64
@@ -14,285 +9,11 @@ import re
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import spacelessCheck, whitespaceCheck, centerPointCalculate, imageInkBuild, boxDebugWrite
+from helper import spacelessCheck, whitespaceCheck, boxFromPointList
 
-class Process:
-    def _pageBuild(self, password, pathInput, pathOutput):
-        argumentList = ["pdftoppm", "-jpeg", "-cropbox", "-scale-to", "1755"]
-
-        if len(password) > 0:
-            argumentList = argumentList + ["-upw", password, "-opw", password]
-
-        runObject = subprocess.run(argumentList + [pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
-
-        if runObject.returncode != 0:
-            print(f"pdf.py - pdftoppm - {runObject.stderr.strip()}")
-
-            return []
-
-        pathFileList = glob.glob(f"{pathOutput}page/page-*.jpg")
-
-        resultList = []
-
-        for a in range(len(pathFileList)):
-            numberPage = int(os.path.splitext(os.path.basename(pathFileList[a]))[0].split("-")[1])
-
-            pathPage = f"{pathOutput}page/{numberPage}.jpg"
-
-            os.rename(pathFileList[a], pathPage)
-
-            resultList.append({"number": numberPage, "image": cv2.imread(pathPage)})
-
-        return sorted(resultList, key=lambda pageObject: pageObject["number"])
-
-    def _itemBuild(self, pageReader, image, reader, countStart, numberPage):
-        if pageReader is None:
-            return []
-
-        imageHeight, imageWidth = image.shape[0:2]
-
-        scaleX = imageWidth / pageReader["width"]
-        scaleY = imageHeight / pageReader["height"]
-
-        elementList = reader.mergeText(self._widthCorrect(pageReader["elementList"], image, pageReader["rotate"], scaleX, scaleY))
-
-        resultList = []
-
-        for a in range(len(elementList)):
-            if elementList[a]["type"] != "text":
-                continue
-
-            bboxList = [
-                int(round(elementList[a]["x0"] * scaleX)),
-                int(round(elementList[a]["y0"] * scaleY)),
-                int(round(elementList[a]["x1"] * scaleX)),
-                int(round(elementList[a]["y1"] * scaleY))
-            ]
-
-            resultList.append({
-                "id": countStart + len(resultList) + 1,
-                "page": numberPage,
-                "bbox": bboxList,
-                "centerPoint": centerPointCalculate(bboxList),
-                "text": elementList[a]["text"],
-                "isMatch": False
-            })
-
-        return resultList
-
-    def _widthCorrect(self, elementList, image, rotate, scaleX, scaleY):
-        isRotate = rotate == 90 or rotate == 270
-
-        elementEstimatedList = []
-
-        for a in range(len(elementList)):
-            if elementList[a]["type"] != "text" or elementList[a]["isWidthEstimated"] == False:
-                continue
-
-            elementEstimatedList.append({"element": elementList[a], "isVertical": elementList[a]["isVertical"] != isRotate})
-
-        if len(elementEstimatedList) == 0:
-            return elementList
-
-        imageInk = imageInkBuild(image)
-
-        boxList = self._boxCollect(image, imageInk)
-
-        for a in range(len(boxList)):
-            for b in range(len(self.axisList)):
-                isVertical = self.axisList[b]
-
-                nameFlow = "y" if isVertical else "x"
-                nameCross = "x" if isVertical else "y"
-
-                scaleFlow = scaleY if isVertical else scaleX
-                scaleCross = scaleX if isVertical else scaleY
-
-                groupList = self._groupCollect(elementEstimatedList, boxList[a], isVertical, nameFlow, nameCross, scaleFlow, scaleCross)
-
-                if len(groupList) == 0:
-                    continue
-
-                flowStart = groupList[0][f"{nameFlow}0"]
-                flowEnd = groupList[len(groupList) - 1][f"{nameFlow}1"]
-
-                edge = self._inkEdge(imageInk, boxList[a], isVertical) / scaleFlow
-
-                if flowEnd <= flowStart or edge <= flowStart:
-                    continue
-
-                ratio = (edge - flowStart) / (flowEnd - flowStart)
-
-                for c in range(len(groupList)):
-                    groupList[c][f"{nameFlow}1"] = groupList[c][f"{nameFlow}0"] + (groupList[c][f"{nameFlow}1"] - groupList[c][f"{nameFlow}0"]) * ratio
-
-        return elementList
-
-    def _groupCollect(self, elementEstimatedList, boxObject, isVertical, nameFlow, nameCross, scaleFlow, scaleCross):
-        resultList = []
-
-        for a in range(len(elementEstimatedList)):
-            if elementEstimatedList[a]["isVertical"] != isVertical:
-                continue
-
-            element = elementEstimatedList[a]["element"]
-
-            cross1 = max(element[f"{nameCross}0"] * scaleCross, boxObject[f"{nameCross}0"])
-            cross2 = min(element[f"{nameCross}1"] * scaleCross, boxObject[f"{nameCross}1"])
-
-            if cross2 - cross1 < (element[f"{nameCross}1"] - element[f"{nameCross}0"]) * scaleCross * self.levelBoxOverlap:
-                continue
-
-            flowStart = element[f"{nameFlow}0"] * scaleFlow
-
-            if flowStart < boxObject[f"{nameFlow}0"] or flowStart > boxObject[f"{nameFlow}1"]:
-                continue
-
-            resultList.append(element)
-
-        resultList.sort(key=lambda elementObject: elementObject[f"{nameFlow}0"])
-
-        return resultList
-
-    def _boxCollect(self, image, imageInk):
-        detectionList = self.ocr.boxDetect(image)
-
-        resultList = []
-
-        for a in range(len(detectionList)):
-            xList = []
-            yList = []
-
-            for b in range(len(detectionList[a]["coordinate"])):
-                xList.append(detectionList[a]["coordinate"][b][0])
-                yList.append(detectionList[a]["coordinate"][b][1])
-
-            x0 = max(0, min(xList))
-            y0 = max(0, min(yList))
-            x1 = min(imageInk.shape[1], max(xList))
-            y1 = min(imageInk.shape[0], max(yList))
-
-            if x1 <= x0 or y1 <= y0:
-                continue
-
-            resultList.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1})
-
-        return resultList
-
-    def _inkEdge(self, imageInk, boxObject, isVertical):
-        region = imageInk[boxObject["y0"]:boxObject["y1"], boxObject["x0"]:boxObject["x1"]]
-
-        valueList = region.sum(axis=1) if isVertical else region.sum(axis=0)
-
-        start = boxObject["y0"] if isVertical else boxObject["x0"]
-
-        for a in range(len(valueList) - 1, -1, -1):
-            if valueList[a] > 0:
-                return start + a + 1
-
-        return start
-
-    def _centerPointCalculate(self, bboxList):
-        return {
-            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
-            "y": int(round((bboxList[1] + bboxList[3]) / 2))
-        }
-
-    def _debugWrite(self, itemList, image, pathOutput, numberPage):
-        bboxList = []
-
-        for a in range(len(itemList)):
-            bboxList.append(itemList[a]["bbox"])
-
-        boxDebugWrite(image, bboxList, f"{pathOutput}debug/ocr/{numberPage}.jpg")
-
-    def _pageReaderCollect(self, pageReaderList, countPage):
-        if len(pageReaderList) != countPage:
-            print(f"pdf.py - page count - raster {countPage}, text {len(pageReaderList)}")
-
-        resultObject = {}
-
-        for a in range(len(pageReaderList)):
-            resultObject[pageReaderList[a]["number"]] = pageReaderList[a]
-
-        return resultObject
-
-    def execute(self, pathInput, pathOutput, password):
-        pageList = self._pageBuild(password, pathInput, pathOutput)
-
-        reader = Reader()
-
-        readerObject = reader.execute(pathInput, password)
-
-        if readerObject["message"] != "":
-            return {"message": readerObject["message"]}
-
-        pageReaderObject = self._pageReaderCollect(readerObject["pageList"], len(pageList))
-
-        astPageList = []
-        layoutList = []
-        tableList = []
-        itemList = []
-
-        for a in range(len(pageList)):
-            astPage = self.layout.execute(pathOutput, pageList[a]["image"], pageList[a]["number"])
-
-            astPageList.append(astPage)
-
-            tablePageList = self.table.execute(astPage, pageList[a]["image"])
-
-            numberPage = pageList[a]["number"]
-
-            itemPageList = self._itemBuild(pageReaderObject[numberPage] if numberPage in pageReaderObject else None, pageList[a]["image"], reader, len(itemList), numberPage)
-
-            if len(itemPageList) == 0:
-                itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, len(itemList), numberPage, pathOutput)
-            else:
-                self._debugWrite(itemPageList, pageList[a]["image"], pathOutput, numberPage)
-
-            self.layout.itemOrder(astPage, itemPageList)
-
-            self.table.orderAssign(astPage, tablePageList)
-
-            self.layout.mediaWrite(astPage, pageList[a]["image"], pathOutput)
-
-            self.table.cellRefine(tablePageList, itemPageList, astPage["direction"])
-
-            self.table.textAssign(tablePageList, itemPageList, astPage["direction"])
-
-            self.table.debugWrite(tablePageList, pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"], len(tableList))
-
-            tableList = tableList + self.table.resultBuild(tablePageList, len(tableList), pageList[a]["number"])
-            itemList = itemList + itemPageList
-
-        self.layout.flowAssign(astPageList)
-
-        for a in range(len(astPageList)):
-            layoutList = layoutList + self.layout.resultBuild(astPageList[a], len(layoutList))
-
-        self.layout.astWrite(pathOutput, astPageList)
-
-        return {
-            "pageCount": len(pageList),
-            "directionList": self.layout.directionBuild(astPageList),
-            "layoutList": layoutList,
-            "tableList": tableList,
-            "itemList": itemList
-        }
-
-    def __init__(self, layout, table, ocr):
-        self.levelBoxOverlap = 0.5
-
-        self.axisList = [False, True]
-
-        self.layout = layout
-        self.table = table
-        self.ocr = ocr
-
-class Reader:
+class PdfParser:
     def _byteText(self, byteList):
         return byteList.decode("latin-1")
 
@@ -1187,24 +908,20 @@ class Reader:
     def _digitCheck(self, code):
         return code >= 48 and code <= 57
 
+    def _positionAdvance(self, codeSet):
+        byteList = self.byteList
+        length = len(byteList)
+        position = self.position
+
+        while position < length and byteList[position] in codeSet:
+            position += 1
+
+        self.position = position
+
     def _parseNumberOrReference(self):
         savedPosition = self.position
 
-        byteList = self.byteList
-        length = len(byteList)
-
-        isRunning = True
-
-        while isRunning:
-            if self.position >= length:
-                isRunning = False
-            else:
-                code = byteList[self.position]
-
-                if (code >= 48 and code <= 57) or code == 43 or code == 45 or code == 46:
-                    self.position += 1
-                else:
-                    isRunning = False
+        self._positionAdvance(self.numberSet)
 
         numberText = self.text[savedPosition:self.position]
 
@@ -1219,8 +936,7 @@ class Reader:
 
             secondPosition = self.position
 
-            while self.position < length and byteList[self.position] >= 48 and byteList[self.position] <= 57:
-                self.position += 1
+            self._positionAdvance(self.digitSet)
 
             secondText = self.text[secondPosition:self.position]
 
@@ -1763,65 +1479,45 @@ class Reader:
 
         return result
 
-    def _cidWidth(self, cidFontObject):
+    def _cidWidthCollect(self, cidFontObject, nameKey, stepValue, countRange):
         resultObject = {}
 
-        widthNode = self._resolve(cidFontObject.get("W"))
+        widthNode = self._resolve(cidFontObject.get(nameKey))
 
-        if widthNode is not None and widthNode["kind"] == "array" and widthNode.get("itemList") is not None:
-            itemList = widthNode["itemList"]
+        if widthNode is None or widthNode["kind"] != "array" or widthNode.get("itemList") is None:
+            return resultObject
 
-            a = 0
+        itemList = widthNode["itemList"]
 
-            while a < len(itemList):
-                first = self._numberValue(itemList[a])
-                second = self._resolve(itemList[a + 1]) if a + 1 < len(itemList) else None
+        a = 0
 
-                if second is not None and second["kind"] == "array" and second.get("itemList") is not None:
-                    for b in range(len(second["itemList"])):
-                        resultObject[int(first) + b] = self._numberValue(second["itemList"][b]) / 1000
+        while a < len(itemList):
+            first = self._numberValue(itemList[a])
+            second = self._resolve(itemList[a + 1]) if a + 1 < len(itemList) else None
 
-                    a += 2
-                else:
-                    last = self._numberValue(itemList[a + 1]) if a + 1 < len(itemList) else 0
-                    width = self._numberValue(itemList[a + 2]) / 1000 if a + 2 < len(itemList) else 0
+            if second is not None and second["kind"] == "array" and second.get("itemList") is not None:
+                for b in range(0, len(second["itemList"]), stepValue):
+                    resultObject[int(first) + int(b / stepValue)] = abs(self._numberValue(second["itemList"][b])) / 1000
 
-                    for cid in range(int(first), int(last) + 1):
-                        resultObject[cid] = width
+                a += 2
 
-                    a += 3
+                continue
+
+            last = self._numberValue(itemList[a + 1]) if a + 1 < len(itemList) else 0
+            width = abs(self._numberValue(itemList[a + 2])) / 1000 if a + 2 < len(itemList) else 0
+
+            for cid in range(int(first), int(last) + 1):
+                resultObject[cid] = width
+
+            a += countRange
 
         return resultObject
+
+    def _cidWidth(self, cidFontObject):
+        return self._cidWidthCollect(cidFontObject, "W", 1, 3)
 
     def _cidWidthVertical(self, cidFontObject):
-        resultObject = {}
-
-        widthNode = self._resolve(cidFontObject.get("W2"))
-
-        if widthNode is not None and widthNode["kind"] == "array" and widthNode.get("itemList") is not None:
-            itemList = widthNode["itemList"]
-
-            a = 0
-
-            while a < len(itemList):
-                first = self._numberValue(itemList[a])
-                second = self._resolve(itemList[a + 1]) if a + 1 < len(itemList) else None
-
-                if second is not None and second["kind"] == "array" and second.get("itemList") is not None:
-                    for b in range(0, len(second["itemList"]), 3):
-                        resultObject[int(first) + int(b / 3)] = abs(self._numberValue(second["itemList"][b])) / 1000
-
-                    a += 2
-                else:
-                    last = self._numberValue(itemList[a + 1]) if a + 1 < len(itemList) else 0
-                    width = abs(self._numberValue(itemList[a + 2])) / 1000 if a + 2 < len(itemList) else 0
-
-                    for cid in range(int(first), int(last) + 1):
-                        resultObject[cid] = width
-
-                    a += 5
-
-        return resultObject
+        return self._cidWidthCollect(cidFontObject, "W2", 3, 5)
 
     def _resourceExternal(self, resourceObject):
         resultObject = {}
@@ -1982,11 +1678,7 @@ class Reader:
             self.fillColor = self._colorRgb((1 - number(4)) * (1 - number(1)), (1 - number(3)) * (1 - number(1)), (1 - number(2)) * (1 - number(1)))
         elif operator == "K":
             self.strokeColor = self._colorRgb((1 - number(4)) * (1 - number(1)), (1 - number(3)) * (1 - number(1)), (1 - number(2)) * (1 - number(1)))
-        elif operator == "m" or operator == "l":
-            self._pathAddPoint(number(2), number(1))
-        elif operator == "c":
-            self._pathAddPoint(number(2), number(1))
-        elif operator == "v" or operator == "y":
+        elif operator == "m" or operator == "l" or operator == "c" or operator == "v" or operator == "y":
             self._pathAddPoint(number(2), number(1))
         elif operator == "re":
             x = number(4)
@@ -2089,21 +1781,16 @@ class Reader:
                 self._transformPoint(renderMatrixList, 0, self.textRise + self.fontSize * 0.8)
             ]
 
-        xList = []
-        yList = []
-
-        for a in range(len(cornerList)):
-            xList.append(cornerList[a][0])
-            yList.append(cornerList[a][1])
+        bboxList = boxFromPointList(cornerList)
 
         if len(text.strip()) > 0 and self.textRender != 3 and self.textRender != 7:
             self.elementList.append({
                 "type": "text",
                 "text": text,
-                "x0": min(xList),
-                "y0": self.pageHeight - max(yList),
-                "x1": max(xList),
-                "y1": self.pageHeight - min(yList),
+                "x0": bboxList[0],
+                "y0": self.pageHeight - bboxList[3],
+                "x1": bboxList[2],
+                "y1": self.pageHeight - bboxList[1],
                 "fontName": font["baseFont"],
                 "fontSize": math.floor(deviceFontSize * 100 + 0.5) / 100,
                 "isVertical": font["isVertical"],
@@ -2296,6 +1983,8 @@ class Reader:
     def __init__(self):
         self.delimiterSet = set(ord(value) for value in "()<>[]{}/%")
         self.whitespaceSet = set([0, 9, 10, 12, 13, 32])
+        self.digitSet = set(range(48, 58))
+        self.numberSet = self.digitSet | set(ord(value) for value in "+-.")
 
         self.paddingByteList = bytes([0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41, 0x64, 0x00, 0x4e, 0x56, 0xff, 0xfa, 0x01, 0x08, 0x2e, 0x2e, 0x00, 0xb6, 0xd0, 0x68, 0x3e, 0x80, 0x2f, 0x0c, 0xa9, 0xfe, 0x64, 0x53, 0x69, 0x7a])
 
@@ -2311,29 +2000,9 @@ class Reader:
         self.numberObject = 0
         self.generationObject = 0
 
-        self.fontSize = 0
-        self.charSpacing = 0
-        self.wordSpacing = 0
-        self.horizontalScale = 1
-        self.leading = 0
-        self.textRender = 0
-        self.textRise = 0
-        self.fillColor = "#000000"
-        self.strokeColor = "#000000"
-        self.currentFont = None
-        self.pageHeight = 0
-        self.elementList = []
         self.byteList = b""
         self.text = ""
         self.position = 0
-
-        self.pathMinX = 0
-        self.pathMinY = 0
-        self.pathMaxX = 0
-        self.pathMaxY = 0
-
-        self.isPathEmpty = True
-        self.isPathRectangle = False
 
         self.codecList = [
             ["UCS2", "utf-16-be"],
@@ -2350,9 +2019,5 @@ class Reader:
             ["B5pc", "big5"],
             ["EUC", "euc_jp"]
         ]
-        self.ctmList = [1, 0, 0, 1, 0, 0]
-        self.textMatrixList = [1, 0, 0, 1, 0, 0]
-        self.lineMatrixList = [1, 0, 0, 1, 0, 0]
-        self.graphicsStateList = []
 
         self.indirectObject = {}

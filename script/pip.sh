@@ -47,8 +47,8 @@ then
     fi
 fi
 
-# Onnx - document_scanner
-pathModel="/home/app/onnx/document_scanner/model/"
+# Onnx
+pathModel="/home/app/onnx/model/"
 urlModel="https://huggingface.co/cimo001/paddle/resolve/main/"
 
 mkdir -p "${pathModel}"
@@ -69,15 +69,15 @@ do
 
     if [ ! -f "${pathModel}${fileName}" ]
     then
-        echo "Download document_scanner: ${fileName}"
+        echo "Download onnx: ${fileName}"
 
         if ! curl -fsSL "${urlModel}${model}" -o "${pathModel}${fileName}"
         then
-            echo "Skip document_scanner - ${fileName}: download failed."
+            echo "Skip onnx - ${fileName}: download failed."
 
             rm -f "${pathModel}${fileName}"
         fi
     fi
 done
 
-python3 "${PATH_ROOT}onnx/document_scanner/server.py" >> "${PATH_ROOT}${MS_O_PATH_LOG}document_scanner.log" 2>&1 &
+python3 "${PATH_ROOT}onnx/server.py" >> "${PATH_ROOT}${MS_O_PATH_LOG}onnx.log" 2>&1 &

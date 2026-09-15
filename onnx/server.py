@@ -54,7 +54,7 @@ class ServerHttp(ThreadingHTTPServer):
 
         print(f"Error: {errorText}")
 
-urlSplit = os.environ["MS_O_URL_API_ONNX_DS"].replace("http://", "").split(":")
+urlSplit = os.environ["MS_O_URL_API_ONNX"].replace("http://", "").split(":")
 host = urlSplit[0]
 port = int(urlSplit[1])
 
@@ -80,6 +80,6 @@ if isRunning:
 
 serverHttp = ServerHttp((host, port), HandlerHttpRequest)
 
-print(f"Onnx - document_scanner - Ready on => {host}:{port}")
+print(f"Onnx - Ready on => {host}:{port}")
 
 serverHttp.serve_forever()

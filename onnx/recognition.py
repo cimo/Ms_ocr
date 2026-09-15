@@ -6,7 +6,6 @@ import io
 import math
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
 from helper import onnxSessionBuild
@@ -147,14 +146,13 @@ class Recognition:
         return resultList
 
     def __init__(self):
-        self.osPathDirName = f"{os.path.dirname(__file__)}/"
-        self.pathModel = f"{self.osPathDirName}model/pp-ocrV6_medium_rec.onnx"
-        self.pathDictionary = f"{self.osPathDirName}model/dictionary.txt"
+        self.pathModel = f"{os.path.dirname(__file__)}/model/pp-ocrV6_medium_rec.onnx"
+        self.pathDictionary = f"{os.path.dirname(__file__)}/model/dictionary.txt"
 
         self.imageHeightModel = 48
         self.imageWidthModel = 320
         self.imageWidthMax = 3200
-        
+
         self.ratioRotate = 1.5
         self.sizeBatch = 16
         self.levelBatchRatio = 1.25

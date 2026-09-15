@@ -39,7 +39,7 @@ export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env["MS_
 export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env["MS_O_FILE_SIZE_MB"] as string);
 
 // Custom
-export const URL_API_ONNX_DS = Ce.checkVariable("MS_O_URL_API_ONNX_DS") || (process.env["MS_O_URL_API_ONNX_DS"] as string);
+export const URL_API_ONNX = Ce.checkVariable("MS_O_URL_API_ONNX") || (process.env["MS_O_URL_API_ONNX"] as string);
 export const PERSISTENCE_SECOND = Ce.checkVariable("MS_O_PERSISTENCE_SECOND") || (process.env["MS_O_PERSISTENCE_SECOND"] as string);
 // Custom
 

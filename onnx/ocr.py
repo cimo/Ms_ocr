@@ -1,14 +1,11 @@
 import sys
-import os
-import cv2
 
 sys.dont_write_bytecode = True
-sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
 import detection
 import recognition
-from helper import centerPointCalculate, imageInkBuild, boxDebugWrite
+from helper import boxFromPointList, centerPointCalculate, imageInkBuild, boxDebugWrite
 
 class Ocr:
     def _verticalCheck(self, detectionList):
@@ -16,7 +13,7 @@ class Ocr:
         countHorizontal = 0
 
         for a in range(len(detectionList)):
-            coordinateList = self._coordinateCalculate(detectionList[a]["coordinate"])
+            coordinateList = boxFromPointList(detectionList[a]["coordinate"])
 
             if coordinateList[3] - coordinateList[1] >= (coordinateList[2] - coordinateList[0]) * self.levelVerticalRatio:
                 countVertical += 1
@@ -26,7 +23,7 @@ class Ocr:
         return countVertical > countHorizontal
 
     def _edgeInsideCollect(self, tableList, pointList, imageInk, isVertical):
-        coordinateList = self._coordinateCalculate(pointList)
+        coordinateList = boxFromPointList(pointList)
 
         indexCross = 0 if isVertical else 1
         indexFlow = 1 if isVertical else 0
@@ -67,16 +64,6 @@ class Ocr:
             resultList.append(edgeList[a])
 
         return resultList
-
-    def _coordinateCalculate(self, pointList):
-        xList = []
-        yList = []
-
-        for a in range(len(pointList)):
-            xList.append(pointList[a][0])
-            yList.append(pointList[a][1])
-
-        return [min(xList), min(yList), max(xList), max(yList)]
 
     def _edgeSplitCheck(self, coordinateList, edge, imageInk, isVertical):
         indexCross = 0 if isVertical else 1
@@ -189,7 +176,7 @@ class Ocr:
             if len(recognitionList[a]["text"].strip()) == 0:
                 continue
 
-            coordinateList = self._coordinateCalculate(quadPageList[a])
+            coordinateList = boxFromPointList(quadPageList[a])
 
             itemList.append({
                 "id": countStart + len(itemList) + 1,
