@@ -51,7 +51,7 @@ export default class Service {
                     const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
                     instance.api
-                        .post<modelService.IapiScannerResponse>(
+                        .post<modelService.IapiResponse>(
                             "/engine",
                             {
                                 headers: {
@@ -63,22 +63,38 @@ export default class Service {
                         .then(async (resultApi) => {
                             const data = resultApi.data;
 
-                            helperSrc.responseBody(
-                                {
-                                    state: data.response.state,
-                                    message: data.response.message,
-                                    data: JSON.stringify({ uniqueId })
-                                },
-                                response,
-                                200
-                            );
+                            if (data.response.state === "ok") {
+                                const fileReadStream = await helperSrc.fileReadStream(`${pathOutput}result.md`);
 
-                            const fileOrFolderDelete = await helperSrc.fileOrFolderDelete(pathInputBasename);
+                                if (!Buffer.isBuffer(fileReadStream)) {
+                                    helperSrc.writeLog(
+                                        "Service.ts - api() - post(/api/extract) - post(/engine) - fileReadStream()",
+                                        fileReadStream.toString()
+                                    );
 
-                            if (typeof fileOrFolderDelete !== "boolean") {
+                                    helperSrc.responseBody({ state: "ko", message: fileReadStream.toString() }, response, 500);
+                                } else {
+                                    helperSrc.responseBody({ state: "ok", message: "", data: fileReadStream.toString("base64") }, response, 200);
+                                }
+                            } else {
+                                helperSrc.responseBody({ state: data.response.state, message: data.response.message }, response, 200);
+                            }
+
+                            const fileOrFolderDeleteInput = await helperSrc.fileOrFolderDelete(pathInputBasename);
+
+                            if (typeof fileOrFolderDeleteInput !== "boolean") {
                                 helperSrc.writeLog(
                                     "Service.ts - api() - post(/api/extract) - post(/engine) - fileOrFolderDelete()",
-                                    fileOrFolderDelete.toString()
+                                    fileOrFolderDeleteInput.toString()
+                                );
+                            }
+
+                            const fileOrFolderDeleteOutput = await helperSrc.fileOrFolderDelete(pathOutput);
+
+                            if (typeof fileOrFolderDeleteOutput !== "boolean") {
+                                helperSrc.writeLog(
+                                    "Service.ts - api() - post(/api/extract) - post(/engine) - fileOrFolderDelete()",
+                                    fileOrFolderDeleteOutput.toString()
                                 );
                             }
                         })
@@ -102,25 +118,6 @@ export default class Service {
 
                     helperSrc.responseBody({ state: "ko", message: error.message }, response, 500);
                 });
-        });
-
-        this.app.post("/api/download", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-            const body = request.body as modelService.IapiDownloadBody;
-
-            const uniqueId = body.uniqueId;
-            const pathFile = body.pathFile;
-
-            const path = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/${pathFile}`;
-
-            helperSrc.fileReadStream(path).then((resultFileReadStream) => {
-                if (!Buffer.isBuffer(resultFileReadStream)) {
-                    helperSrc.writeLog("Service.ts - api() - post(/api/download) - fileReadStream()", resultFileReadStream.toString());
-
-                    helperSrc.responseBody({ state: "ko", message: resultFileReadStream.toString() }, response, 500);
-                } else {
-                    helperSrc.responseBody({ state: "ok", message: "", data: resultFileReadStream.toString("base64") }, response, 200);
-                }
-            });
         });
     };
 }

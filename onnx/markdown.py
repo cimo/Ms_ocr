@@ -350,11 +350,8 @@ class Markdown:
 
             return resultObject
 
-        def _rowIndexAnchor(self, cellObject, itemList, numberPage, rowRangeObject):
-            bboxList = cellObject["bbox"]
-
-            y1List = []
-            y2List = []
+        def _itemInsideCollect(self, itemList, numberPage, bboxList):
+            resultList = []
 
             for a in range(len(itemList)):
                 if itemList[a]["page"] != numberPage:
@@ -363,8 +360,19 @@ class Markdown:
                 if boxCenterInsideCheck(itemList[a]["bbox"], bboxList) == False:
                     continue
 
-                y1List.append(itemList[a]["bbox"][1])
-                y2List.append(itemList[a]["bbox"][3])
+                resultList.append(itemList[a])
+
+            return resultList
+
+        def _rowIndexAnchor(self, cellObject, itemList, numberPage, rowRangeObject):
+            itemInsideList = self._itemInsideCollect(itemList, numberPage, cellObject["bbox"])
+
+            y1List = []
+            y2List = []
+
+            for a in range(len(itemInsideList)):
+                y1List.append(itemInsideList[a]["bbox"][1])
+                y2List.append(itemInsideList[a]["bbox"][3])
 
             rowIndexBest = cellObject["rowIndex"]
             overlapBest = 0
@@ -386,18 +394,7 @@ class Markdown:
             return rowIndexBest
 
         def _textBuild(self, itemList, numberPage, bboxList, directionObject):
-            itemInsideList = []
-
-            for a in range(len(itemList)):
-                if itemList[a]["page"] != numberPage:
-                    continue
-
-                if boxCenterInsideCheck(itemList[a]["bbox"], bboxList) == False:
-                    continue
-
-                itemInsideList.append(itemList[a])
-
-            lineList = self._lineGroup(itemInsideList, directionObject)
+            lineList = self._lineGroup(self._itemInsideCollect(itemList, numberPage, bboxList), directionObject)
 
             textList = []
 

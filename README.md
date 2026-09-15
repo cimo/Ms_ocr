@@ -69,20 +69,7 @@ password        "" (only on pdf with password)
 searchText      ""
 ```
 
-4. Download
-```
-url = https://localhost:1045/api/download
-method = POST
-
-json
-
-key             value
----             ---
-"uniqueId":     "abc123",
-"pathFile":     "result.md"
-```
-
-5. Logout
+4. Logout
 ```
 url = https://localhost:1045/logout
 method = GET

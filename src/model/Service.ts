@@ -1,9 +1,4 @@
-export interface IapiDownloadBody {
-    uniqueId: string;
-    pathFile: string;
-}
-
-export interface IapiScannerResponse {
+export interface IapiResponse {
     response: {
         state: string;
         message: string;

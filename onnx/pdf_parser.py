@@ -47,7 +47,7 @@ class PdfParser:
         if version == 5:
             keyList = self._keyAes256(password, revision, userByteList, self._stringByte(entryObject.get("UE")), ownerByteList, self._stringByte(entryObject.get("OE")))
         else:
-            keyList = self._keyStandard(password, revision, version, entryObject, ownerByteList, userByteList)
+            keyList = self._keyStandard(password, revision, entryObject, ownerByteList, userByteList)
 
         if keyList is None:
             return self.messagePasswordWrong if len(password) > 0 else self.messagePasswordRequired
@@ -108,7 +108,7 @@ class PdfParser:
 
         return filterObject[node["value"]] if node["value"] in filterObject else "Identity"
 
-    def _keyStandard(self, password, revision, version, entryObject, ownerByteList, userByteList):
+    def _keyStandard(self, password, revision, entryObject, ownerByteList, userByteList):
         idByteList = self._idByte()
 
         permission = int(self._numberValue(entryObject.get("P")))
