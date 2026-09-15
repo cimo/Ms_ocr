@@ -264,10 +264,12 @@ class Office:
         result = 0
 
         for a in range(len(reference)):
-            if reference[a].isalpha() == False:
+            character = reference[a].upper()
+
+            if character < "A" or character > "Z":
                 break
 
-            result = result * 26 + (ord(reference[a].upper()) - 64)
+            result = result * 26 + (ord(character) - 64)
 
         return max(0, result - 1)
 
@@ -275,7 +277,7 @@ class Office:
         result = ""
 
         for a in range(len(reference)):
-            if reference[a].isdigit():
+            if reference[a] >= "0" and reference[a] <= "9":
                 result += reference[a]
 
         return int(result)
@@ -1175,8 +1177,8 @@ class Office:
 
                         if len(referenceSplit) == 2:
                             resultList.append({
-                                "rowFirst": int(re.sub(r"[A-Za-z]", "", referenceSplit[0])),
-                                "rowLast": int(re.sub(r"[A-Za-z]", "", referenceSplit[1])),
+                                "rowFirst": self.office._gridRowNumber(referenceSplit[0]),
+                                "rowLast": self.office._gridRowNumber(referenceSplit[1]),
                                 "columnFirst": self.office._gridColumnIndex(referenceSplit[0]),
                                 "columnLast": self.office._gridColumnIndex(referenceSplit[1])
                             })
