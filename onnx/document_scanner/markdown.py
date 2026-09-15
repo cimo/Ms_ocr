@@ -1,10 +1,11 @@
 import sys
-import icu
+import os
 
 sys.dont_write_bytecode = True
+sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-import office
+from helper import spacelessCheck, whitespaceCheck, wideCheck, sentenceEndCheck
 
 class Markdown:
     def _textJoin(self, textList):
@@ -16,7 +17,12 @@ class Markdown:
 
                 continue
 
-            if self._spacelessCheck(result[-1:]) and self._spacelessCheck(textList[a][0:1]):
+            if whitespaceCheck(result[-1:]) or whitespaceCheck(textList[a][0:1]):
+                result += textList[a]
+
+                continue
+
+            if spacelessCheck(result[-1:]) and spacelessCheck(textList[a][0:1]):
                 result += textList[a]
 
                 continue
@@ -24,18 +30,6 @@ class Markdown:
             result += f"{self.separatorText}{textList[a]}"
 
         return result
-
-    def _spacelessCheck(self, character):
-        if self._wideCheck(character):
-            return True
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
-
-    def _wideCheck(self, character):
-        if character == "":
-            return False
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
 
     def _textEscape(self, text):
         return text.replace("<", "\\<")
@@ -67,7 +61,7 @@ class Markdown:
         return resultList
 
     def _cellEscape(self, text):
-        return self._textEscape(text.replace(self.separatorCell, self.separatorCellEscaped).strip())
+        return self._textEscape(text.replace(self.separatorCell, self.separatorCellEscaped).replace(self.separatorLine, self.separatorText).strip())
 
     def _tableWrite(self, headerList, gridList):
         separatorList = []
@@ -94,10 +88,7 @@ class Markdown:
     def execute(self, resultObject, extension):
         return self.builderObject[extension].execute(resultObject, extension)
 
-    def __init__(self, extensionObject):
-        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
-        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
-
+    def __init__(self, extensionObject, office):
         self.separatorText = " "
         self.separatorLine = "\n"
         self.separatorBlock = "\n\n"
@@ -116,7 +107,7 @@ class Markdown:
         for a in range(len(extensionObject["pdf"])):
             self.builderObject[extensionObject["pdf"][a]] = builderImage
 
-        builderOffice = self.Office(self)
+        builderOffice = self.Office(self, office)
 
         for a in range(len(extensionObject["office"])):
             self.builderObject[extensionObject["office"][a]] = builderOffice
@@ -269,6 +260,9 @@ class Markdown:
             return self.markdown._textEscape(result)
 
         def _spaceCheck(self, bboxPreviousList, bboxList, textPrevious, text, directionPageObject):
+            if whitespaceCheck(textPrevious[-1:]) or whitespaceCheck(text[0:1]):
+                return False
+
             if directionPageObject["isVertical"]:
                 gap = bboxList[1] - bboxPreviousList[3]
                 size = min(bboxPreviousList[2] - bboxPreviousList[0], bboxList[2] - bboxList[0])
@@ -279,7 +273,7 @@ class Markdown:
                 gap = bboxList[0] - bboxPreviousList[2]
                 size = min(bboxPreviousList[3] - bboxPreviousList[1], bboxList[3] - bboxList[1])
 
-            if self.markdown._wideCheck(textPrevious[-1:]) and self.markdown._wideCheck(text[0:1]):
+            if wideCheck(textPrevious[-1:]) and wideCheck(text[0:1]):
                 return False
 
             return gap >= size * self.levelSpaceGap
@@ -463,7 +457,7 @@ class Markdown:
                 if len(resultList) > 0:
                     blockPrevious = resultList[len(resultList) - 1]
 
-                    if blockPrevious["isJoinable"] and blockList[a]["isJoinable"] and self._pageBreakCheck(blockPrevious, blockList[a], directionObject) and self._sentenceEndCheck(blockPrevious["text"]) == False:
+                    if blockPrevious["isJoinable"] and blockList[a]["isJoinable"] and self._pageBreakCheck(blockPrevious, blockList[a], directionObject) and sentenceEndCheck(blockPrevious["text"], self.levelReferenceLength) == False:
                         blockPrevious["text"] = self.markdown._textJoin([blockPrevious["text"], blockList[a]["text"]])
                         blockPrevious["page"] = blockList[a]["page"]
                         blockPrevious["bbox"] = blockList[a]["bbox"]
@@ -495,48 +489,6 @@ class Markdown:
             sizeMinimum = min(columnPreviousList[1] - columnPreviousList[0], columnList[1] - columnList[0])
 
             return (column2 - column1) / float(sizeMinimum) >= self.levelColumnOverlap
-
-        def _sentenceEndCheck(self, text):
-            textClean = self._sentenceTailStrip(text)
-
-            return len(textClean) > 0 and icu.Char.hasBinaryProperty(textClean[-1:], icu.UProperty.S_TERM)
-
-        def _sentenceTailStrip(self, text):
-            result = text.strip()
-
-            while len(result) > 0:
-                character = result[-1:]
-
-                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION:
-                    indexOpen = self._groupOpenIndex(result)
-
-                    result = result[0:indexOpen] if indexOpen >= 0 else result[0:-1]
-
-                    continue
-
-                if icu.Char.charType(character) == icu.UCharCategory.FINAL_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.QUOTATION_MARK) or icu.Char.isUWhiteSpace(character):
-                    result = result[0:-1]
-
-                    continue
-
-                break
-
-            return result
-
-        def _groupOpenIndex(self, text):
-            for a in range(len(text) - 2, len(text) - 2 - self.levelReferenceLength, -1):
-                if a < 0:
-                    break
-
-                character = text[a]
-
-                if icu.Char.charType(character) == icu.UCharCategory.START_PUNCTUATION:
-                    return a
-
-                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.S_TERM):
-                    break
-
-            return -1
 
         def execute(self, resultObject, extension):
             layoutList = resultObject["layoutList"]
@@ -821,9 +773,8 @@ class Markdown:
 
             return buildObject[extension](resultObject["astPageList"], resultObject["tableList"])
 
-        def __init__(self, markdown):
+        def __init__(self, markdown, office):
             self.levelHeadingMax = 6
 
             self.markdown = markdown
-
-            self.office = office.Office()
+            self.office = office

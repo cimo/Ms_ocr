@@ -2,3 +2,4 @@ numpy==2.4.3
 opencv-python-headless==4.13.0.92
 pyclipper==1.3.0.post6
 fonttools==4.65.0
+cryptography==50.0.1

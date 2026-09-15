@@ -9,7 +9,7 @@ sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import onnxSessionBuild
+from helper import onnxSessionBuild, centerPointCalculate, boxArea, boxIntersection, boxContainedRemove
 
 class Layout:
     def _detect(self, image):
@@ -56,19 +56,13 @@ class Layout:
                 "label": label,
                 "score": score,
                 "bbox": [x1, y1, x2, y2],
-                "centerPoint": self._centerPointCalculate([x1, y1, x2, y2]),
+                "centerPoint": centerPointCalculate([x1, y1, x2, y2]),
                 "path": "",
                 "isAside": False,
                 "columnX1": 0
             })
 
-        return self._boxContainedRemove(self._boxSuppression(resultList))
-
-    def _centerPointCalculate(self, bboxList):
-        return {
-            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
-            "y": int(round((bboxList[1] + bboxList[3]) / 2))
-        }
+        return boxContainedRemove(self._boxSuppression(resultList), "bbox", self.levelBoxContained)
 
     def _boxSuppression(self, boxList):
         resultList = []
@@ -76,26 +70,17 @@ class Layout:
         boxSortedList = sorted(boxList, key=lambda boxObject: (boxObject["label"] in self.labelContainerList, boxObject["score"]), reverse=True)
 
         for a in range(len(boxSortedList)):
-            bboxList = boxSortedList[a]["bbox"]
-
-            area = (bboxList[2] - bboxList[0]) * (bboxList[3] - bboxList[1])
+            area = boxArea(boxSortedList[a]["bbox"])
 
             isKeep = True
 
             for b in range(len(resultList)):
-                bboxKeptList = resultList[b]["bbox"]
+                areaKept = boxArea(resultList[b]["bbox"])
 
-                areaKept = (bboxKeptList[2] - bboxKeptList[0]) * (bboxKeptList[3] - bboxKeptList[1])
+                areaIntersection = boxIntersection(boxSortedList[a]["bbox"], resultList[b]["bbox"])
 
-                x1 = max(bboxList[0], bboxKeptList[0])
-                y1 = max(bboxList[1], bboxKeptList[1])
-                x2 = min(bboxList[2], bboxKeptList[2])
-                y2 = min(bboxList[3], bboxKeptList[3])
-
-                if x2 <= x1 or y2 <= y1:
+                if areaIntersection == 0:
                     continue
-
-                areaIntersection = (x2 - x1) * (y2 - y1)
 
                 isSameRegion = areaIntersection / float(area + areaKept - areaIntersection) >= self.levelBoxNms
                 isInside = areaIntersection / float(min(area, areaKept)) >= self.levelBoxContained
@@ -116,45 +101,6 @@ class Layout:
             return self.labelGroupObject[label]
 
         return label
-
-    def _boxContainedRemove(self, boxList):
-        resultList = []
-
-        for a in range(len(boxList)):
-            bboxList = boxList[a]["bbox"]
-
-            area = (bboxList[2] - bboxList[0]) * (bboxList[3] - bboxList[1])
-
-            isContained = False
-
-            for b in range(len(boxList)):
-                if a == b:
-                    continue
-
-                bboxParentList = boxList[b]["bbox"]
-
-                areaParent = (bboxParentList[2] - bboxParentList[0]) * (bboxParentList[3] - bboxParentList[1])
-
-                if areaParent <= area:
-                    continue
-
-                x1 = max(bboxList[0], bboxParentList[0])
-                y1 = max(bboxList[1], bboxParentList[1])
-                x2 = min(bboxList[2], bboxParentList[2])
-                y2 = min(bboxList[3], bboxParentList[3])
-
-                if x2 <= x1 or y2 <= y1:
-                    continue
-
-                if (x2 - x1) * (y2 - y1) / float(area) >= self.levelBoxContained:
-                    isContained = True
-
-                    break
-
-            if isContained == False:
-                resultList.append(boxList[a])
-
-        return resultList
 
     def _directionDetect(self, itemList):
         countRightToLeft = 0

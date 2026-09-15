@@ -2,13 +2,12 @@ import sys
 import os
 import cv2
 import numpy
-import icu
 
 sys.dont_write_bytecode = True
 sys.path.append(f"{os.path.dirname(__file__)}/..")
 
 # Source
-from helper import onnxSessionBuild
+from helper import onnxSessionBuild, spacelessCheck, whitespaceCheck, wideCheck, centerPointCalculate, boxArea, boxIntersection, boxContainedRemove
 
 class Table:
     def _collect(self, astPage):
@@ -108,26 +107,17 @@ class Table:
         boxSortedList = sorted(boxList, key=lambda boxObject: boxObject["score"], reverse=True)
 
         for a in range(len(boxSortedList)):
-            coordinateList = boxSortedList[a]["coordinate"]
-
-            area = (coordinateList[2] - coordinateList[0]) * (coordinateList[3] - coordinateList[1])
+            area = boxArea(boxSortedList[a]["coordinate"])
 
             isOverlapped = False
 
             for b in range(len(resultList)):
-                coordinateKeptList = resultList[b]["coordinate"]
+                areaKept = boxArea(resultList[b]["coordinate"])
 
-                areaKept = (coordinateKeptList[2] - coordinateKeptList[0]) * (coordinateKeptList[3] - coordinateKeptList[1])
+                areaIntersection = boxIntersection(boxSortedList[a]["coordinate"], resultList[b]["coordinate"])
 
-                x1 = max(coordinateList[0], coordinateKeptList[0])
-                y1 = max(coordinateList[1], coordinateKeptList[1])
-                x2 = min(coordinateList[2], coordinateKeptList[2])
-                y2 = min(coordinateList[3], coordinateKeptList[3])
-
-                if x2 <= x1 or y2 <= y1:
+                if areaIntersection == 0:
                     continue
-
-                areaIntersection = (x2 - x1) * (y2 - y1)
 
                 if areaIntersection / float(area + areaKept - areaIntersection) >= self.levelBoxNms:
                     isOverlapped = True
@@ -143,80 +133,27 @@ class Table:
         resultList = []
 
         for a in range(len(cellList)):
-            coordinateList = cellList[a]["coordinate"]
-
             countContained = 0
 
             for b in range(len(cellList)):
                 if a == b:
                     continue
 
-                coordinateChildList = cellList[b]["coordinate"]
+                areaChild = boxArea(cellList[b]["coordinate"])
 
-                areaChild = (coordinateChildList[2] - coordinateChildList[0]) * (coordinateChildList[3] - coordinateChildList[1])
-
-                x1 = max(coordinateList[0], coordinateChildList[0])
-                y1 = max(coordinateList[1], coordinateChildList[1])
-                x2 = min(coordinateList[2], coordinateChildList[2])
-                y2 = min(coordinateList[3], coordinateChildList[3])
-
-                if x2 <= x1 or y2 <= y1:
-                    continue
-
-                if (x2 - x1) * (y2 - y1) / float(areaChild) >= self.levelBoxContained:
+                if boxIntersection(cellList[a]["coordinate"], cellList[b]["coordinate"]) / float(areaChild) >= self.levelBoxContained:
                     countContained += 1
 
             if countContained < self.countContainedMinimum:
                 resultList.append(cellList[a])
 
-        return self._boxContainedRemove(resultList)
-
-    def _boxContainedRemove(self, boxList):
-        resultList = []
-
-        for a in range(len(boxList)):
-            coordinateList = boxList[a]["coordinate"]
-
-            area = (coordinateList[2] - coordinateList[0]) * (coordinateList[3] - coordinateList[1])
-
-            isContained = False
-
-            for b in range(len(boxList)):
-                if a == b:
-                    continue
-
-                coordinateParentList = boxList[b]["coordinate"]
-
-                areaParent = (coordinateParentList[2] - coordinateParentList[0]) * (coordinateParentList[3] - coordinateParentList[1])
-
-                if areaParent <= area:
-                    continue
-
-                x1 = max(coordinateList[0], coordinateParentList[0])
-                y1 = max(coordinateList[1], coordinateParentList[1])
-                x2 = min(coordinateList[2], coordinateParentList[2])
-                y2 = min(coordinateList[3], coordinateParentList[3])
-
-                if x2 <= x1 or y2 <= y1:
-                    continue
-
-                if (x2 - x1) * (y2 - y1) / float(area) >= self.levelBoxContained:
-                    isContained = True
-
-                    break
-
-            if isContained == False:
-                resultList.append(boxList[a])
-
-        return resultList
+        return boxContainedRemove(resultList, "coordinate", self.levelBoxContained)
 
     def _boxOverlapRemove(self, boxList):
         resultList = []
 
         for a in range(len(boxList)):
-            coordinateList = boxList[a]["coordinate"]
-
-            area = (coordinateList[2] - coordinateList[0]) * (coordinateList[3] - coordinateList[1])
+            area = boxArea(boxList[a]["coordinate"])
 
             areaOverlap = 0
 
@@ -224,17 +161,7 @@ class Table:
                 if a == b or boxList[b]["score"] <= boxList[a]["score"]:
                     continue
 
-                coordinateOtherList = boxList[b]["coordinate"]
-
-                x1 = max(coordinateList[0], coordinateOtherList[0])
-                y1 = max(coordinateList[1], coordinateOtherList[1])
-                x2 = min(coordinateList[2], coordinateOtherList[2])
-                y2 = min(coordinateList[3], coordinateOtherList[3])
-
-                if x2 <= x1 or y2 <= y1:
-                    continue
-
-                areaOverlap += (x2 - x1) * (y2 - y1)
+                areaOverlap += boxIntersection(boxList[a]["coordinate"], boxList[b]["coordinate"])
 
             if areaOverlap / float(area) < self.levelBoxOverlap:
                 resultList.append(boxList[a])
@@ -572,6 +499,9 @@ class Table:
         return result
 
     def _spaceCheck(self, coordinatePreviousList, coordinateList, textPrevious, text, directionObject):
+        if whitespaceCheck(textPrevious[-1:]) or whitespaceCheck(text[0:1]):
+            return False
+
         if directionObject["isVertical"]:
             cross1 = max(coordinatePreviousList[0], coordinateList[0])
             cross2 = min(coordinatePreviousList[2], coordinateList[2])
@@ -585,25 +515,13 @@ class Table:
             gap = coordinatePreviousList[0] - coordinateList[2] if directionObject["isRightToLeft"] else coordinateList[0] - coordinatePreviousList[2]
             size = min(coordinatePreviousList[3] - coordinatePreviousList[1], coordinateList[3] - coordinateList[1])
 
-        if self._wideCheck(textPrevious[-1:]) and self._wideCheck(text[0:1]):
+        if wideCheck(textPrevious[-1:]) and wideCheck(text[0:1]):
             return False
 
         if cross2 <= cross1:
-            return self._spacelessCheck(textPrevious[-1:]) == False or self._spacelessCheck(text[0:1]) == False
+            return spacelessCheck(textPrevious[-1:]) == False or spacelessCheck(text[0:1]) == False
 
         return gap >= size * self.levelSpaceGap
-
-    def _spacelessCheck(self, character):
-        if self._wideCheck(character):
-            return True
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
-
-    def _wideCheck(self, character):
-        if character == "":
-            return False
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
 
     def _textOrderKey(self, textObject, directionObject):
         coordinateList = textObject["coordinate"]
@@ -693,12 +611,6 @@ class Table:
 
         cv2.imwrite(f"{pathOutput}debug/table/{numberPage}_table{tableIndex}_{tableType}.jpg", imageDebug)
 
-    def _centerPointCalculate(self, bboxList):
-        return {
-            "x": int(round((bboxList[0] + bboxList[2]) / 2)),
-            "y": int(round((bboxList[1] + bboxList[3]) / 2))
-        }
-
     def orderAssign(self, astPage, tableList):
         itemList = astPage["itemList"]
 
@@ -724,6 +636,53 @@ class Table:
 
             for b in range(len(cellList)):
                 cellList[b]["text"] = self._textJoin(textList, cellList[b]["coordinate"], directionObject)
+
+            tableList[a]["cellList"] = self._rowEmptyRemove(cellList)
+
+    def _rowEmptyRemove(self, cellList):
+        rowKeepObject = {}
+
+        for a in range(len(cellList)):
+            rowIndex = cellList[a]["rowIndex"]
+
+            if rowIndex not in rowKeepObject:
+                rowKeepObject[rowIndex] = False
+
+            if len(cellList[a]["text"].strip()) > 0 or cellList[a]["score"] != self.scoreCellRecovered:
+                rowKeepObject[rowIndex] = True
+
+        rowRemoveList = []
+
+        for rowIndex in rowKeepObject:
+            if rowKeepObject[rowIndex] == False:
+                rowRemoveList.append(rowIndex)
+
+        if len(rowRemoveList) == 0:
+            return cellList
+
+        resultList = []
+
+        for a in range(len(cellList)):
+            rowIndex = cellList[a]["rowIndex"]
+
+            if rowIndex in rowRemoveList:
+                continue
+
+            countBefore = 0
+            countInside = 0
+
+            for b in range(len(rowRemoveList)):
+                if rowRemoveList[b] < rowIndex:
+                    countBefore += 1
+                elif rowRemoveList[b] < rowIndex + cellList[a]["rowSpan"]:
+                    countInside += 1
+
+            cellList[a]["rowIndex"] = rowIndex - countBefore
+            cellList[a]["rowSpan"] = cellList[a]["rowSpan"] - countInside
+
+            resultList.append(cellList[a])
+
+        return resultList
 
     def debugWrite(self, tableList, image, itemList, pathOutput, numberPage, countStart):
         for a in range(len(tableList)):
@@ -767,7 +726,7 @@ class Table:
                     "rowSpan": cellList[b]["rowSpan"],
                     "columnSpan": cellList[b]["columnSpan"],
                     "bbox": bboxList,
-                    "centerPoint": self._centerPointCalculate(bboxList),
+                    "centerPoint": centerPointCalculate(bboxList),
                     "text": cellList[b]["text"]
                 })
 
@@ -776,7 +735,7 @@ class Table:
                 "page": numberPage,
                 "type": tablePageList[a]["type"],
                 "bbox": coordinateList,
-                "centerPoint": self._centerPointCalculate(coordinateList),
+                "centerPoint": centerPointCalculate(coordinateList),
                 "cellList": cellResultList
             })
 
@@ -811,9 +770,6 @@ class Table:
         self.pathModelClassification = f"{self.osPathDirName}model/pp-lcNet_x1_0_table_cls.onnx"
         self.pathModelCellWired = f"{self.osPathDirName}model/rt-detr-l_wired_table_cell_det.onnx"
         self.pathModelCellWireless = f"{self.osPathDirName}model/rt-detr-l_wireless_table_cell_det.onnx"
-
-        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
-        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
 
         self.countContainedMinimum = 2
         self.sizeCoverageKernel = 3

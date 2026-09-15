@@ -27,6 +27,7 @@ export default class Service {
                 .execute(request, true, false, `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/`)
                 .then(async (resultControllerUploadList) => {
                     let fileName = "";
+                    let password = "";
                     let searchText = "";
 
                     for (let a = 0; a < resultControllerUploadList.length; a++) {
@@ -34,6 +35,8 @@ export default class Service {
 
                         if (resultControllerUpload.name === "file" && resultControllerUpload.fileName) {
                             fileName = resultControllerUpload.fileName;
+                        } else if (resultControllerUpload.name === "password" && resultControllerUpload.buffer) {
+                            password = resultControllerUpload.buffer.toString();
                         } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
                             searchText = resultControllerUpload.buffer.toString();
                         }
@@ -55,7 +58,7 @@ export default class Service {
                                     "Content-Type": "application/json"
                                 }
                             },
-                            { pathInput, pathOutput, searchText }
+                            { pathInput, pathOutput, password, searchText }
                         )
                         .then(async (resultApi) => {
                             const data = resultApi.data;

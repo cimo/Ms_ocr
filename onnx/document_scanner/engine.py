@@ -17,6 +17,13 @@ import office
 import markdown
 
 class Engine:
+    def _extensionCategory(self, extension):
+        for category in self.extensionObject:
+            if extension in self.extensionObject[category]:
+                return category
+
+        return ""
+
     def _matchAssign(self, itemList, searchText):
         for a in range(len(itemList)):
             itemList[a]["isMatch"] = self._matchCheck(searchText, itemList[a]["text"])
@@ -73,22 +80,33 @@ class Engine:
 
         return resultObject
 
-    def execute(self, pathInput, pathOutput, searchText):
+    def execute(self, pathInput, pathOutput, password, searchText):
         timeStart = time.perf_counter()
+
+        extension = os.path.splitext(pathInput)[1].lower()
+
+        category = self._extensionCategory(extension)
+
+        if category == "":
+            return {"response": {"state": "ko", "message": "Extension not supported."}}
 
         for a in range(len(self.debugNameList)):
             os.makedirs(f"{pathOutput}debug/{self.debugNameList[a]}/", exist_ok=True)
 
         os.makedirs(f"{pathOutput}page/", exist_ok=True)
 
-        extension = os.path.splitext(pathInput)[1].lower()
-
-        if extension in self.extensionObject["image"]:
+        if category == "image":
             resultObject = self.image.execute(pathInput, pathOutput)
-        elif extension in self.extensionObject["pdf"]:
-            resultObject = self.pdf.execute(pathInput, pathOutput)
-        elif extension in self.extensionObject["office"]:
+        elif category == "pdf":
+            resultObject = self.pdf.execute(pathInput, pathOutput, password)
+        else:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
+
+        if "message" in resultObject:
+            return {"response": {"state": "ko", "message": resultObject["message"]}}
+
+        if resultObject["pageCount"] == 0:
+            return {"response": {"state": "ko", "message": "File not readable."}}
 
         resultObject["markdown"] = self.markdown.execute(resultObject, extension)
 
@@ -117,9 +135,9 @@ class Engine:
         self.table = table.Table()
         self.ocr = ocr.Ocr()
         self.image = image.Image(self.layout, self.table, self.ocr)
-        self.pdf = pdf.Process(self.layout, self.table)
+        self.pdf = pdf.Process(self.layout, self.table, self.ocr)
         self.office = office.Office()
-        self.markdown = markdown.Markdown(self.extensionObject)
+        self.markdown = markdown.Markdown(self.extensionObject, self.office)
 
         cv2.setUseOptimized(True)
         cv2.setNumThreads(self.countThread)

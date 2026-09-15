@@ -8,6 +8,10 @@ import datetime
 import xml.etree.ElementTree
 
 sys.dont_write_bytecode = True
+sys.path.append(f"{os.path.dirname(__file__)}/..")
+
+# Source
+from helper import spacelessCheck, sentenceEndCheck
 
 class Office:
     def _xmlRootBuild(self, pathFile, zipFile):
@@ -440,7 +444,7 @@ class Office:
             return resultList
 
         def _paragraphText(self, paragraphNode):
-            return self._textCollect(paragraphNode).strip()
+            return re.sub(self.patternTabulation, " ", self._textCollect(paragraphNode)).strip()
 
         def _textCollect(self, node):
             result = ""
@@ -450,8 +454,12 @@ class Office:
             if tag != "txbxContent":
                 if tag == "t":
                     result += node.text if node.text is not None else ""
-                elif tag == "tab" or tag == "br":
-                    result += " "
+                elif tag == "tab":
+                    result += "\t"
+                elif tag == "br" or tag == "cr":
+                    result += "\n"
+                elif tag == "noBreakHyphen":
+                    result += "-"
 
                 for childNode in node:
                     result += self._textCollect(childNode)
@@ -587,7 +595,7 @@ class Office:
                     if previous["kind"] == "paragraph" and previous["isWrapped"]:
                         isMerge = True
 
-                        separator = "" if self._spacelessCheck(previous["text"][-1:]) and self._spacelessCheck(block["text"][0:1]) else " "
+                        separator = "" if spacelessCheck(previous["text"][-1:]) and spacelessCheck(block["text"][0:1]) else " "
 
                         previous["text"] = f"{previous['text']}{separator}{block['text']}"
 
@@ -708,18 +716,6 @@ class Office:
 
             return value if value != "" else "continue"
 
-        def _spacelessCheck(self, character):
-            if self._wideCheck(character):
-                return True
-
-            return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
-
-        def _wideCheck(self, character):
-            if character == "":
-                return False
-
-            return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
-
         def _asideMark(self, blockList):
             runIndexList = []
 
@@ -787,7 +783,7 @@ class Office:
 
             if previous is not None and previous["kind"] == "paragraph" and previous["isAside"] == False:
                 if len(previous["text"]) > self.levelAsideLength and previous["size"] == block["size"]:
-                    if self._sentenceEndCheck(previous["text"]) == False:
+                    if sentenceEndCheck(previous["text"], self.levelReferenceLength) == False:
                         result = True
 
             return result
@@ -799,48 +795,6 @@ class Office:
                 return False
 
             return icu.Char.hasBinaryProperty(character, icu.UProperty.LOWERCASE) == False
-
-        def _sentenceEndCheck(self, text):
-            textClean = self._sentenceTailStrip(text)
-
-            return len(textClean) > 0 and icu.Char.hasBinaryProperty(textClean[-1:], icu.UProperty.S_TERM)
-
-        def _sentenceTailStrip(self, text):
-            result = text.strip()
-
-            while len(result) > 0:
-                character = result[-1:]
-
-                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION:
-                    indexOpen = self._groupOpenIndex(result)
-
-                    result = result[0:indexOpen] if indexOpen >= 0 else result[0:-1]
-
-                    continue
-
-                if icu.Char.charType(character) == icu.UCharCategory.FINAL_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.QUOTATION_MARK) or icu.Char.isUWhiteSpace(character):
-                    result = result[0:-1]
-
-                    continue
-
-                break
-
-            return result
-
-        def _groupOpenIndex(self, text):
-            for a in range(len(text) - 2, len(text) - 2 - self.levelReferenceLength, -1):
-                if a < 0:
-                    break
-
-                character = text[a]
-
-                if icu.Char.charType(character) == icu.UCharCategory.START_PUNCTUATION:
-                    return a
-
-                if icu.Char.charType(character) == icu.UCharCategory.END_PUNCTUATION or icu.Char.hasBinaryProperty(character, icu.UProperty.S_TERM):
-                    break
-
-            return -1
 
         def _asideRunFlush(self, runIndexList, blockList):
             if len(runIndexList) >= self.levelAsideCount:
@@ -858,7 +812,7 @@ class Office:
                         previousBlock = self._previousBlock(a, blockList)
 
                         if previousBlock is not None and previousBlock["isAside"] and previousBlock["size"] == block["size"]:
-                            if self._sentenceEndCheck(previousBlock["text"]) == False:
+                            if sentenceEndCheck(previousBlock["text"], self.levelReferenceLength) == False:
                                 block["isAside"] = True
 
                                 isChained = True
@@ -1050,7 +1004,7 @@ class Office:
                 elif block["isContinuation"] and len(itemMainList) > 0:
                     itemPrevious = itemMainList[len(itemMainList) - 1]
 
-                    if self._spacelessCheck(itemPrevious["text"][-1:]) and self._spacelessCheck(block["text"][0:1]):
+                    if spacelessCheck(itemPrevious["text"][-1:]) and spacelessCheck(block["text"][0:1]):
                         itemPrevious["text"] += block["text"]
                     else:
                         itemPrevious["text"] += f" {block['text']}"
@@ -1103,11 +1057,10 @@ class Office:
             self.namespaceRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
 
-            self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
-            self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
-
             self.valueFalseList = ["0", "false"]
             self.valueTextDirectionVertical = "tbRl"
+
+            self.patternTabulation = r"[ ]*\t[ \t]*"
 
             self.styleTitleList = ["title"]
             self.styleCaptionList = ["caption"]
@@ -1225,6 +1178,19 @@ class Office:
 
             return resultList
 
+        def _dateSystemCheck(self, zipFile):
+            workbookRootNode = self.office._xmlRootBuild("xl/workbook.xml", zipFile)
+
+            if workbookRootNode is None:
+                return False
+
+            propertyNode = workbookRootNode.find(f"{{{self.namespaceMain}}}workbookPr")
+
+            if propertyNode is None:
+                return False
+
+            return propertyNode.attrib.get("date1904", "0") not in self.valueFalseList
+
         def _pivotRangeCollect(self, zipFile, sheetPath):
             resultList = []
 
@@ -1265,7 +1231,7 @@ class Office:
 
             return max(0, result - 1)
 
-        def _rowCollect(self, sheetRootNode, sharedStringList, dateStyleList, pivotRangeList):
+        def _rowCollect(self, sheetRootNode, sharedStringList, dateStyleList, isDate1904, pivotRangeList):
             rowObjectList = []
 
             rowNumberNext = 1
@@ -1285,7 +1251,7 @@ class Office:
                         while len(cellList) < column:
                             cellList.append("")
 
-                        cellText = self._cellText(cellNode, sharedStringList, dateStyleList)
+                        cellText = self._cellText(cellNode, sharedStringList, dateStyleList, isDate1904)
 
                         for a in range(len(pivotRangeList)):
                             if pivotRangeList[a]["rowFirst"] <= rowNumber <= pivotRangeList[a]["rowLast"] and pivotRangeList[a]["columnFirst"] <= column <= pivotRangeList[a]["columnLast"]:
@@ -1334,7 +1300,7 @@ class Office:
 
             return resultList
 
-        def _cellText(self, cellNode, sharedStringList, dateStyleList):
+        def _cellText(self, cellNode, sharedStringList, dateStyleList, isDate1904):
             result = ""
 
             cellType = cellNode.attrib.get("t", "n")
@@ -1362,7 +1328,7 @@ class Office:
                     styleIndex = int(styleText) if styleText.isdigit() else -1
 
                     if styleIndex in dateStyleList:
-                        result = self._dateText(float(valueText))
+                        result = self._dateText(isDate1904, float(valueText))
                     else:
                         result = self._numberText(valueText)
 
@@ -1371,8 +1337,8 @@ class Office:
         def _numberCheck(self, text):
             return re.match(r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$", text) is not None
 
-        def _dateText(self, value):
-            dateValue = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=value)
+        def _dateText(self, isDate1904, value):
+            dateValue = (datetime.datetime(1904, 1, 1) if isDate1904 else datetime.datetime(1899, 12, 30)) + datetime.timedelta(days=value)
 
             result = dateValue.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1484,15 +1450,16 @@ class Office:
 
             sheetList = self._sheetBuild(zipFile)
 
+            isDate1904 = self._dateSystemCheck(zipFile)
+
             pageList = []
-            rowCount = 0
 
             for a in range(len(sheetList)):
                 sheetRootNode = self.office._xmlRootBuild(sheetList[a]["path"], zipFile)
 
                 pivotRangeList = self._pivotRangeCollect(zipFile, sheetList[a]["path"])
 
-                rowList = self._rowCollect(sheetRootNode, sharedStringList, dateStyleList, pivotRangeList) if sheetRootNode is not None else []
+                rowList = self._rowCollect(sheetRootNode, sharedStringList, dateStyleList, isDate1904, pivotRangeList) if sheetRootNode is not None else []
                 mergeList = self._mergeCollect(sheetRootNode) if sheetRootNode is not None else []
 
                 directionObject = self._sheetDirection(sheetRootNode)
@@ -1514,8 +1481,6 @@ class Office:
 
                 pageList.append({"number": a + 1, "direction": directionObject, "mergeList": mergeList, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList})
 
-                rowCount += len(rowList)
-
             zipFile.close()
 
             resultObject = {"pageList": pageList}
@@ -1533,6 +1498,8 @@ class Office:
             self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
             self.namespaceRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
+
+            self.valueFalseList = ["0", "false"]
 
             self.numberFormatDateList = [14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]
 
@@ -1628,7 +1595,7 @@ class Office:
             return result
 
         def _paragraphText(self, paragraphNode):
-            return self._textCollect(paragraphNode).strip()
+            return re.sub(self.patternTabulation, " ", self._textCollect(paragraphNode)).strip()
 
         def _textCollect(self, node):
             result = ""
@@ -1637,8 +1604,10 @@ class Office:
 
             if tag == "t":
                 result += node.text if node.text is not None else ""
-            elif tag == "br" or tag == "tab":
-                result += " "
+            elif tag == "tab":
+                result += "\t"
+            elif tag == "br":
+                result += "\n"
 
             for childNode in node:
                 result += self._textCollect(childNode)
@@ -1714,7 +1683,6 @@ class Office:
             slidePathList = self._slideBuild(zipFile)
 
             pageList = []
-            blockCount = 0
 
             isDocTitleFound = False
 
@@ -1795,8 +1763,6 @@ class Office:
 
                 pageList.append({"number": a + 1, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList})
 
-                blockCount += len(blockList)
-
             zipFile.close()
 
             resultObject = {"pageList": pageList}
@@ -1814,5 +1780,7 @@ class Office:
             self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
             self.namespaceRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
             self.namespacePackage = "http://schemas.openxmlformats.org/package/2006/relationships"
+
+            self.patternTabulation = r"[ ]*\t[ \t]*"
 
             self.placeholderSkipList = ["sldNum", "dt", "ftr"]

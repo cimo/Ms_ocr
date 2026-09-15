@@ -18,7 +18,7 @@ class HandlerHttpRequest(BaseHTTPRequestHandler):
     def _routeEngine(self, text):
         payload = json.loads(text)
 
-        return self.engine.execute(payload["pathInput"], payload["pathOutput"], payload["searchText"])
+        return self.engine.execute(payload["pathInput"], payload["pathOutput"], payload["password"], payload["searchText"])
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -64,7 +64,7 @@ checkSocket.close()
 
 if isRunning:
     pathScript = os.path.dirname(os.path.abspath(__file__))
-    pgrepRun = subprocess.run(["pgrep", "-f", f"{pathScript}/server.py"], capture_output=True, text=True)
+    pgrepRun = subprocess.run(["pgrep", "-f", f"{os.path.basename(pathScript)}/server.py"], capture_output=True, text=True)
     pidSplit = pgrepRun.stdout.split()
 
     for a in range(len(pidSplit)):

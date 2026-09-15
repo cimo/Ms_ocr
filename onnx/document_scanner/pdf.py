@@ -7,14 +7,31 @@ import subprocess
 import cv2
 import math
 import zlib
+import base64
 import codecs
+import hashlib
 import re
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 sys.dont_write_bytecode = True
+sys.path.append(f"{os.path.dirname(__file__)}/..")
+
+# Source
+from helper import spacelessCheck, whitespaceCheck, centerPointCalculate, imageInkBuild, boxDebugWrite
 
 class Process:
-    def _pageBuild(self, pathInput, pathOutput):
-        subprocess.run(["pdftoppm", "-jpeg", "-scale-to", "1755", pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
+    def _pageBuild(self, password, pathInput, pathOutput):
+        argumentList = ["pdftoppm", "-jpeg", "-cropbox", "-scale-to", "1755"]
+
+        if len(password) > 0:
+            argumentList = argumentList + ["-upw", password, "-opw", password]
+
+        runObject = subprocess.run(argumentList + [pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
+
+        if runObject.returncode != 0:
+            print(f"pdf.py - pdftoppm - {runObject.stderr.strip()}")
+
+            return []
 
         pathFileList = glob.glob(f"{pathOutput}page/page-*.jpg")
 
@@ -31,13 +48,16 @@ class Process:
 
         return sorted(resultList, key=lambda pageObject: pageObject["number"])
 
-    def _itemBuild(self, image, pageReader, countStart, numberPage):
+    def _itemBuild(self, pageReader, image, reader, countStart, numberPage):
+        if pageReader is None:
+            return []
+
         imageHeight, imageWidth = image.shape[0:2]
 
         scaleX = imageWidth / pageReader["width"]
         scaleY = imageHeight / pageReader["height"]
 
-        elementList = pageReader["elementList"]
+        elementList = reader.mergeText(self._widthCorrect(pageReader["elementList"], image, pageReader["rotate"], scaleX, scaleY))
 
         resultList = []
 
@@ -56,12 +76,124 @@ class Process:
                 "id": countStart + len(resultList) + 1,
                 "page": numberPage,
                 "bbox": bboxList,
-                "centerPoint": self._centerPointCalculate(bboxList),
+                "centerPoint": centerPointCalculate(bboxList),
                 "text": elementList[a]["text"],
                 "isMatch": False
             })
 
         return resultList
+
+    def _widthCorrect(self, elementList, image, rotate, scaleX, scaleY):
+        isRotate = rotate == 90 or rotate == 270
+
+        elementEstimatedList = []
+
+        for a in range(len(elementList)):
+            if elementList[a]["type"] != "text" or elementList[a]["isWidthEstimated"] == False:
+                continue
+
+            elementEstimatedList.append({"element": elementList[a], "isVertical": elementList[a]["isVertical"] != isRotate})
+
+        if len(elementEstimatedList) == 0:
+            return elementList
+
+        imageInk = imageInkBuild(image)
+
+        boxList = self._boxCollect(image, imageInk)
+
+        for a in range(len(boxList)):
+            for b in range(len(self.axisList)):
+                isVertical = self.axisList[b]
+
+                nameFlow = "y" if isVertical else "x"
+                nameCross = "x" if isVertical else "y"
+
+                scaleFlow = scaleY if isVertical else scaleX
+                scaleCross = scaleX if isVertical else scaleY
+
+                groupList = self._groupCollect(elementEstimatedList, boxList[a], isVertical, nameFlow, nameCross, scaleFlow, scaleCross)
+
+                if len(groupList) == 0:
+                    continue
+
+                flowStart = groupList[0][f"{nameFlow}0"]
+                flowEnd = groupList[len(groupList) - 1][f"{nameFlow}1"]
+
+                edge = self._inkEdge(imageInk, boxList[a], isVertical) / scaleFlow
+
+                if flowEnd <= flowStart or edge <= flowStart:
+                    continue
+
+                ratio = (edge - flowStart) / (flowEnd - flowStart)
+
+                for c in range(len(groupList)):
+                    groupList[c][f"{nameFlow}1"] = groupList[c][f"{nameFlow}0"] + (groupList[c][f"{nameFlow}1"] - groupList[c][f"{nameFlow}0"]) * ratio
+
+        return elementList
+
+    def _groupCollect(self, elementEstimatedList, boxObject, isVertical, nameFlow, nameCross, scaleFlow, scaleCross):
+        resultList = []
+
+        for a in range(len(elementEstimatedList)):
+            if elementEstimatedList[a]["isVertical"] != isVertical:
+                continue
+
+            element = elementEstimatedList[a]["element"]
+
+            cross1 = max(element[f"{nameCross}0"] * scaleCross, boxObject[f"{nameCross}0"])
+            cross2 = min(element[f"{nameCross}1"] * scaleCross, boxObject[f"{nameCross}1"])
+
+            if cross2 - cross1 < (element[f"{nameCross}1"] - element[f"{nameCross}0"]) * scaleCross * self.levelBoxOverlap:
+                continue
+
+            flowStart = element[f"{nameFlow}0"] * scaleFlow
+
+            if flowStart < boxObject[f"{nameFlow}0"] or flowStart > boxObject[f"{nameFlow}1"]:
+                continue
+
+            resultList.append(element)
+
+        resultList.sort(key=lambda elementObject: elementObject[f"{nameFlow}0"])
+
+        return resultList
+
+    def _boxCollect(self, image, imageInk):
+        detectionList = self.ocr.boxDetect(image)
+
+        resultList = []
+
+        for a in range(len(detectionList)):
+            xList = []
+            yList = []
+
+            for b in range(len(detectionList[a]["coordinate"])):
+                xList.append(detectionList[a]["coordinate"][b][0])
+                yList.append(detectionList[a]["coordinate"][b][1])
+
+            x0 = max(0, min(xList))
+            y0 = max(0, min(yList))
+            x1 = min(imageInk.shape[1], max(xList))
+            y1 = min(imageInk.shape[0], max(yList))
+
+            if x1 <= x0 or y1 <= y0:
+                continue
+
+            resultList.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1})
+
+        return resultList
+
+    def _inkEdge(self, imageInk, boxObject, isVertical):
+        region = imageInk[boxObject["y0"]:boxObject["y1"], boxObject["x0"]:boxObject["x1"]]
+
+        valueList = region.sum(axis=1) if isVertical else region.sum(axis=0)
+
+        start = boxObject["y0"] if isVertical else boxObject["x0"]
+
+        for a in range(len(valueList) - 1, -1, -1):
+            if valueList[a] > 0:
+                return start + a + 1
+
+        return start
 
     def _centerPointCalculate(self, bboxList):
         return {
@@ -69,20 +201,36 @@ class Process:
             "y": int(round((bboxList[1] + bboxList[3]) / 2))
         }
 
-    def _debugText(self, image, itemList, pathOutput, numberPage):
-        imageDebug = image.copy()
+    def _debugWrite(self, itemList, image, pathOutput, numberPage):
+        bboxList = []
 
         for a in range(len(itemList)):
-            bboxList = itemList[a]["bbox"]
+            bboxList.append(itemList[a]["bbox"])
 
-            cv2.rectangle(imageDebug, (bboxList[0], bboxList[1]), (bboxList[2], bboxList[3]), (0, 200, 0), 1)
+        boxDebugWrite(image, bboxList, f"{pathOutput}debug/ocr/{numberPage}.jpg")
 
-        cv2.imwrite(f"{pathOutput}debug/ocr/{numberPage}.jpg", imageDebug)
+    def _pageReaderCollect(self, pageReaderList, countPage):
+        if len(pageReaderList) != countPage:
+            print(f"pdf.py - page count - raster {countPage}, text {len(pageReaderList)}")
 
-    def execute(self, pathInput, pathOutput):
-        pageList = self._pageBuild(pathInput, pathOutput)
+        resultObject = {}
 
-        pageReaderList = self.reader.execute(pathInput)
+        for a in range(len(pageReaderList)):
+            resultObject[pageReaderList[a]["number"]] = pageReaderList[a]
+
+        return resultObject
+
+    def execute(self, pathInput, pathOutput, password):
+        pageList = self._pageBuild(password, pathInput, pathOutput)
+
+        reader = Reader()
+
+        readerObject = reader.execute(pathInput, password)
+
+        if readerObject["message"] != "":
+            return {"message": readerObject["message"]}
+
+        pageReaderObject = self._pageReaderCollect(readerObject["pageList"], len(pageList))
 
         astPageList = []
         layoutList = []
@@ -96,9 +244,14 @@ class Process:
 
             tablePageList = self.table.execute(astPage, pageList[a]["image"])
 
-            itemPageList = self._itemBuild(pageList[a]["image"], pageReaderList[a], len(itemList), pageList[a]["number"])
+            numberPage = pageList[a]["number"]
 
-            self._debugText(pageList[a]["image"], itemPageList, pathOutput, pageList[a]["number"])
+            itemPageList = self._itemBuild(pageReaderObject[numberPage] if numberPage in pageReaderObject else None, pageList[a]["image"], reader, len(itemList), numberPage)
+
+            if len(itemPageList) == 0:
+                itemPageList = self.ocr.execute(pageList[a]["image"], tablePageList, len(itemList), numberPage, pathOutput)
+            else:
+                self._debugWrite(itemPageList, pageList[a]["image"], pathOutput, numberPage)
 
             self.layout.itemOrder(astPage, itemPageList)
 
@@ -130,14 +283,347 @@ class Process:
             "itemList": itemList
         }
 
-    def __init__(self, layout, table):
-        self.reader = Reader()
+    def __init__(self, layout, table, ocr):
+        self.levelBoxOverlap = 0.5
+
+        self.axisList = [False, True]
+
         self.layout = layout
         self.table = table
+        self.ocr = ocr
 
 class Reader:
     def _byteText(self, byteList):
         return byteList.decode("latin-1")
+
+    def _decryptBuild(self, password):
+        matchEncrypt = re.search(r"/Encrypt\s+(\d+)\s+(\d+)\s+R", self.text)
+
+        if matchEncrypt is None:
+            return ""
+
+        entryObject = self._encryptEntry(int(matchEncrypt.group(1)))
+
+        if entryObject is None:
+            return self.messageEncryption
+
+        filterNode = entryObject.get("Filter")
+
+        if filterNode is None or filterNode["kind"] != "name" or filterNode["value"] != "Standard":
+            return self.messageEncryption
+
+        version = int(self._numberValue(entryObject.get("V")))
+        revision = int(self._numberValue(entryObject.get("R")))
+
+        if version not in self.versionEncryptList:
+            return self.messageEncryption
+
+        ownerByteList = self._stringByte(entryObject.get("O"))
+        userByteList = self._stringByte(entryObject.get("U"))
+
+        methodObject = self._cryptMethod(entryObject, version)
+
+        if version == 5:
+            keyList = self._keyAes256(password, revision, userByteList, self._stringByte(entryObject.get("UE")), ownerByteList, self._stringByte(entryObject.get("OE")))
+        else:
+            keyList = self._keyStandard(password, revision, version, entryObject, ownerByteList, userByteList)
+
+        if keyList is None:
+            return self.messagePasswordWrong if len(password) > 0 else self.messagePasswordRequired
+
+        self.decryptObject = {
+            "keyList": keyList,
+            "isAes256": version == 5,
+            "methodStream": methodObject["stream"],
+            "methodString": methodObject["string"]
+        }
+
+        return ""
+
+    def _encryptEntry(self, number):
+        match = re.search(rf"(?<!\d)(?<!\d\s){number}\s+\d+\s+obj\b", self.text)
+
+        if match is None:
+            return None
+
+        self.position = match.end()
+
+        value = self._parseValue()
+
+        return value.get("entryObject")
+
+    def _stringByte(self, node):
+        if node is None or (node["kind"] != "string" and node["kind"] != "hexString"):
+            return b""
+
+        return node["value"].encode("latin-1")
+
+    def _cryptMethod(self, entryObject, version):
+        if version < 4:
+            return {"stream": "RC4", "string": "RC4"}
+
+        filterObject = {}
+
+        cryptNode = self._resolve(entryObject.get("CF"))
+
+        if cryptNode is not None and cryptNode.get("entryObject") is not None:
+            for name in cryptNode["entryObject"]:
+                methodNode = self._resolve(cryptNode["entryObject"][name])
+
+                if methodNode is not None and methodNode.get("entryObject") is not None:
+                    codeNode = methodNode["entryObject"].get("CFM")
+
+                    if codeNode is not None and codeNode["kind"] == "name":
+                        filterObject[name] = "AES" if codeNode["value"] == "AESV2" or codeNode["value"] == "AESV3" else "RC4"
+
+        return {
+            "stream": self._cryptName(entryObject.get("StmF"), filterObject),
+            "string": self._cryptName(entryObject.get("StrF"), filterObject)
+        }
+
+    def _cryptName(self, node, filterObject):
+        if node is None or node["kind"] != "name" or node["value"] == "Identity":
+            return "Identity"
+
+        return filterObject[node["value"]] if node["value"] in filterObject else "Identity"
+
+    def _keyStandard(self, password, revision, version, entryObject, ownerByteList, userByteList):
+        idByteList = self._idByte()
+
+        permission = int(self._numberValue(entryObject.get("P")))
+
+        countByte = 5 if revision == 2 else int(self._numberValue(entryObject.get("Length")) / 8)
+
+        if countByte <= 0:
+            countByte = 5
+
+        isMetadata = True
+
+        metadataNode = entryObject.get("EncryptMetadata")
+
+        if metadataNode is not None and metadataNode["kind"] == "boolean":
+            isMetadata = metadataNode["value"]
+
+        keyList = self._keyCompute(password.encode("latin-1", "ignore"), revision, countByte, ownerByteList, permission, idByteList, isMetadata)
+
+        if self._userCheck(keyList, revision, userByteList, idByteList):
+            return keyList
+
+        passwordUser = self._passwordOwner(password.encode("latin-1", "ignore"), revision, countByte, ownerByteList)
+
+        keyList = self._keyCompute(passwordUser, revision, countByte, ownerByteList, permission, idByteList, isMetadata)
+
+        if self._userCheck(keyList, revision, userByteList, idByteList):
+            return keyList
+
+        return None
+
+    def _idByte(self):
+        match = re.search(r"/ID\s*\[", self.text)
+
+        if match is None:
+            return b""
+
+        self.position = match.end() - 1
+
+        value = self._parseValue()
+
+        if value["kind"] != "array" or value.get("itemList") is None or len(value["itemList"]) == 0:
+            return b""
+
+        return self._stringByte(value["itemList"][0])
+
+    def _keyCompute(self, passwordByteList, revision, countByte, ownerByteList, permission, idByteList, isMetadata):
+        digest = hashlib.md5()
+
+        digest.update((passwordByteList + self.paddingByteList)[0:32])
+        digest.update(ownerByteList[0:32])
+        digest.update((permission & 0xffffffff).to_bytes(4, "little"))
+        digest.update(idByteList)
+
+        if revision >= 4 and isMetadata == False:
+            digest.update(b"\xff\xff\xff\xff")
+
+        keyList = digest.digest()
+
+        if revision >= 3:
+            for a in range(50):
+                keyList = hashlib.md5(keyList[0:countByte]).digest()
+
+        return keyList[0:countByte]
+
+    def _userCheck(self, keyList, revision, userByteList, idByteList):
+        if revision == 2:
+            return self._rc4(keyList, self.paddingByteList) == userByteList[0:32]
+
+        value = self._rc4(keyList, hashlib.md5(self.paddingByteList + idByteList).digest())
+
+        for a in range(1, 20):
+            value = self._rc4(self._keyXor(keyList, a), value)
+
+        return value == userByteList[0:16]
+
+    def _keyXor(self, keyList, value):
+        resultList = bytearray()
+
+        for a in range(len(keyList)):
+            resultList.append(keyList[a] ^ value)
+
+        return bytes(resultList)
+
+    def _passwordOwner(self, passwordByteList, revision, countByte, ownerByteList):
+        keyList = hashlib.md5((passwordByteList + self.paddingByteList)[0:32]).digest()
+
+        if revision >= 3:
+            for a in range(50):
+                keyList = hashlib.md5(keyList).digest()
+
+        keyList = keyList[0:countByte]
+
+        if revision == 2:
+            return self._rc4(keyList, ownerByteList)
+
+        value = ownerByteList
+
+        for a in range(19, -1, -1):
+            value = self._rc4(self._keyXor(keyList, a), value)
+
+        return value
+
+    def _keyAes256(self, password, revision, userByteList, userKeyByteList, ownerByteList, ownerKeyByteList):
+        passwordByteList = password.encode("utf-8")
+
+        if len(userByteList) >= 48 and self._hashAes256(revision, passwordByteList, userByteList[32:40], b"") == userByteList[0:32]:
+            return self._aesDecryptNoPad(self._hashAes256(revision, passwordByteList, userByteList[40:48], b""), userKeyByteList)
+
+        if len(ownerByteList) >= 48 and self._hashAes256(revision, passwordByteList, ownerByteList[32:40], userByteList[0:48]) == ownerByteList[0:32]:
+            return self._aesDecryptNoPad(self._hashAes256(revision, passwordByteList, ownerByteList[40:48], userByteList[0:48]), ownerKeyByteList)
+
+        return None
+
+    def _hashAes256(self, revision, passwordByteList, saltByteList, userByteList):
+        digest = hashlib.sha256(passwordByteList + saltByteList + userByteList).digest()
+
+        if revision == 5:
+            return digest
+
+        count = 0
+
+        while True:
+            dataList = (passwordByteList + digest + userByteList) * 64
+
+            encryptedList = self._aesEncryptNoPad(digest[0:16], digest[16:32], dataList)
+
+            total = 0
+
+            for a in range(16):
+                total += encryptedList[a]
+
+            index = total % 3
+
+            if index == 0:
+                digest = hashlib.sha256(encryptedList).digest()
+            elif index == 1:
+                digest = hashlib.sha384(encryptedList).digest()
+            else:
+                digest = hashlib.sha512(encryptedList).digest()
+
+            count += 1
+
+            if count >= 64 and encryptedList[len(encryptedList) - 1] <= count - 32:
+                break
+
+        return digest[0:32]
+
+    def _aesEncryptNoPad(self, keyList, vectorList, byteList):
+        encryptor = Cipher(algorithms.AES(keyList), modes.CBC(vectorList)).encryptor()
+
+        return encryptor.update(byteList) + encryptor.finalize()
+
+    def _aesDecryptNoPad(self, keyList, byteList):
+        countBlock = int(len(byteList) / 16) * 16
+
+        if countBlock == 0:
+            return b""
+
+        decryptor = Cipher(algorithms.AES(keyList), modes.CBC(bytes(16))).decryptor()
+
+        return decryptor.update(byteList[0:countBlock]) + decryptor.finalize()
+
+    def _aesDecrypt(self, keyList, byteList):
+        countBlock = int((len(byteList) - 16) / 16) * 16
+
+        if len(byteList) <= 16 or countBlock == 0:
+            return b""
+
+        decryptor = Cipher(algorithms.AES(keyList), modes.CBC(byteList[0:16])).decryptor()
+
+        resultList = decryptor.update(byteList[16:16 + countBlock]) + decryptor.finalize()
+
+        countPadding = resultList[len(resultList) - 1]
+
+        if countPadding >= 1 and countPadding <= 16 and countPadding <= len(resultList):
+            return resultList[0:len(resultList) - countPadding]
+
+        return resultList
+
+    def _rc4(self, keyList, byteList):
+        stateList = list(range(256))
+
+        indexState = 0
+
+        for a in range(256):
+            indexState = (indexState + stateList[a] + keyList[a % len(keyList)]) % 256
+
+            stateList[a], stateList[indexState] = stateList[indexState], stateList[a]
+
+        resultList = bytearray()
+
+        indexA = 0
+        indexB = 0
+
+        for a in range(len(byteList)):
+            indexA = (indexA + 1) % 256
+            indexB = (indexB + stateList[indexA]) % 256
+
+            stateList[indexA], stateList[indexB] = stateList[indexB], stateList[indexA]
+
+            resultList.append(byteList[a] ^ stateList[(stateList[indexA] + stateList[indexB]) % 256])
+
+        return bytes(resultList)
+
+    def _decryptByte(self, byteList, isStream):
+        if self.decryptObject is None or self.isDecryptActive == False:
+            return byteList
+
+        method = self.decryptObject["methodStream"] if isStream else self.decryptObject["methodString"]
+
+        if method == "Identity":
+            return byteList
+
+        keyList = self._keyObject()
+
+        if method == "AES":
+            return self._aesDecrypt(keyList, byteList)
+
+        return self._rc4(keyList, byteList)
+
+    def _keyObject(self):
+        keyList = self.decryptObject["keyList"]
+
+        if self.decryptObject["isAes256"]:
+            return keyList
+
+        digest = hashlib.md5()
+
+        digest.update(keyList)
+        digest.update(bytes([self.numberObject & 0xff, (self.numberObject >> 8) & 0xff, (self.numberObject >> 16) & 0xff]))
+        digest.update(bytes([self.generationObject & 0xff, (self.generationObject >> 8) & 0xff]))
+
+        if self.decryptObject["methodStream"] == "AES" or self.decryptObject["methodString"] == "AES":
+            digest.update(b"sAlT")
+
+        return digest.digest()[0:min(len(keyList) + 5, 16)]
 
     def _parseIndirect(self):
         resultList = []
@@ -147,7 +633,14 @@ class Reader:
         for a in range(len(matchList)):
             self.position = matchList[a].end()
 
+            self.numberObject = int(matchList[a].group(1))
+            self.generationObject = int(matchList[a].group(2))
+
+            self.isDecryptActive = True
+
             value = self._parseValue()
+
+            self.isDecryptActive = False
 
             category = value["kind"]
 
@@ -320,7 +813,7 @@ class Reader:
                 value += chr(code)
                 self.position += 1
 
-        return {"kind": "string", "value": value}
+        return {"kind": "string", "value": self._byteText(self._decryptByte(value.encode("latin-1"), False))}
 
     def _parseDictionaryOrStream(self):
         self.position += 2
@@ -397,6 +890,9 @@ class Reader:
 
         rawList = self.byteList[start:end]
 
+        if category != "XRef":
+            rawList = self._decryptByte(bytes(rawList), True)
+
         self.position = endIndex + 9
 
         filterList = self._filterExtract(entryObject)
@@ -441,11 +937,135 @@ class Reader:
         result = rawList
 
         for a in range(len(filterList)):
-            if filterList[a] == "FlateDecode" or filterList[a] == "Fl":
+            if filterList[a] == "ASCII85Decode" or filterList[a] == "A85":
+                result = self._ascii85Decode(result)
+            elif filterList[a] == "ASCIIHexDecode" or filterList[a] == "AHx":
+                result = self._asciiHexDecode(result)
+            elif filterList[a] == "RunLengthDecode" or filterList[a] == "RL":
+                result = self._runLengthDecode(result)
+            elif filterList[a] == "LZWDecode" or filterList[a] == "LZW":
+                result = self._lzwDecode(result, self._earlyChangeValue(entryObject))
+                result = self._applyPredictor(result, entryObject)
+            elif filterList[a] == "FlateDecode" or filterList[a] == "Fl":
                 result = self._inflate(result)
                 result = self._applyPredictor(result, entryObject)
 
         return result
+
+    def _ascii85Decode(self, byteList):
+        result = bytes(byteList)
+
+        indexStart = result.find(b"<~")
+
+        if indexStart >= 0:
+            result = result[indexStart + 2:]
+
+        indexEnd = result.find(b"~>")
+
+        if indexEnd >= 0:
+            result = result[:indexEnd]
+
+        return base64.a85decode(result)
+
+    def _asciiHexDecode(self, byteList):
+        text = bytes(byteList).decode("latin-1")
+
+        indexEnd = text.find(">")
+
+        if indexEnd >= 0:
+            text = text[:indexEnd]
+
+        result = ""
+
+        for a in range(len(text)):
+            if whitespaceCheck(text[a]) == False:
+                result += text[a]
+
+        if len(result) % 2 == 1:
+            result += "0"
+
+        return bytes.fromhex(result)
+
+    def _runLengthDecode(self, byteList):
+        result = bytearray()
+        position = 0
+
+        while position < len(byteList):
+            length = byteList[position]
+            position += 1
+
+            if length == 128:
+                break
+
+            if length < 128:
+                result += byteList[position:position + length + 1]
+                position += length + 1
+
+                continue
+
+            result += bytes([byteList[position]]) * (257 - length)
+            position += 1
+
+        return bytes(result)
+
+    def _earlyChangeValue(self, entryObject):
+        result = 1
+
+        parmsNode = entryObject.get("DecodeParms")
+
+        if parmsNode is not None and parmsNode["kind"] == "dictionary" and parmsNode.get("entryObject") is not None:
+            earlyNode = parmsNode["entryObject"].get("EarlyChange")
+
+            if earlyNode is not None and earlyNode["kind"] == "number":
+                result = int(earlyNode["value"])
+
+        return result
+
+    def _lzwDecode(self, byteList, earlyChange):
+        dictionaryList = [bytes([a]) for a in range(256)] + [b"", b""]
+
+        result = bytearray()
+        previousList = None
+        codeWidth = 9
+        buffer = 0
+        bufferLength = 0
+
+        for a in range(len(byteList)):
+            buffer = (buffer << 8) | byteList[a]
+            bufferLength += 8
+
+            while bufferLength >= codeWidth:
+                code = (buffer >> (bufferLength - codeWidth)) & ((1 << codeWidth) - 1)
+                bufferLength -= codeWidth
+
+                if code == 257:
+                    return bytes(result)
+
+                if code == 256:
+                    dictionaryList = dictionaryList[0:258]
+                    previousList = None
+                    codeWidth = 9
+
+                    continue
+
+                if previousList is None:
+                    entryList = dictionaryList[code]
+                elif code < len(dictionaryList):
+                    entryList = dictionaryList[code]
+
+                    dictionaryList.append(previousList + entryList[0:1])
+                else:
+                    entryList = previousList + previousList[0:1]
+
+                    dictionaryList.append(entryList)
+
+                result += entryList
+                previousList = entryList
+
+                if len(dictionaryList) + earlyChange >= (1 << codeWidth) and codeWidth < 12:
+                    codeWidth += 1
+
+        return bytes(result)
 
     def _inflate(self, byteList):
         isZlibHeader = False
@@ -542,7 +1162,7 @@ class Reader:
         if len(hexText) % 2 == 1:
             hexText += "0"
 
-        value = bytes.fromhex(hexText).decode("latin-1")
+        value = self._byteText(self._decryptByte(bytes.fromhex(hexText), False))
 
         return {"kind": "hexString", "value": value}
 
@@ -711,7 +1331,7 @@ class Reader:
         pageRawList = []
 
         if catalog is not None and catalog.get("entryObject") is not None:
-            self._collectPage(catalog["entryObject"].get("Pages"), {}, [0, 0, 595, 842], pageRawList)
+            self._collectPage(catalog["entryObject"].get("Pages"), {"resourceObject": {}, "mediaBoxList": [0, 0, 595, 842], "cropBoxList": None, "rotate": 0}, pageRawList)
 
         for a in range(len(pageRawList)):
             pageRaw = pageRawList[a]
@@ -732,20 +1352,49 @@ class Reader:
             self.currentFont = None
             self._pathReset()
 
-            width = pageRaw["mediaBoxList"][2] - pageRaw["mediaBoxList"][0]
-            height = pageRaw["mediaBoxList"][3] - pageRaw["mediaBoxList"][1]
+            boxList = pageRaw["boxList"]
 
-            self.pageHeight = height
+            width = boxList[2] - boxList[0]
+            height = boxList[3] - boxList[1]
+
+            self.pageHeight = boxList[3]
             self.elementList = []
 
             content = self._pageContent(pageRaw["entryObject"])
 
             self._interpretContent(content, pageRaw["resourceObject"])
-            self._pageLink(pageRaw["entryObject"])
 
-            resultList.append({"number": a + 1, "width": width, "height": height, "elementList": self._mergeText(self.elementList)})
+            elementList = self._elementTransform(self.elementList, boxList[0], pageRaw["rotate"], width, height)
+
+            if pageRaw["rotate"] == 90 or pageRaw["rotate"] == 270:
+                width, height = height, width
+
+            resultList.append({"number": a + 1, "width": width, "height": height, "rotate": pageRaw["rotate"], "elementList": elementList})
 
         return resultList
+
+    def _elementTransform(self, elementList, offsetX, rotate, width, height):
+        for a in range(len(elementList)):
+            x0 = elementList[a]["x0"] - offsetX
+            x1 = elementList[a]["x1"] - offsetX
+            y0 = elementList[a]["y0"]
+            y1 = elementList[a]["y1"]
+
+            if rotate == 90:
+                pointList = [[height - y0, x0], [height - y1, x1]]
+            elif rotate == 180:
+                pointList = [[width - x0, height - y0], [width - x1, height - y1]]
+            elif rotate == 270:
+                pointList = [[y0, width - x0], [y1, width - x1]]
+            else:
+                pointList = [[x0, y0], [x1, y1]]
+
+            elementList[a]["x0"] = min(pointList[0][0], pointList[1][0])
+            elementList[a]["y0"] = min(pointList[0][1], pointList[1][1])
+            elementList[a]["x1"] = max(pointList[0][0], pointList[1][0])
+            elementList[a]["y1"] = max(pointList[0][1], pointList[1][1])
+
+        return elementList
 
     def _resolve(self, node):
         result = node
@@ -757,41 +1406,87 @@ class Reader:
 
         return result
 
-    def _collectPage(self, node, parentResourceObject, parentMediaBoxList, resultList):
+    def _collectPage(self, node, parentObject, resultList):
         resolved = self._resolve(node)
 
         if resolved is not None and resolved.get("entryObject") is not None:
-            resourceObject = parentResourceObject
-            mediaBoxList = parentMediaBoxList
+            entryObject = resolved["entryObject"]
 
-            resourceNode = self._resolve(resolved["entryObject"].get("Resources"))
+            inheritObject = {
+                "resourceObject": parentObject["resourceObject"],
+                "mediaBoxList": parentObject["mediaBoxList"],
+                "cropBoxList": parentObject["cropBoxList"],
+                "rotate": parentObject["rotate"]
+            }
+
+            resourceNode = self._resolve(entryObject.get("Resources"))
 
             if resourceNode is not None and resourceNode.get("entryObject") is not None:
-                resourceObject = resourceNode["entryObject"]
+                inheritObject["resourceObject"] = resourceNode["entryObject"]
 
-            mediaBoxNode = self._resolve(resolved["entryObject"].get("MediaBox"))
+            mediaBoxList = self._boxValue(entryObject, "MediaBox")
 
-            if mediaBoxNode is not None and mediaBoxNode["kind"] == "array" and mediaBoxNode.get("itemList") is not None:
-                itemList = mediaBoxNode["itemList"]
+            if mediaBoxList is not None:
+                inheritObject["mediaBoxList"] = mediaBoxList
 
-                mediaBoxList = [
-                    self._numberValue(itemList[0] if len(itemList) > 0 else None),
-                    self._numberValue(itemList[1] if len(itemList) > 1 else None),
-                    self._numberValue(itemList[2] if len(itemList) > 2 else None),
-                    self._numberValue(itemList[3] if len(itemList) > 3 else None)
-                ]
+            cropBoxList = self._boxValue(entryObject, "CropBox")
 
-            typeNode = self._resolve(resolved["entryObject"].get("Type"))
+            if cropBoxList is not None:
+                inheritObject["cropBoxList"] = cropBoxList
+
+            rotateNode = self._resolve(entryObject.get("Rotate"))
+
+            if rotateNode is not None and rotateNode["kind"] == "number":
+                inheritObject["rotate"] = int(rotateNode["value"])
+
+            typeNode = self._resolve(entryObject.get("Type"))
             type = typeNode["value"] if typeNode is not None and typeNode["kind"] == "name" else ""
 
-            if type == "Page":
-                resultList.append({"entryObject": resolved["entryObject"], "resourceObject": resourceObject, "mediaBoxList": mediaBoxList})
-            else:
-                kidsNode = self._resolve(resolved["entryObject"].get("Kids"))
+            kidsNode = self._resolve(entryObject.get("Kids"))
 
-                if kidsNode is not None and kidsNode["kind"] == "array" and kidsNode.get("itemList") is not None:
-                    for a in range(len(kidsNode["itemList"])):
-                        self._collectPage(kidsNode["itemList"][a], resourceObject, mediaBoxList, resultList)
+            if type == "Page" or (type != "Pages" and kidsNode is None):
+                resultList.append({
+                    "entryObject": entryObject,
+                    "resourceObject": inheritObject["resourceObject"],
+                    "boxList": self._viewBox(inheritObject["mediaBoxList"], inheritObject["cropBoxList"]),
+                    "rotate": inheritObject["rotate"] % 360
+                })
+            elif kidsNode is not None and kidsNode["kind"] == "array" and kidsNode.get("itemList") is not None:
+                for a in range(len(kidsNode["itemList"])):
+                    self._collectPage(kidsNode["itemList"][a], inheritObject, resultList)
+
+    def _boxValue(self, entryObject, key):
+        boxNode = self._resolve(entryObject.get(key))
+
+        if boxNode is None or boxNode["kind"] != "array" or boxNode.get("itemList") is None:
+            return None
+
+        itemList = boxNode["itemList"]
+
+        valueList = [
+            self._numberValue(itemList[0] if len(itemList) > 0 else None),
+            self._numberValue(itemList[1] if len(itemList) > 1 else None),
+            self._numberValue(itemList[2] if len(itemList) > 2 else None),
+            self._numberValue(itemList[3] if len(itemList) > 3 else None)
+        ]
+
+        return [min(valueList[0], valueList[2]), min(valueList[1], valueList[3]), max(valueList[0], valueList[2]), max(valueList[1], valueList[3])]
+
+    def _viewBox(self, mediaBoxList, cropBoxList):
+        if cropBoxList is None:
+            return mediaBoxList
+
+        resultList = [
+            max(mediaBoxList[0], cropBoxList[0]),
+            max(mediaBoxList[1], cropBoxList[1]),
+            min(mediaBoxList[2], cropBoxList[2]),
+            min(mediaBoxList[3], cropBoxList[3])
+        ]
+
+        if resultList[2] <= resultList[0] or resultList[3] <= resultList[1]:
+            return mediaBoxList
+
+        return resultList
 
     def _numberValue(self, node):
         result = 0
@@ -883,12 +1578,13 @@ class Reader:
 
         codecName = self._codecGet(encoding) if subtype == "Type0" else ""
 
-        isBold = self._boldCheck(entryObject)
         byteLength = 2 if subtype == "Type0" else 1
 
         result = {
             "baseFont": baseFont,
-            "isBold": isBold,
+            "isVertical": self._verticalCheck(encoding, encodingNode),
+            "verticalFraction": 1.0,
+            "verticalObject": {},
             "byteLength": byteLength,
             "firstChar": 0,
             "widthList": [],
@@ -916,6 +1612,8 @@ class Reader:
                     defaultWidthNode = self._resolve(cidFontNode["entryObject"].get("DW"))
 
                     result["defaultWidthFraction"] = defaultWidthNode["value"] / 1000 if defaultWidthNode is not None and defaultWidthNode["kind"] == "number" else 1
+                    result["verticalFraction"] = self._verticalFraction(cidFontNode["entryObject"])
+                    result["verticalObject"] = self._cidWidthVertical(cidFontNode["entryObject"])
                     result["widthObject"] = self._cidWidth(cidFontNode["entryObject"])
         else:
             firstCharNode = self._resolve(entryObject.get("FirstChar"))
@@ -935,35 +1633,32 @@ class Reader:
                 if matrixNode is not None and matrixNode["kind"] == "array" and matrixNode.get("itemList") is not None:
                     result["widthScale"] = self._numberValue(matrixNode["itemList"][0] if len(matrixNode["itemList"]) > 0 else None)
 
+        result["isCidResolved"] = subtype != "Type0" or encoding[0:8] == "Identity"
+
+        result["isWidthEstimated"] = result["isCidResolved"] == False or (len(result["widthList"]) == 0 and len(result["widthObject"]) == 0)
+
         return result
 
-    def _boldCheck(self, entryObject):
-        descriptorNode = self._resolve(entryObject.get("FontDescriptor"))
-
-        if descriptorNode is None:
-            descendantNode = self._resolve(entryObject.get("DescendantFonts"))
-
-            if descendantNode is None or descendantNode["kind"] != "array" or len(descendantNode["itemList"]) == 0:
-                return False
-
-            descendantFontNode = self._resolve(descendantNode["itemList"][0])
-
-            if descendantFontNode is None or descendantFontNode.get("entryObject") is None:
-                return False
-
-            descriptorNode = self._resolve(descendantFontNode["entryObject"].get("FontDescriptor"))
-
-        if descriptorNode is None or descriptorNode.get("entryObject") is None:
-            return False
-
-        flagNode = self._resolve(descriptorNode["entryObject"].get("Flags"))
-
-        if flagNode is not None and flagNode["kind"] == "number" and int(flagNode["value"]) & self.flagForceBold:
+    def _verticalCheck(self, encoding, encodingNode):
+        if encoding[-2:] == "-V":
             return True
 
-        weightNode = self._resolve(descriptorNode["entryObject"].get("FontWeight"))
+        streamNode = self._resolve(encodingNode)
 
-        return weightNode is not None and weightNode["kind"] == "number" and float(weightNode["value"]) >= self.levelFontWeightBold
+        if streamNode is None or streamNode["kind"] != "stream" or streamNode.get("entryObject") is None:
+            return False
+
+        modeNode = self._resolve(streamNode["entryObject"].get("WMode"))
+
+        return modeNode is not None and modeNode["kind"] == "number" and int(modeNode["value"]) == 1
+
+    def _verticalFraction(self, entryObject):
+        defaultNode = self._resolve(entryObject.get("DW2"))
+
+        if defaultNode is None or defaultNode["kind"] != "array" or defaultNode.get("itemList") is None or len(defaultNode["itemList"]) < 2:
+            return 1.0
+
+        return abs(self._numberValue(defaultNode["itemList"][1])) / 1000
 
     def _codecGet(self, encoding):
         for a in range(len(self.codecList)):
@@ -1095,6 +1790,36 @@ class Reader:
                         resultObject[cid] = width
 
                     a += 3
+
+        return resultObject
+
+    def _cidWidthVertical(self, cidFontObject):
+        resultObject = {}
+
+        widthNode = self._resolve(cidFontObject.get("W2"))
+
+        if widthNode is not None and widthNode["kind"] == "array" and widthNode.get("itemList") is not None:
+            itemList = widthNode["itemList"]
+
+            a = 0
+
+            while a < len(itemList):
+                first = self._numberValue(itemList[a])
+                second = self._resolve(itemList[a + 1]) if a + 1 < len(itemList) else None
+
+                if second is not None and second["kind"] == "array" and second.get("itemList") is not None:
+                    for b in range(0, len(second["itemList"]), 3):
+                        resultObject[int(first) + int(b / 3)] = abs(self._numberValue(second["itemList"][b])) / 1000
+
+                    a += 2
+                else:
+                    last = self._numberValue(itemList[a + 1]) if a + 1 < len(itemList) else 0
+                    width = abs(self._numberValue(itemList[a + 2])) / 1000 if a + 2 < len(itemList) else 0
+
+                    for cid in range(int(first), int(last) + 1):
+                        resultObject[cid] = width
+
+                    a += 5
 
         return resultObject
 
@@ -1328,6 +2053,15 @@ class Reader:
                 for b in range(len(decoded["charList"])):
                     text += decoded["charList"][b]
 
+                    if font["isVertical"]:
+                        code = decoded["codeList"][b]
+
+                        fraction = font["verticalObject"][code] if font["isCidResolved"] and code in font["verticalObject"] else font["verticalFraction"]
+
+                        advance += fraction * self.fontSize + self.charSpacing
+
+                        continue
+
                     glyph = decoded["widthFractionList"][b] * self.fontSize + self.charSpacing
 
                     if font["byteLength"] == 1 and decoded["codeList"][b] == 32:
@@ -1335,29 +2069,49 @@ class Reader:
 
                     advance += glyph * self.horizontalScale
             elif part["kind"] == "number":
-                advance -= part["value"] / 1000 * self.fontSize * self.horizontalScale
+                advance -= part["value"] / 1000 * self.fontSize * (1 if font["isVertical"] else self.horizontalScale)
 
         renderMatrixList = self._matrixMultiply(self.ctmList, self.textMatrixList)
         deviceFontSize = self.fontSize * math.hypot(renderMatrixList[2], renderMatrixList[3])
 
-        startList = self._transformPoint(renderMatrixList, 0, self.textRise)
-        endList = self._transformPoint(renderMatrixList, advance, self.textRise)
+        if font["isVertical"]:
+            cornerList = [
+                self._transformPoint(renderMatrixList, -self.fontSize * 0.5, self.textRise),
+                self._transformPoint(renderMatrixList, self.fontSize * 0.5, self.textRise),
+                self._transformPoint(renderMatrixList, self.fontSize * 0.5, self.textRise - advance),
+                self._transformPoint(renderMatrixList, -self.fontSize * 0.5, self.textRise - advance)
+            ]
+        else:
+            cornerList = [
+                self._transformPoint(renderMatrixList, 0, self.textRise - self.fontSize * 0.2),
+                self._transformPoint(renderMatrixList, advance, self.textRise - self.fontSize * 0.2),
+                self._transformPoint(renderMatrixList, advance, self.textRise + self.fontSize * 0.8),
+                self._transformPoint(renderMatrixList, 0, self.textRise + self.fontSize * 0.8)
+            ]
+
+        xList = []
+        yList = []
+
+        for a in range(len(cornerList)):
+            xList.append(cornerList[a][0])
+            yList.append(cornerList[a][1])
 
         if len(text.strip()) > 0 and self.textRender != 3 and self.textRender != 7:
             self.elementList.append({
                 "type": "text",
                 "text": text,
-                "x0": min(startList[0], endList[0]),
-                "y0": self.pageHeight - (startList[1] + deviceFontSize * 0.8),
-                "x1": max(startList[0], endList[0]),
-                "y1": self.pageHeight - (startList[1] - deviceFontSize * 0.2),
+                "x0": min(xList),
+                "y0": self.pageHeight - max(yList),
+                "x1": max(xList),
+                "y1": self.pageHeight - min(yList),
                 "fontName": font["baseFont"],
                 "fontSize": math.floor(deviceFontSize * 100 + 0.5) / 100,
-                "isBold": font["isBold"],
+                "isVertical": font["isVertical"],
+                "isWidthEstimated": font["isWidthEstimated"],
                 "color": self.fillColor
             })
 
-        self.textMatrixList = self._matrixMultiply(self.textMatrixList, [1, 0, 0, 1, advance, 0])
+        self.textMatrixList = self._matrixMultiply(self.textMatrixList, [1, 0, 0, 1, 0, -advance] if font["isVertical"] else [1, 0, 0, 1, advance, 0])
 
     def _fontDecode(self, raw, font):
         charList = []
@@ -1398,7 +2152,7 @@ class Reader:
             widthFraction = font["defaultWidthFraction"]
 
             if font["byteLength"] == 2:
-                if font["widthObject"].get(code) is not None:
+                if font["isCidResolved"] and font["widthObject"].get(code) is not None:
                     widthFraction = font["widthObject"][code]
             elif code >= font["firstChar"] and code - font["firstChar"] < len(font["widthList"]):
                 widthFraction = font["widthList"][code - font["firstChar"]] * font["widthScale"]
@@ -1450,58 +2204,7 @@ class Reader:
 
         self._pathReset()
 
-    def _pageLink(self, entryObject):
-        annotsNode = self._resolve(entryObject.get("Annots"))
-
-        if annotsNode is not None and annotsNode["kind"] == "array" and annotsNode.get("itemList") is not None:
-            for a in range(len(annotsNode["itemList"])):
-                annot = self._resolve(annotsNode["itemList"][a])
-
-                if annot is not None and annot.get("entryObject") is not None:
-                    subtypeNode = self._resolve(annot["entryObject"].get("Subtype"))
-
-                    if subtypeNode is not None and subtypeNode["kind"] == "name" and subtypeNode["value"] == "Link":
-                        rectNode = self._resolve(annot["entryObject"].get("Rect"))
-                        actionNode = self._resolve(annot["entryObject"].get("A"))
-
-                        uri = ""
-
-                        if actionNode is not None and actionNode.get("entryObject") is not None:
-                            uriNode = self._resolve(actionNode["entryObject"].get("URI"))
-
-                            if uriNode is not None and (uriNode["kind"] == "string" or uriNode["kind"] == "hexString"):
-                                uri = uriNode["value"]
-
-                        if rectNode is not None and rectNode["kind"] == "array" and rectNode.get("itemList") is not None:
-                            itemList = rectNode["itemList"]
-
-                            left = self._numberValue(itemList[0] if len(itemList) > 0 else None)
-                            bottom = self._numberValue(itemList[1] if len(itemList) > 1 else None)
-                            right = self._numberValue(itemList[2] if len(itemList) > 2 else None)
-                            top = self._numberValue(itemList[3] if len(itemList) > 3 else None)
-
-                            self.elementList.append({
-                                "type": "link",
-                                "x0": min(left, right),
-                                "y0": self.pageHeight - max(top, bottom),
-                                "x1": max(left, right),
-                                "y1": self.pageHeight - min(top, bottom),
-                                "uri": uri
-                            })
-
-    def _spacelessCheck(self, character):
-        if self._wideCheck(character):
-            return True
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.LINE_BREAK) == self.lineBreakComplex
-
-    def _wideCheck(self, character):
-        if character == "":
-            return False
-
-        return icu.Char.getIntPropertyValue(character, icu.UProperty.EAST_ASIAN_WIDTH) in self.widthWideList
-
-    def _mergeText(self, elementList):
+    def mergeText(self, elementList):
         resultList = []
 
         current = None
@@ -1520,24 +2223,38 @@ class Reader:
             else:
                 size = current["fontSize"] if current.get("fontSize") is not None else 0
                 elementSize = element["fontSize"] if element.get("fontSize") is not None else 0
-                gap = element["x0"] - current["x1"]
 
-                isSameLine = abs(element["y0"] - current["y0"]) <= size * 0.6
+                if current["isVertical"]:
+                    gap = element["y0"] - current["y1"]
+
+                    isSameLine = abs(element["x0"] - current["x0"]) <= size * 0.6
+                else:
+                    gap = element["x0"] - current["x1"]
+
+                    isSameLine = abs(element["y0"] - current["y0"]) <= size * 0.6
+
+                isSameLine = isSameLine and current["isVertical"] == element["isVertical"]
                 isCompatibleSize = elementSize >= size * 0.45 and elementSize <= size * 1.4
                 isClose = gap >= -size * 0.3 and gap <= size * 1.0
 
                 if isSameLine and isCompatibleSize and isClose:
                     previousText = current["text"] if current.get("text") is not None else ""
                     elementText = element["text"] if element.get("text") is not None else ""
-                    isSpace = gap > size * 0.15 and previousText[-1:] != " " and elementText[0:1] != " "
+                    isSpace = gap > size * 0.15 and whitespaceCheck(previousText[-1:]) == False and whitespaceCheck(elementText[0:1]) == False
 
-                    if self._spacelessCheck(previousText[-1:]) and self._spacelessCheck(elementText[0:1]):
+                    if spacelessCheck(previousText[-1:]) and spacelessCheck(elementText[0:1]):
                         isSpace = False
 
                     current["text"] = f"{previousText} {elementText}" if isSpace else f"{previousText}{elementText}"
-                    current["x1"] = element["x1"]
-                    current["y0"] = min(current["y0"], element["y0"])
-                    current["y1"] = max(current["y1"], element["y1"])
+
+                    if current["isVertical"]:
+                        current["y1"] = element["y1"]
+                        current["x0"] = min(current["x0"], element["x0"])
+                        current["x1"] = max(current["x1"], element["x1"])
+                    else:
+                        current["x1"] = element["x1"]
+                        current["y0"] = min(current["y0"], element["y0"])
+                        current["y1"] = max(current["y1"], element["y1"])
                 else:
                     resultList.append(current)
 
@@ -1555,12 +2272,17 @@ class Reader:
 
         return resultList
 
-    def execute(self, pathInput):
+    def execute(self, pathInput, password):
         with open(pathInput, "rb") as file:
             self.byteList = bytes(file.read())
 
         self.text = self._byteText(self.byteList)
         self.position = 0
+
+        message = self._decryptBuild(password)
+
+        if message != "":
+            return {"message": message, "pageList": []}
 
         indirectList = self._parseIndirect()
 
@@ -1569,17 +2291,25 @@ class Reader:
         for a in range(len(indirectList)):
             self.indirectObject[indirectList[a]["number"]] = indirectList[a]
 
-        return self._buildPage()
+        return {"message": "", "pageList": self._buildPage()}
 
     def __init__(self):
-        self.flagForceBold = 1 << 18
-        self.levelFontWeightBold = 600
-
-        self.widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
-        self.lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")
-
         self.delimiterSet = set(ord(value) for value in "()<>[]{}/%")
         self.whitespaceSet = set([0, 9, 10, 12, 13, 32])
+
+        self.paddingByteList = bytes([0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41, 0x64, 0x00, 0x4e, 0x56, 0xff, 0xfa, 0x01, 0x08, 0x2e, 0x2e, 0x00, 0xb6, 0xd0, 0x68, 0x3e, 0x80, 0x2f, 0x0c, 0xa9, 0xfe, 0x64, 0x53, 0x69, 0x7a])
+
+        self.versionEncryptList = [1, 2, 4, 5]
+
+        self.messageEncryption = "Encryption not supported."
+        self.messagePasswordRequired = "Password required."
+        self.messagePasswordWrong = "Password wrong."
+
+        self.decryptObject = None
+        self.isDecryptActive = False
+
+        self.numberObject = 0
+        self.generationObject = 0
 
         self.fontSize = 0
         self.charSpacing = 0
