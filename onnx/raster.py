@@ -122,7 +122,7 @@ class Raster:
             return sorted(resultList, key=lambda pageObject: pageObject["number"])
 
         def _itemBuild(self, pageReader, image, pdfParser, countStart, numberPage):
-            if pageReader is None:
+            if pageReader is None or pageReader["width"] == 0 or pageReader["height"] == 0:
                 return []
 
             imageHeight, imageWidth = image.shape[0:2]

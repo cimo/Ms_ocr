@@ -23,8 +23,10 @@ export default class Service {
 
     api = (): void => {
         this.app.post("/api/extract", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
+            const uniqueId = helperSrc.generateUniqueId();
+
             this.controllerUpload
-                .execute(request, true, false, `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/`)
+                .execute(request, true, false, `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${uniqueId}/`)
                 .then(async (resultControllerUploadList) => {
                     let fileName = "";
                     let password = "";
@@ -44,10 +46,8 @@ export default class Service {
 
                     const fileDetail = await helperSrc.fileDetail(fileName);
 
-                    const uniqueId = helperSrc.generateUniqueId();
-
-                    const pathInput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/${fileDetail.name}`;
-                    const pathInputBasename = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${fileDetail.baseName}/`;
+                    const pathInput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${uniqueId}/${fileDetail.baseName}/${fileDetail.name}`;
+                    const pathInputBasename = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${uniqueId}/`;
                     const pathOutput = `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`;
 
                     instance.api
