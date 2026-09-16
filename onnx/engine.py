@@ -77,10 +77,11 @@ class Engine:
         if category == "":
             return {"response": {"state": "ko", "message": "Extension not supported."}}
 
-        for a in range(len(self.debugNameList)):
-            os.makedirs(f"{pathOutput}debug/{self.debugNameList[a]}/", exist_ok=True)
+        os.makedirs(pathOutput, exist_ok=True)
 
-        os.makedirs(f"{pathOutput}page/", exist_ok=True)
+        if self.isDebug:
+            for a in range(len(self.debugNameList)):
+                os.makedirs(f"{pathOutput}debug/{self.debugNameList[a]}/", exist_ok=True)
 
         if category == "image":
             resultObject = self.raster.image.execute(pathInput, pathOutput)
@@ -99,8 +100,9 @@ class Engine:
 
         self._matchAssign(resultObject["itemList"], searchText)
 
-        with open(f"{pathOutput}result.json", "w", encoding="utf-8") as file:
-            json.dump({"layoutList": resultObject["layoutList"], "tableList": resultObject["tableList"], "itemList": resultObject["itemList"]}, file, ensure_ascii=False, indent=2)
+        if self.isDebug:
+            with open(f"{pathOutput}debug/result.json", "w", encoding="utf-8") as file:
+                json.dump({"layoutList": resultObject["layoutList"], "tableList": resultObject["tableList"], "itemList": resultObject["itemList"]}, file, ensure_ascii=False, indent=2)
 
         with open(f"{pathOutput}result.md", "w", encoding="utf-8") as file:
             file.write(resultObject["markdown"])
@@ -112,17 +114,19 @@ class Engine:
         return {"response": {"state": "ok", "message": "Task completed."}}
 
     def __init__(self):
+        self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+
         self.countThread = 0
 
         self.extensionObject = self._extensionAllowed()
 
-        self.debugNameList = ["layout", "table", "ocr"]
+        self.debugNameList = ["layout", "table", "ocr", "page"]
 
-        self.layout = layout.Layout()
-        self.table = table.Table()
-        self.ocr = ocr.Ocr()
-        self.raster = raster.Raster(self.layout, self.table, self.ocr)
-        self.office = office.Office()
+        self.layout = layout.Layout(self.isDebug)
+        self.table = table.Table(self.isDebug)
+        self.ocr = ocr.Ocr(self.isDebug)
+        self.raster = raster.Raster(self.isDebug, self.layout, self.table, self.ocr)
+        self.office = office.Office(self.isDebug)
         self.markdown = markdown.Markdown(self.extensionObject, self.office)
 
         cv2.setUseOptimized(True)

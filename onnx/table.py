@@ -612,6 +612,9 @@ class Table:
         return resultList
 
     def debugWrite(self, tableList, image, itemList, pathOutput, numberPage, countStart):
+        if self.isDebug == False:
+            return
+
         for a in range(len(tableList)):
             coordinateList = tableList[a]["coordinate"]
 
@@ -692,7 +695,9 @@ class Table:
 
         return resultList
 
-    def __init__(self):
+    def __init__(self, isDebug):
+        self.isDebug = isDebug
+
         self.pathModelClassification = f"{os.path.dirname(__file__)}/model/pp-lcNet_x1_0_table_cls.onnx"
         self.pathModelCellWired = f"{os.path.dirname(__file__)}/model/rt-detr-l_wired_table_cell_det.onnx"
         self.pathModelCellWireless = f"{os.path.dirname(__file__)}/model/rt-detr-l_wireless_table_cell_det.onnx"

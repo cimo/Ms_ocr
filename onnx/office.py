@@ -393,7 +393,9 @@ class Office:
 
         return resultObject
 
-    def __init__(self):
+    def __init__(self, isDebug):
+        self.isDebug = isDebug
+
         self.namespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/main"
         self.namespaceChart = "http://schemas.openxmlformats.org/drawingml/2006/chart"
         self.namespaceRelationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -1036,7 +1038,8 @@ class Office:
 
             pageList = [{"number": 1, "itemMainList": itemMainList, "itemSecondaryList": itemSecondaryList}]
 
-            astWrite(pathOutput, pageList)
+            if self.office.isDebug:
+                astWrite(pathOutput, pageList)
 
             return {"pageList": pageList}
 
@@ -1419,7 +1422,8 @@ class Office:
 
             zipFile.close()
 
-            astWrite(pathOutput, pageList)
+            if self.office.isDebug:
+                astWrite(pathOutput, pageList)
 
             return {"pageList": pageList}
 
@@ -1648,7 +1652,8 @@ class Office:
 
             zipFile.close()
 
-            astWrite(pathOutput, pageList)
+            if self.office.isDebug:
+                astWrite(pathOutput, pageList)
 
             return {"pageList": pageList}
 

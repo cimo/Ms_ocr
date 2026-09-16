@@ -441,11 +441,14 @@ class Layout:
 
         itemList = self._detect(image)
 
-        self._debugBox(image, itemList, pathOutput, numberPage)
+        if self.isDebug:
+            self._debugBox(image, itemList, pathOutput, numberPage)
 
         return {"number": numberPage, "width": imageWidth, "height": imageHeight, "itemList": itemList}
 
-    def __init__(self):
+    def __init__(self, isDebug):
+        self.isDebug = isDebug
+
         self.pathModelLayout = f"{os.path.dirname(__file__)}/model/pp-docLayout_plus-l.onnx"
 
         self.imageSizeLayout = 800

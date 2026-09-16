@@ -1,8 +1,7 @@
 import sys
-import os
-import glob
 import subprocess
 import cv2
+import numpy
 
 sys.dont_write_bytecode = True
 
@@ -39,7 +38,8 @@ class Raster:
         for a in range(len(astPageList)):
             layoutList = layoutList + self.layout.resultBuild(astPageList[a], len(layoutList))
 
-        astWrite(pathOutput, astPageList)
+        if self.isDebug:
+            astWrite(pathOutput, astPageList)
 
         return {
             "pageCount": countPage,
@@ -49,7 +49,9 @@ class Raster:
             "itemList": itemList
         }
 
-    def __init__(self, layout, table, ocr):
+    def __init__(self, isDebug, layout, table, ocr):
+        self.isDebug = isDebug
+
         self.layout = layout
         self.table = table
         self.ocr = ocr
@@ -64,7 +66,8 @@ class Raster:
             if image is None:
                 return []
 
-            cv2.imwrite(f"{pathOutput}page/{self.numberPageFirst}.jpg", image)
+            if self.raster.isDebug:
+                cv2.imwrite(f"{pathOutput}debug/page/{self.numberPageFirst}.jpg", image)
 
             return [{"number": self.numberPageFirst, "image": image}]
 
@@ -99,27 +102,43 @@ class Raster:
             if len(password) > 0:
                 argumentList = argumentList + ["-upw", password, "-opw", password]
 
-            runObject = subprocess.run(argumentList + [pathInput, f"{pathOutput}page/page"], capture_output=True, text=True)
+            runObject = subprocess.run(argumentList + [pathInput], capture_output=True)
 
             if runObject.returncode != 0:
-                print(f"raster.py - pdftoppm - {runObject.stderr.strip()}")
+                print(f"raster.py - pdftoppm - {runObject.stderr.decode('utf-8', 'replace').strip()}")
 
                 return []
 
-            pathFileList = glob.glob(f"{pathOutput}page/page-*.jpg")
+            byteFileList = self._pageStreamSplit(runObject.stdout)
 
             resultList = []
 
-            for a in range(len(pathFileList)):
-                numberPage = int(os.path.splitext(os.path.basename(pathFileList[a]))[0].split("-")[1])
+            for a in range(len(byteFileList)):
+                numberPage = a + 1
 
-                pathPage = f"{pathOutput}page/{numberPage}.jpg"
+                if self.raster.isDebug:
+                    with open(f"{pathOutput}debug/page/{numberPage}.jpg", "wb") as file:
+                        file.write(byteFileList[a])
 
-                os.rename(pathFileList[a], pathPage)
+                resultList.append({"number": numberPage, "image": cv2.imdecode(numpy.frombuffer(byteFileList[a], dtype=numpy.uint8), cv2.IMREAD_COLOR)})
 
-                resultList.append({"number": numberPage, "image": cv2.imread(pathPage)})
+            return resultList
 
-            return sorted(resultList, key=lambda pageObject: pageObject["number"])
+        def _pageStreamSplit(self, byteList):
+            markerStart = b"\xff\xd8\xff"
+
+            resultList = []
+
+            position = byteList.find(markerStart)
+
+            while position >= 0:
+                positionNext = byteList.find(markerStart, position + len(markerStart))
+
+                resultList.append(byteList[position:positionNext] if positionNext >= 0 else byteList[position:])
+
+                position = positionNext
+
+            return resultList
 
         def _itemBuild(self, pageReader, image, pdfParser, countStart, numberPage):
             if pageReader is None or pageReader["width"] == 0 or pageReader["height"] == 0:
@@ -264,6 +283,9 @@ class Raster:
             return start
 
         def _debugWrite(self, itemList, image, pathOutput, numberPage):
+            if self.raster.isDebug == False:
+                return
+
             bboxList = []
 
             for a in range(len(itemList)):

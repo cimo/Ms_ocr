@@ -189,11 +189,14 @@ class Ocr:
 
             coordinateItemList.append(itemList[len(itemList) - 1]["bbox"])
 
-        boxDebugWrite(image, coordinateItemList, f"{pathOutput}debug/ocr/{numberPage}.jpg")
+        if self.isDebug:
+            boxDebugWrite(image, coordinateItemList, f"{pathOutput}debug/ocr/{numberPage}.jpg")
 
         return itemList
 
-    def __init__(self):
+    def __init__(self, isDebug):
+        self.isDebug = isDebug
+
         self.levelVerticalRatio = 2.0
 
         self.levelSplitMargin = 0.5
