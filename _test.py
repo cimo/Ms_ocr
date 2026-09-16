@@ -24,11 +24,11 @@ class Test:
             return {"status": response.status, "bodyObject": json.loads(response.read().decode("utf-8"))}
 
     def _resultRead(self, nameOutput):
-        with open(f"file/output/{nameOutput}/result.json", encoding="utf-8") as file:
+        with open(f"file/output/{nameOutput}/debug/result.json", encoding="utf-8") as file:
             return json.load(file)
 
     def _inkCoverage(self, nameOutput, numberPage, itemList):
-        image = cv2.imread(f"file/output/{nameOutput}/page/{numberPage}.jpg")
+        image = cv2.imread(f"file/output/{nameOutput}/debug/page/{numberPage}.jpg")
 
         imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
@@ -67,7 +67,7 @@ class Test:
         }
 
     def _inkDifferenceList(self, nameOutput, numberPage, itemList, isVertical):
-        image = cv2.imread(f"file/output/{nameOutput}/page/{numberPage}.jpg")
+        image = cv2.imread(f"file/output/{nameOutput}/debug/page/{numberPage}.jpg")
 
         imageInk = cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
