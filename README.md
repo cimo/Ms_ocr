@@ -22,9 +22,14 @@ bash docker/container_execute.sh "local" "build-up" "gpu"
 bash docker/container_execute.sh "local" "build-up" "cpu"
 ```
 
-3. Just for up write on host terminal:
+3. Just for up with GPU write on host terminal:
 ```
-bash docker/container_execute.sh "local" "up" "xxx"
+bash docker/container_execute.sh "local" "up" "gpu"
+```
+
+4. Just for up with CPU write on host terminal:
+```
+bash docker/container_execute.sh "local" "up" "cpu"
 ```
 
 ## Reset
