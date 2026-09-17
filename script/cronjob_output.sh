@@ -1,6 +1,6 @@
 #!/bin/bash
 
-path="${PATH_ROOT}${MS_O_PATH_FILE}output/"
+path="${PATH_ROOT}${MS_FDE_PATH_FILE}output/"
 
 currentTime=$(date +%s)
 
@@ -11,7 +11,7 @@ do
         statData=$(stat -c %Y "${data}")
         time=$((${currentTime} - ${statData}))
 
-        if [ "${time}" -gt "${MS_O_PERSISTENCE_SECOND}" ]
+        if [ "${time}" -gt "${MS_FDE_PERSISTENCE_SECOND}" ]
         then
             if [ -d "${data}" ]
             then

@@ -37,7 +37,7 @@ class Engine:
     def _extensionAllowed(self):
         resultObject = {"image": [], "pdf": [], "office": []}
 
-        mimeTypeList = json.loads(os.environ["MS_O_MIME_TYPE"])
+        mimeTypeList = json.loads(os.environ["MS_FDE_MIME_TYPE"])
 
         for a in range(len(mimeTypeList)):
             extension = f".{mimeTypeList[a].split('/')[1]}"
@@ -114,7 +114,7 @@ class Engine:
         return {"response": {"state": "ok", "message": "Task completed."}}
 
     def __init__(self):
-        self.isDebug = os.environ["MS_O_IS_DEBUG"] == "true"
+        self.isDebug = os.environ["MS_FDE_IS_DEBUG"] == "true"
 
         self.countThread = 0
 

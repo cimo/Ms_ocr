@@ -80,4 +80,4 @@ do
     fi
 done
 
-python3 "${PATH_ROOT}onnx/server.py" >> "${PATH_ROOT}${MS_O_PATH_LOG}onnx.log" 2>&1 &
+python3 "${PATH_ROOT}onnx/server.py" >> "${PATH_ROOT}${MS_FDE_PATH_LOG}onnx.log" 2>&1 &

@@ -54,7 +54,7 @@ class ServerHttp(ThreadingHTTPServer):
 
         print(f"Error: {errorText}")
 
-urlSplit = os.environ["MS_O_URL_API_ONNX"].replace("http://", "").split(":")
+urlSplit = os.environ["MS_FDE_URL_API_ONNX"].replace("http://", "").split(":")
 host = urlSplit[0]
 port = int(urlSplit[1])
 

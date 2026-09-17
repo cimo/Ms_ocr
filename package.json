@@ -1,12 +1,12 @@
 {
-    "name": "ms_ocr",
+    "name": "ms_file_data_extractor",
     "version": "1.0.0",
-    "description": "Microservice OCR.",
+    "description": "Microservice file data extractor.",
     "author": "cimo",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/cimo/Ms_ocr.git"
+        "url": "git+https://github.com/cimo/Ms_file_data_extractor.git"
     },
     "type": "module",
     "scripts": {

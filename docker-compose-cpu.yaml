@@ -1,6 +1,6 @@
 services:
-  cimo_ms_ocr_cpu:
-    container_name: cimo-ms-ocr-cpu
+  cimo_ms_file_data_extractor_cpu:
+    container_name: cimo-ms-file-data-extractor-cpu
     env_file:
       - ./env/local.env
       - ./env/local.secret.env
@@ -19,7 +19,7 @@ services:
         _LANG: ${LANG}
         _SERVER_PORT: ${SERVER_PORT}
         _PATH_ROOT: ${PATH_ROOT}
-        _PATH_CERTIFICATE_PEM: ${MS_O_PATH_CERTIFICATE_PEM}
+        _PATH_CERTIFICATE_PEM: ${MS_FDE_PATH_CERTIFICATE_PEM}
         _DEVICE: "cpu"
     ports:
       - 127.0.0.1:${SERVER_PORT}:${SERVER_PORT}

@@ -523,7 +523,7 @@ class Test:
         return 0 if self.countPass == self.countTotal else 1
 
     def __init__(self):
-        self.urlEngine = f"{os.environ['MS_O_URL_API_ONNX']}/engine"
+        self.urlEngine = f"{os.environ['MS_FDE_URL_API_ONNX']}/engine"
 
         self.levelInkItem = 0.01
         self.levelInkPage = 0.8

@@ -1,5 +1,5 @@
-# Ms_ocr
-Microservice OCR.
+# Ms_file_data_extractor
+Microservice file data extractor.
 
 Depend on "Ms_cronjob" (use "ms_cronjob-volume" to share the certificate).
 

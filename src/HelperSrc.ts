@@ -22,25 +22,25 @@ export const TIME_ZONE = Ce.checkVariable("TIME_ZONE") || (process.env["TIME_ZON
 export const LANG = Ce.checkVariable("LANG") || (process.env["LANG"] as string);
 export const SERVER_PORT = Ce.checkVariable("SERVER_PORT") || (process.env["SERVER_PORT"] as string);
 export const PATH_ROOT = Ce.checkVariable("PATH_ROOT");
-export const NAME = Ce.checkVariable("MS_O_NAME") || (process.env["MS_O_NAME"] as string);
-export const LABEL = Ce.checkVariable("MS_O_LABEL") || (process.env["MS_O_LABEL"] as string);
-export const IS_DEBUG = Ce.checkVariable("MS_O_IS_DEBUG") || (process.env["MS_O_IS_DEBUG"] as string);
-export const NODE_ENV = Ce.checkVariable("MS_O_NODE_ENV") || (process.env["MS_O_NODE_ENV"] as string);
-export const URL_ROOT = Ce.checkVariable("MS_O_URL_ROOT") || (process.env["MS_O_URL_ROOT"] as string);
-export const URL_CORS_ORIGIN = Ce.checkVariable("MS_O_URL_CORS_ORIGIN") || (process.env["MS_O_URL_CORS_ORIGIN"] as string);
-export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_O_PATH_CERTIFICATE_KEY");
-export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_O_PATH_CERTIFICATE_CRT");
-export const PATH_CERTIFICATE_PEM = Ce.checkVariable("MS_O_PATH_CERTIFICATE_PEM");
-export const PATH_FILE = Ce.checkVariable("MS_O_PATH_FILE");
-export const PATH_LOG = Ce.checkVariable("MS_O_PATH_LOG");
-export const PATH_PUBLIC = Ce.checkVariable("MS_O_PATH_PUBLIC");
-export const PATH_SCRIPT = Ce.checkVariable("MS_O_PATH_SCRIPT");
-export const MIME_TYPE = Ce.checkVariable("MS_O_MIME_TYPE") || (process.env["MS_O_MIME_TYPE"] as string);
-export const FILE_SIZE_MB = Ce.checkVariable("MS_O_FILE_SIZE_MB") || (process.env["MS_O_FILE_SIZE_MB"] as string);
+export const NAME = Ce.checkVariable("MS_FDE_NAME") || (process.env["MS_FDE_NAME"] as string);
+export const LABEL = Ce.checkVariable("MS_FDE_LABEL") || (process.env["MS_FDE_LABEL"] as string);
+export const IS_DEBUG = Ce.checkVariable("MS_FDE_IS_DEBUG") || (process.env["MS_FDE_IS_DEBUG"] as string);
+export const NODE_ENV = Ce.checkVariable("MS_FDE_NODE_ENV") || (process.env["MS_FDE_NODE_ENV"] as string);
+export const URL_ROOT = Ce.checkVariable("MS_FDE_URL_ROOT") || (process.env["MS_FDE_URL_ROOT"] as string);
+export const URL_CORS_ORIGIN = Ce.checkVariable("MS_FDE_URL_CORS_ORIGIN") || (process.env["MS_FDE_URL_CORS_ORIGIN"] as string);
+export const PATH_CERTIFICATE_KEY = Ce.checkVariable("MS_FDE_PATH_CERTIFICATE_KEY");
+export const PATH_CERTIFICATE_CRT = Ce.checkVariable("MS_FDE_PATH_CERTIFICATE_CRT");
+export const PATH_CERTIFICATE_PEM = Ce.checkVariable("MS_FDE_PATH_CERTIFICATE_PEM");
+export const PATH_FILE = Ce.checkVariable("MS_FDE_PATH_FILE");
+export const PATH_LOG = Ce.checkVariable("MS_FDE_PATH_LOG");
+export const PATH_PUBLIC = Ce.checkVariable("MS_FDE_PATH_PUBLIC");
+export const PATH_SCRIPT = Ce.checkVariable("MS_FDE_PATH_SCRIPT");
+export const MIME_TYPE = Ce.checkVariable("MS_FDE_MIME_TYPE") || (process.env["MS_FDE_MIME_TYPE"] as string);
+export const FILE_SIZE_MB = Ce.checkVariable("MS_FDE_FILE_SIZE_MB") || (process.env["MS_FDE_FILE_SIZE_MB"] as string);
 
 // Custom
-export const URL_API_ONNX = Ce.checkVariable("MS_O_URL_API_ONNX") || (process.env["MS_O_URL_API_ONNX"] as string);
-export const PERSISTENCE_SECOND = Ce.checkVariable("MS_O_PERSISTENCE_SECOND") || (process.env["MS_O_PERSISTENCE_SECOND"] as string);
+export const URL_API_ONNX = Ce.checkVariable("MS_FDE_URL_API_ONNX") || (process.env["MS_FDE_URL_API_ONNX"] as string);
+export const PERSISTENCE_SECOND = Ce.checkVariable("MS_FDE_PERSISTENCE_SECOND") || (process.env["MS_FDE_PERSISTENCE_SECOND"] as string);
 // Custom
 
 const fileSize = (value: Uint8Array | number, isOnlyByte = true): string => {
