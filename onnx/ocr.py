@@ -183,8 +183,7 @@ class Ocr:
                 "page": numberPage,
                 "bbox": [int(round(coordinateList[0])), int(round(coordinateList[1])), int(round(coordinateList[2])), int(round(coordinateList[3]))],
                 "centerPoint": centerPointCalculate(coordinateList),
-                "text": recognitionList[a]["text"],
-                "isMatch": False
+                "text": recognitionList[a]["text"]
             })
 
             coordinateItemList.append(itemList[len(itemList) - 1]["bbox"])

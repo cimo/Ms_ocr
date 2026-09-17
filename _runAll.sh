@@ -13,6 +13,6 @@ IFS=$'\n'
 for pathFile in $(ls file/test/); do
   nameFile="${pathFile%.*}"
   curl -s -o /dev/null -X POST -H "Content-Type: application/json" \
-    -d "{\"pathInput\":\"file/test/$pathFile\",\"pathOutput\":\"file/output/$nameFile/\",\"password\":\"\",\"searchText\":\"\"}" \
+    -d "{\"pathInput\":\"file/test/$pathFile\",\"pathOutput\":\"file/output/$nameFile/\",\"password\":\"\"}" \
     http://127.0.0.1:1114/engine
 done

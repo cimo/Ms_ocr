@@ -30,7 +30,6 @@ export default class Service {
                 .then(async (resultControllerUploadList) => {
                     let fileName = "";
                     let password = "";
-                    let searchText = "";
 
                     for (let a = 0; a < resultControllerUploadList.length; a++) {
                         const resultControllerUpload = resultControllerUploadList[a];
@@ -39,8 +38,6 @@ export default class Service {
                             fileName = resultControllerUpload.fileName;
                         } else if (resultControllerUpload.name === "password" && resultControllerUpload.buffer) {
                             password = resultControllerUpload.buffer.toString();
-                        } else if (resultControllerUpload.name === "searchText" && resultControllerUpload.buffer) {
-                            searchText = resultControllerUpload.buffer.toString();
                         }
                     }
 
@@ -58,7 +55,7 @@ export default class Service {
                                     "Content-Type": "application/json"
                                 }
                             },
-                            { pathInput, pathOutput, password, searchText }
+                            { pathInput, pathOutput, password }
                         )
                         .then(async (resultApi) => {
                             const data = resultApi.data;

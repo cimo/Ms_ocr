@@ -360,8 +360,7 @@ class Office:
                     "page": astPageList[a]["number"],
                     "bbox": [0, 0, 0, 0],
                     "centerPoint": {"x": 0, "y": 0},
-                    "text": itemList[b]["text"],
-                    "isMatch": False
+                    "text": itemList[b]["text"]
                 })
 
         return resultList

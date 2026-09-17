@@ -169,8 +169,7 @@ class Raster:
                     "page": numberPage,
                     "bbox": bboxList,
                     "centerPoint": centerPointCalculate(bboxList),
-                    "text": elementList[a]["text"],
-                    "isMatch": False
+                    "text": elementList[a]["text"]
                 })
 
             return resultList

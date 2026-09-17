@@ -7,8 +7,6 @@ import time
 sys.dont_write_bytecode = True
 
 # Source
-from helper import textNormalize
-
 import layout
 import table
 import ocr
@@ -23,16 +21,6 @@ class Engine:
                 return category
 
         return ""
-
-    def _matchAssign(self, itemList, searchText):
-        for a in range(len(itemList)):
-            itemList[a]["isMatch"] = self._matchCheck(searchText, itemList[a]["text"])
-
-    def _matchCheck(self, searchText, value):
-        if searchText == "" or value == "":
-            return False
-
-        return textNormalize(searchText) in textNormalize(value)
 
     def _extensionAllowed(self):
         resultObject = {"image": [], "pdf": [], "office": []}
@@ -67,7 +55,7 @@ class Engine:
 
         return resultObject
 
-    def execute(self, pathInput, pathOutput, password, searchText):
+    def execute(self, pathInput, pathOutput, password):
         timeStart = time.perf_counter()
 
         extension = os.path.splitext(pathInput)[1].lower()
@@ -97,8 +85,6 @@ class Engine:
             return {"response": {"state": "ko", "message": "File not readable."}}
 
         resultObject["markdown"] = self.markdown.execute(resultObject, extension)
-
-        self._matchAssign(resultObject["itemList"], searchText)
 
         if self.isDebug:
             with open(f"{pathOutput}debug/result.json", "w", encoding="utf-8") as file:

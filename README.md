@@ -71,7 +71,6 @@ key             value
 ---             ---
 file            jp_1.jpg
 password        "" (only on pdf with password)
-searchText      ""
 ```
 
 4. Logout

@@ -16,7 +16,7 @@ class ProcessorPassthrough(urllib.request.HTTPErrorProcessor):
 
 class Test:
     def _engineCall(self, nameFile, nameOutput, password):
-        payload = json.dumps({"pathInput": f"file/test/{nameFile}", "pathOutput": f"file/output/{nameOutput}/", "password": password, "searchText": ""}).encode("utf-8")
+        payload = json.dumps({"pathInput": f"file/test/{nameFile}", "pathOutput": f"file/output/{nameOutput}/", "password": password}).encode("utf-8")
 
         request = urllib.request.Request(self.urlEngine, data=payload, headers={"Content-Type": "application/json"})
 

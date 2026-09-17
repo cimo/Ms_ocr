@@ -18,7 +18,7 @@ class HandlerHttpRequest(BaseHTTPRequestHandler):
     def _routeEngine(self, text):
         payload = json.loads(text)
 
-        return self.engine.execute(payload["pathInput"], payload["pathOutput"], payload["password"], payload["searchText"])
+        return self.engine.execute(payload["pathInput"], payload["pathOutput"], payload["password"])
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
