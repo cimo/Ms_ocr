@@ -33,19 +33,24 @@ then
     if [ "${parameter3}" = "cpu" ]
     then
         docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" build --no-cache &&
-        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --force-recreate
     elif [ "${parameter3}" = "gpu" ]
     then
         docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" build --no-cache &&
-        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --force-recreate
     fi
 elif [ "${parameter2}" = "up" ]
 then
     if [ "${parameter3}" = "cpu" ]
     then
-        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
+        docker compose -f "docker-compose-cpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --force-recreate
     elif [ "${parameter3}" = "gpu" ]
     then
-        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always
+        docker compose -f "docker-compose-gpu.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" up --detach --pull always --force-recreate
     fi
+fi
+
+if [ "${parameter2}" = "build-up" ] || [ "${parameter2}" = "up" ]
+then
+    docker compose -f "docker-compose-${parameter3}.yaml" --env-file "./env/${parameter1}.env" --env-file "./env/${parameter1}.secret.env" exec -u root -T "${projectName}_ms_file_data_extractor_${parameter3}" update-ca-certificates
 fi
