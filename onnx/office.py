@@ -1,7 +1,9 @@
 import sys
 import os
 import re
+import cv2
 import icu
+import numpy
 import zipfile
 import datetime
 import xml.etree.ElementTree
@@ -9,7 +11,7 @@ import xml.etree.ElementTree
 sys.dont_write_bytecode = True
 
 # Source
-from helper import spacelessCheck, sentenceEndCheck, textNormalize, astWrite
+from helper import spacelessCheck, sentenceEndCheck, textNormalize, astWrite, mediaImageWrite
 
 class Office:
     def _xmlRootBuild(self, pathFile, zipFile):
@@ -136,13 +138,22 @@ class Office:
 
         return resultObject
 
-    def _mediaWrite(self, pathOutput, pathMedia, zipFile):
+    def _mediaWrite(self, zipFile, pathMedia, pathOutput):
+        byteList = zipFile.read(pathMedia)
+
+        image = cv2.imdecode(numpy.frombuffer(byteList, numpy.uint8), cv2.IMREAD_UNCHANGED)
+
+        if image is not None:
+            return mediaImageWrite(image, pathOutput)
+
+        fileName = os.path.basename(pathMedia)
+
         os.makedirs(f"{pathOutput}media/", exist_ok=True)
 
-        with open(f"{pathOutput}media/{os.path.basename(pathMedia)}", "wb") as file:
-            file.write(zipFile.read(pathMedia))
+        with open(f"{pathOutput}media/{fileName}", "wb") as file:
+            file.write(byteList)
 
-        return f"media/{os.path.basename(pathMedia)}"
+        return f"media/{fileName}"
 
     def _flowAssign(self, itemMainList, itemSecondaryList):
         for a in range(len(itemMainList)):
@@ -1000,7 +1011,7 @@ class Office:
                         if chartRootNode is not None:
                             item["text"] = self.office._xmlChartText(chartRootNode)
                     elif pathTarget in zipFile.namelist():
-                        item["path"] = self.office._mediaWrite(pathOutput, pathTarget, zipFile)
+                        item["path"] = self.office._mediaWrite(zipFile, pathTarget, pathOutput)
 
                     itemSecondaryList.append(item)
                 elif block["isAside"]:
@@ -1370,7 +1381,7 @@ class Office:
                                 pathMedia = pathObject[relationshipId]["path"] if relationshipId in pathObject else ""
 
                                 if pathMedia in zipFile.namelist():
-                                    item["path"] = self.office._mediaWrite(pathOutput, pathMedia, zipFile)
+                                    item["path"] = self.office._mediaWrite(zipFile, pathMedia, pathOutput)
 
                                 resultList.append(item)
 
@@ -1636,7 +1647,7 @@ class Office:
                         pathMedia = pathObject[block["relationshipId"]]["path"] if block["relationshipId"] in pathObject else ""
 
                         if pathMedia in zipFile.namelist():
-                            item["path"] = self.office._mediaWrite(pathOutput, pathMedia, zipFile)
+                            item["path"] = self.office._mediaWrite(zipFile, pathMedia, pathOutput)
 
                         itemSecondaryList.append(item)
 

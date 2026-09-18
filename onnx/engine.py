@@ -3,6 +3,7 @@ import os
 import cv2
 import json
 import time
+import zipfile
 
 sys.dont_write_bytecode = True
 
@@ -15,6 +16,18 @@ import office
 import markdown
 
 class Engine:
+    def _packageZip(self, pathOutput):
+        pathMedia = f"{pathOutput}media/"
+
+        with zipfile.ZipFile(f"{pathOutput}result.zip", "w") as zipFile:
+            zipFile.write(f"{pathOutput}result.md", "result.md", zipfile.ZIP_DEFLATED)
+
+            if os.path.isdir(pathMedia):
+                fileNameList = sorted(os.listdir(pathMedia))
+
+                for a in range(len(fileNameList)):
+                    zipFile.write(f"{pathMedia}{fileNameList[a]}", f"media/{fileNameList[a]}", zipfile.ZIP_STORED)
+
     def _extensionCategory(self, extension):
         for category in self.extensionObject:
             if extension in self.extensionObject[category]:
@@ -92,6 +105,8 @@ class Engine:
 
         with open(f"{pathOutput}result.md", "w", encoding="utf-8") as file:
             file.write(resultObject["markdown"])
+
+        self._packageZip(pathOutput)
 
         timeEnd = time.perf_counter() - timeStart
 

@@ -61,7 +61,7 @@ export default class Service {
                             const data = resultApi.data;
 
                             if (data.response.state === "ok") {
-                                const fileReadStream = await helperSrc.fileReadStream(`${pathOutput}result.md`);
+                                const fileReadStream = await helperSrc.fileReadStream(`${pathOutput}result.zip`);
 
                                 if (!Buffer.isBuffer(fileReadStream)) {
                                     helperSrc.writeLog(

@@ -3,6 +3,7 @@ import cv2
 import icu
 import json
 import numpy
+import hashlib
 
 stderrFileDescriptor = os.dup(2)
 nullFileDescriptor = os.open(os.devnull, os.O_WRONLY)
@@ -263,6 +264,35 @@ def boxContainedRemove(boxList, nameKey, levelContained):
 def imageInkBuild(image):
     return cv2.threshold(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
+def mediaImageWrite(image, pathOutput):
+    imageHeight, imageWidth = image.shape[0:2]
+
+    sideLongest = max(imageHeight, imageWidth)
+
+    if sideLongest > mediaSideMax:
+        ratio = mediaSideMax / sideLongest
+
+        image = cv2.resize(image, (int(round(imageWidth * ratio)), int(round(imageHeight * ratio))), interpolation=cv2.INTER_AREA)
+
+    isEncode, bufferEncode = cv2.imencode(".webp", image, [cv2.IMWRITE_WEBP_QUALITY, mediaQuality])
+
+    if not isEncode:
+        return ""
+
+    byteList = bufferEncode.tobytes()
+
+    fileName = f"{hashlib.md5(byteList).hexdigest()}.webp"
+
+    pathMedia = f"{pathOutput}media/{fileName}"
+
+    if not os.path.exists(pathMedia):
+        os.makedirs(f"{pathOutput}media/", exist_ok=True)
+
+        with open(pathMedia, "wb") as file:
+            file.write(byteList)
+
+    return f"media/{fileName}"
+
 def astWrite(pathOutput, astPageList):
     with open(f"{pathOutput}debug/layout/ast.json", "w", encoding="utf-8") as file:
         json.dump({"pageList": astPageList}, file, ensure_ascii=False, indent=4)
@@ -274,6 +304,9 @@ def boxDebugWrite(image, bboxList, pathFile):
         cv2.rectangle(imageDebug, (bboxList[a][0], bboxList[a][1]), (bboxList[a][2], bboxList[a][3]), (0, 200, 0), 1)
 
     cv2.imwrite(pathFile, imageDebug)
+
+mediaSideMax = 1280
+mediaQuality = 80
 
 widthWideList = [icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "W"), icu.Char.getPropertyValueEnum(icu.UProperty.EAST_ASIAN_WIDTH, "F")]
 lineBreakComplex = icu.Char.getPropertyValueEnum(icu.UProperty.LINE_BREAK, "SA")

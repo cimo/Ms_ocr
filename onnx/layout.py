@@ -7,7 +7,7 @@ import numpy
 sys.dont_write_bytecode = True
 
 # Source
-from helper import onnxSessionBuild, detrDetect, centerPointCalculate, boxArea, boxIntersection, boxIou, boxContainedRemove, rangeOverlapRatio
+from helper import onnxSessionBuild, detrDetect, centerPointCalculate, boxArea, boxIntersection, boxIou, boxContainedRemove, rangeOverlapRatio, mediaImageWrite
 
 class Layout:
     def _detect(self, image):
@@ -359,13 +359,7 @@ class Layout:
 
             imageCrop = image[bboxList[1]:bboxList[3], bboxList[0]:bboxList[2]]
 
-            fileName = f"{astPage['number']}_{a + 1}.jpg"
-
-            os.makedirs(f"{pathOutput}media/", exist_ok=True)
-
-            cv2.imwrite(f"{pathOutput}media/{fileName}", imageCrop)
-
-            itemList[a]["path"] = f"media/{fileName}"
+            itemList[a]["path"] = mediaImageWrite(imageCrop, pathOutput)
 
     def flowAssign(self, astPageList):
         columnList = self._documentColumn(astPageList)
