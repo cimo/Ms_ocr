@@ -66,7 +66,7 @@ export default class Service {
         return new Promise((resolve) => {
             this.engineResolveObject[uniqueId] = resolve;
 
-            this.engineProcess.stdin.write(`${JSON.stringify({ uniqueId, pathInput, pathOutput, password })}\n`);
+            this.engineProcess.stdin.write(`${JSON.stringify({ action: "execute", uniqueId, pathInput, pathOutput, password })}\n`);
         });
     };
 
@@ -119,7 +119,8 @@ export default class Service {
                     this.jobObject[uniqueId] = {
                         state: "",
                         message: "",
-                        isError: false
+                        isError: false,
+                        isCancel: false
                     };
 
                     this.cq.jobList.push({
@@ -127,7 +128,20 @@ export default class Service {
                         callback: async () => {
                             await this.engine(uniqueId, pathInput, pathOutput, password);
 
-                            this.jobExpire(uniqueId);
+                            if (this.jobObject[uniqueId].isCancel) {
+                                delete this.jobObject[uniqueId];
+
+                                const fileOrFolderDeleteOutput = await helperSrc.fileOrFolderDelete(pathOutput);
+
+                                if (typeof fileOrFolderDeleteOutput !== "boolean") {
+                                    helperSrc.writeLog(
+                                        "Service.ts - api() - post(/api/extract) - engine() - fileOrFolderDelete()",
+                                        fileOrFolderDeleteOutput.toString()
+                                    );
+                                }
+                            } else {
+                                this.jobExpire(uniqueId);
+                            }
 
                             const fileOrFolderDeleteInput = await helperSrc.fileOrFolderDelete(pathInputBasename);
 
@@ -196,6 +210,46 @@ export default class Service {
 
                 if (typeof fileOrFolderDeleteOutput !== "boolean") {
                     helperSrc.writeLog("Service.ts - api() - post(/api/extract-check) - fileOrFolderDelete()", fileOrFolderDeleteOutput.toString());
+                }
+            }
+        });
+
+        this.app.post("/api/extract-cancel", Ca.authenticationMiddleware, async (request: Request, response: Response) => {
+            const body = request.body as modelService.IapiCancelBody;
+
+            const uniqueId = body.uniqueId;
+
+            const isJobExists = typeof uniqueId === "string" && Object.hasOwn(this.jobObject, uniqueId);
+
+            if (!isJobExists) {
+                helperSrc.responseBody({ state: "ko", message: "Job not found." }, response, 200);
+            } else if (this.cq.remove(uniqueId)) {
+                delete this.jobObject[uniqueId];
+
+                helperSrc.responseBody({ state: "ok", message: "" }, response, 200);
+
+                const fileOrFolderDeleteInput = await helperSrc.fileOrFolderDelete(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}input/${uniqueId}/`);
+
+                if (typeof fileOrFolderDeleteInput !== "boolean") {
+                    helperSrc.writeLog("Service.ts - api() - post(/api/extract-cancel) - fileOrFolderDelete()", fileOrFolderDeleteInput.toString());
+                }
+            } else if (this.cq.state(uniqueId).name === "running") {
+                this.jobObject[uniqueId].isCancel = true;
+
+                this.engineProcess.stdin.write(`${JSON.stringify({ action: "cancel", uniqueId })}\n`);
+
+                helperSrc.responseBody({ state: "ok", message: "" }, response, 200);
+            } else {
+                delete this.jobObject[uniqueId];
+
+                helperSrc.responseBody({ state: "ok", message: "" }, response, 200);
+
+                const fileOrFolderDeleteOutput = await helperSrc.fileOrFolderDelete(
+                    `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`
+                );
+
+                if (typeof fileOrFolderDeleteOutput !== "boolean") {
+                    helperSrc.writeLog("Service.ts - api() - post(/api/extract-cancel) - fileOrFolderDelete()", fileOrFolderDeleteOutput.toString());
                 }
             }
         });

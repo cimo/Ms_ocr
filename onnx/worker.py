@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import concurrent.futures
+import functools
 
 sys.dont_write_bytecode = True
 
@@ -23,21 +24,30 @@ engineObject = engine.Engine()
 
 executorThread = concurrent.futures.ThreadPoolExecutor(1)
 
+def jobDone(uniqueId, future):
+    if future.exception() is not None:
+        print(f"Error: {future.exception()}")
+
+        lineWrite({"uniqueId": uniqueId, "error": str(future.exception())})
+
+        return
+
+    resultObject = future.result()
+    resultObject["uniqueId"] = uniqueId
+
+    lineWrite(resultObject)
+
 print("Onnx - Ready")
 
 for line in sys.stdin:
     payload = json.loads(line)
 
-    future = executorThread.submit(engineObject.execute, payload["pathInput"], payload["pathOutput"], payload["password"])
-
-    if future.exception() is not None:
-        print(f"Error: {future.exception()}")
-
-        lineWrite({"uniqueId": payload["uniqueId"], "error": str(future.exception())})
+    if payload["action"] == "cancel":
+        engineObject.raster.isCancel = True
 
         continue
 
-    resultObject = future.result()
-    resultObject["uniqueId"] = payload["uniqueId"]
+    engineObject.raster.isCancel = False
 
-    lineWrite(resultObject)
+    future = executorThread.submit(engineObject.execute, payload["pathInput"], payload["pathOutput"], payload["password"])
+    future.add_done_callback(functools.partial(jobDone, payload["uniqueId"]))

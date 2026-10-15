@@ -52,6 +52,8 @@ class Raster:
     def __init__(self, isDebug, layout, table, ocr):
         self.isDebug = isDebug
 
+        self.isCancel = False
+
         self.layout = layout
         self.table = table
         self.ocr = ocr
@@ -79,11 +81,20 @@ class Raster:
             itemList = []
 
             for a in range(len(pageList)):
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
+
                 astObject = self.raster.astBuild(pathOutput, pageList[a])
 
                 astPageList.append(astObject["astPage"])
 
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
+
                 itemPageList = self.raster.ocr.execute(pageList[a]["image"], astObject["tablePageList"], len(itemList), pageList[a]["number"], pathOutput)
+
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
 
                 tableList = tableList + self.raster.pageAssemble(astObject["astPage"], itemPageList, astObject["tablePageList"], pageList[a], pathOutput, len(tableList))
                 itemList = itemList + itemPageList
@@ -306,6 +317,9 @@ class Raster:
         def execute(self, pathInput, pathOutput, password):
             pageList = self._pageBuild(password, pathInput, pathOutput)
 
+            if self.raster.isCancel:
+                return {"message": "Job cancelled."}
+
             pdfParser = pdf_parser.PdfParser()
 
             parserObject = pdfParser.execute(pathInput, password)
@@ -320,9 +334,15 @@ class Raster:
             itemList = []
 
             for a in range(len(pageList)):
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
+
                 astObject = self.raster.astBuild(pathOutput, pageList[a])
 
                 astPageList.append(astObject["astPage"])
+
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
 
                 numberPage = pageList[a]["number"]
 
@@ -332,6 +352,9 @@ class Raster:
                     itemPageList = self.raster.ocr.execute(pageList[a]["image"], astObject["tablePageList"], len(itemList), numberPage, pathOutput)
                 else:
                     self._debugWrite(itemPageList, pageList[a]["image"], pathOutput, numberPage)
+
+                if self.raster.isCancel:
+                    return {"message": "Job cancelled."}
 
                 tableList = tableList + self.raster.pageAssemble(astObject["astPage"], itemPageList, astObject["tablePageList"], pageList[a], pathOutput, len(tableList))
                 itemList = itemList + itemPageList
