@@ -43,6 +43,8 @@ export default class Server {
     }
 
     createSetting = (): void => {
+        Ca.setCookieName(`${helperSrc.LABEL}_authentication`);
+
         this.app.set("trust proxy", "loopback");
         this.app.use(Compression());
         this.app.use(Express.json());
@@ -107,15 +109,27 @@ export default class Server {
             });
 
             this.app.get("/login", this.limiter, (request: Request, response: Response) => {
-                Ca.writeCookie(`${helperSrc.LABEL}_authentication`, response);
+                Ca.writeCookie("", response);
 
                 helperSrc.responseBody({ state: "ok", message: "" }, response, 200);
             });
 
             this.app.get("/logout", this.limiter, Ca.authenticationMiddleware, (request: Request, response: Response) => {
-                Ca.deleteCookie(`${helperSrc.LABEL}_authentication`, request, response);
+                Ca.deleteCookie(request, response);
 
                 helperSrc.responseBody({ state: "ok", message: "" }, response, 200);
+            });
+
+            this.app.use((error: Error, _: Request, response: Response, next: NextFunction) => {
+                helperSrc.writeLog("Server.ts - createServer() - listen() - use()", error.message);
+
+                if (response.headersSent) {
+                    next(error);
+
+                    return;
+                }
+
+                helperSrc.responseBody({ state: "ko", message: "Internal error." }, response, 500);
             });
         });
     };

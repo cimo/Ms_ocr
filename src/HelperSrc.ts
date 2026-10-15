@@ -39,7 +39,6 @@ export const MIME_TYPE = Ce.checkVariable("MS_FDE_MIME_TYPE") || (process.env["M
 export const FILE_SIZE_MB = Ce.checkVariable("MS_FDE_FILE_SIZE_MB") || (process.env["MS_FDE_FILE_SIZE_MB"] as string);
 
 // Custom
-export const URL_API_ONNX = Ce.checkVariable("MS_FDE_URL_API_ONNX") || (process.env["MS_FDE_URL_API_ONNX"] as string);
 export const PERSISTENCE_SECOND = Ce.checkVariable("MS_FDE_PERSISTENCE_SECOND") || (process.env["MS_FDE_PERSISTENCE_SECOND"] as string);
 // Custom
 
@@ -65,6 +64,24 @@ const fileSize = (value: Uint8Array | number, isOnlyByte = true): string => {
     }
 
     return result;
+};
+
+const fileMagicByteMatch = (magicByteList: modelHelperSrc.IfileDetailMagicByte[], buffer: Uint8Array): boolean => {
+    for (let a = 0; a < magicByteList.length; a++) {
+        const check = magicByteList[a];
+
+        if (buffer.length < check.offset + check.bytes.length) {
+            return false;
+        }
+
+        for (let b = 0; b < check.bytes.length; b++) {
+            if (buffer[check.offset + b] !== check.bytes[b]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 };
 
 Ce.loadFile(`./env/${ENV_NAME}.secret.env`);
@@ -189,7 +206,9 @@ export const jsonCheck = (value: string): boolean => {
 };
 
 export const fileCheckMimeType = (value: string): boolean => {
-    if (!MIME_TYPE.includes(value)) {
+    const mimeTypeList = JSON.parse(MIME_TYPE) as string[];
+
+    if (!mimeTypeList.includes(value)) {
         return false;
     }
 
@@ -322,11 +341,26 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
         { mimeType: "video/webm", extension: "webm", category: "video", magicByteList: [{ offset: 0, bytes: [0x1a, 0x45, 0xdf, 0xa3] }] },
         { mimeType: "application/pdf", extension: "pdf", category: "document", magicByteList: [{ offset: 0, bytes: [0x25, 0x50, 0x44, 0x46] }] },
         { mimeType: "application/msword", extension: "doc", category: "document" },
-        { mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", extension: "docx", category: "document" },
+        {
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            extension: "docx",
+            category: "document",
+            magicByteList: [{ offset: 0, bytes: [0x50, 0x4b, 0x03, 0x04] }]
+        },
         { mimeType: "application/vnd.ms-excel", extension: "xls", category: "document" },
-        { mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", category: "document" },
+        {
+            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            extension: "xlsx",
+            category: "document",
+            magicByteList: [{ offset: 0, bytes: [0x50, 0x4b, 0x03, 0x04] }]
+        },
         { mimeType: "application/vnd.ms-powerpoint", extension: "ppt", category: "document" },
-        { mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", extension: "pptx", category: "document" },
+        {
+            mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            extension: "pptx",
+            category: "document",
+            magicByteList: [{ offset: 0, bytes: [0x50, 0x4b, 0x03, 0x04] }]
+        },
         { mimeType: "application/vnd.oasis.opendocument.text", extension: "odt", category: "document" },
         { mimeType: "application/vnd.oasis.opendocument.spreadsheet", extension: "ods", category: "document" },
         { mimeType: "application/vnd.oasis.opendocument.presentation", extension: "odp", category: "document" },
@@ -377,37 +411,7 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
         for (let a = 0; a < signatureList.length; a++) {
             const magicByteList = signatureList[a].magicByteList;
 
-            if (!magicByteList) {
-                continue;
-            }
-
-            let isMatched = false;
-
-            for (let b = 0; b < magicByteList.length; b++) {
-                const check = magicByteList[b];
-
-                if (buffer.length < check.offset + check.bytes.length) {
-                    isMatched = false;
-
-                    break;
-                }
-
-                isMatched = true;
-
-                for (let c = 0; c < check.bytes.length; c++) {
-                    if (buffer[check.offset + c] !== check.bytes[c]) {
-                        isMatched = false;
-
-                        break;
-                    }
-                }
-
-                if (!isMatched) {
-                    break;
-                }
-            }
-
-            if (isMatched) {
+            if (magicByteList && fileMagicByteMatch(magicByteList, buffer)) {
                 resultObject = {
                     ...resultObject,
                     name: fileNameWithExtension,
@@ -427,6 +431,12 @@ export const fileDetail = async (value: string, buffer?: Uint8Array, isOnlyByte 
 
         for (let a = 0; a < signatureList.length; a++) {
             if (signatureList[a].extension === extension) {
+                const magicByteList = signatureList[a].magicByteList;
+
+                if (buffer && magicByteList && !fileMagicByteMatch(magicByteList, buffer)) {
+                    break;
+                }
+
                 resultObject = {
                     ...resultObject,
                     name: fileNameWithExtension,
@@ -665,7 +675,7 @@ export const findPathDirnameRecursive = async (path: string, fileName: string): 
     for (let a = 0; a < pathFileList.length; a++) {
         const pathFile = pathFileList[a];
 
-        if (pathFile.endsWith(fileName)) {
+        if (Path.basename(pathFile) === fileName) {
             result = `${Path.dirname(pathFile)}/`;
 
             break;
@@ -780,6 +790,43 @@ export const executionFile = (argumentList: string[]): Promise<modelHelperSrc.Ie
     };
 };
 
+export const checkPath = (pathRoot: string, path: string): boolean => {
+    const pathRootResolve = Path.resolve(pathRoot);
+    const pathResolve = Path.resolve(pathRootResolve, path);
+
+    return pathResolve === pathRootResolve || pathResolve.startsWith(`${pathRootResolve}/`);
+};
+
+export const checkPathChild = (pathRoot: string, path: string): boolean => {
+    const pathRootResolve = Path.resolve(pathRoot);
+    const pathResolve = Path.resolve(pathRootResolve, path);
+
+    return pathResolve.startsWith(`${pathRootResolve}/`);
+};
+
+export const checkUriComponent = (value: string): boolean => {
+    if (/%(?![0-9A-Fa-f]{2})/.test(value)) {
+        return false;
+    }
+
+    const bufferList: Buffer[] = [];
+    const partList = value.split(/(%[0-9A-Fa-f]{2})/);
+
+    for (let a = 0; a < partList.length; a++) {
+        const part = partList[a];
+
+        if (/^%[0-9A-Fa-f]{2}$/.test(part)) {
+            bufferList.push(Buffer.from([parseInt(part.slice(1), 16)]));
+        } else {
+            bufferList.push(Buffer.from(part, "utf8"));
+        }
+    }
+
+    const buffer = Buffer.concat(bufferList);
+
+    return Buffer.from(buffer.toString("utf8"), "utf8").equals(buffer);
+};
+
 // Custom
 export const headerClientIp = (request: Request): string => {
     let result = "";
@@ -793,12 +840,6 @@ export const headerClientIp = (request: Request): string => {
     }
 
     return result.split(",")[0] || request.ip || "";
-};
-
-export const headerBearerToken = (request: Request): string => {
-    const authorization = request.headers["authorization"];
-
-    return authorization && authorization.startsWith("Bearer ") ? authorization.substring(7) : "";
 };
 
 export const responseBody = (actionOperation: modelHelperSrc.IactionOperation, response: Response, mode: number): void => {

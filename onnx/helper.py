@@ -24,7 +24,7 @@ def onnxSessionBuild(pathModel):
 
     option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-    option.intra_op_num_threads = max(1, os.cpu_count())
+    option.intra_op_num_threads = len(os.sched_getaffinity(0))
     option.inter_op_num_threads = 1
 
     option.enable_cpu_mem_arena = True

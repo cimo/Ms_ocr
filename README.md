@@ -9,7 +9,6 @@ Just add it to the "/certificate/custom/" folder and change the env variable bef
 ## Info:
 - Cross platform (Windows, Linux)
 - WSLg for WSL2 (Run linux GUI app directly in windows) with full nvidia GPU host support.
-- Onnx: (PP-DocLayout_plus-L, PP-OCRv6_medium_det, PP-OCRv6_medium_rec).
 
 ## Installation
 1. For build and up with GPU write on host terminal:
@@ -73,7 +72,19 @@ file            jp_1.jpg
 password        "" (only on pdf with password)
 ```
 
-4. Logout
+4. Extract data check
+```
+url = https://localhost:1045/api/extract-check
+method = POST
+
+json
+
+{
+    "uniqueId": "xxx"
+}
+```
+
+5. Logout
 ```
 url = https://localhost:1045/logout
 method = GET
