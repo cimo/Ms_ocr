@@ -81,7 +81,7 @@ def mergeText(elementList):
 
     return resultList
 
-class PdfParser:
+class Pdf:
     def _byteText(self, byteList):
         return byteList.decode("latin-1")
 

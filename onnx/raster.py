@@ -6,7 +6,7 @@ import numpy
 sys.dont_write_bytecode = True
 
 # Source
-import pdf_parser
+import pdf
 from helper import boxFromPointList, centerPointCalculate, imageInkBuild, boxDebugWrite, astWrite
 
 class Raster:
@@ -158,7 +158,7 @@ class Raster:
             scaleX = imageWidth / pageReader["width"]
             scaleY = imageHeight / pageReader["height"]
 
-            elementList = pdf_parser.mergeText(self._widthCorrect(pageReader["elementList"], image, pageReader["rotate"], scaleX, scaleY))
+            elementList = pdf.mergeText(self._widthCorrect(pageReader["elementList"], image, pageReader["rotate"], scaleX, scaleY))
 
             resultList = []
 
@@ -318,12 +318,12 @@ class Raster:
             if job["isCancel"]:
                 return {"message": "Job cancelled."}
 
-            parserObject = pdf_parser.PdfParser().execute(pathInput, password)
+            pdfObject = pdf.Pdf().execute(pathInput, password)
 
-            if parserObject["message"] != "":
-                return {"message": parserObject["message"]}
+            if pdfObject["message"] != "":
+                return {"message": pdfObject["message"]}
 
-            pageReaderObject = self._pageReaderCollect(parserObject["pageList"], len(pageList))
+            pageReaderObject = self._pageReaderCollect(pdfObject["pageList"], len(pageList))
 
             astPageList = []
             tableList = []
