@@ -312,7 +312,7 @@ class Raster:
 
             return resultObject
 
-        def execute(self, pathInput, pathOutput, password, job):
+        def execute(self, password, pathInput, pathOutput, job):
             pageList = self._pageBuild(password, pathInput, pathOutput)
 
             if job["isCancel"]:

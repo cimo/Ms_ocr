@@ -87,7 +87,7 @@ class Engine:
         if category == "image":
             resultObject = self.raster.image.execute(pathInput, pathOutput, job)
         elif category == "pdf":
-            resultObject = self.raster.pdf.execute(pathInput, pathOutput, password, job)
+            resultObject = self.raster.pdf.execute(password, pathInput, pathOutput, job)
         else:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
 
