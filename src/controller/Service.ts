@@ -23,24 +23,19 @@ export default class Service {
 
     // Method
     private jobExpire = (uniqueId: string): void => {
-        setTimeout(
-            async () => {
-                if (!this.jobObject[uniqueId]) {
-                    return;
-                }
+        setTimeout(async () => {
+            if (!this.jobObject[uniqueId]) {
+                return;
+            }
 
-                delete this.jobObject[uniqueId];
+            delete this.jobObject[uniqueId];
 
-                const fileOrFolderDeleteOutput = await helperSrc.fileOrFolderDelete(
-                    `${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`
-                );
+            const fileOrFolderDeleteOutput = await helperSrc.fileOrFolderDelete(`${helperSrc.PATH_ROOT}${helperSrc.PATH_FILE}output/${uniqueId}/`);
 
-                if (typeof fileOrFolderDeleteOutput !== "boolean") {
-                    helperSrc.writeLog("Service.ts - jobExpire() - fileOrFolderDelete()", fileOrFolderDeleteOutput.toString());
-                }
-            },
-            parseInt(helperSrc.PERSISTENCE_SECOND) * 1000
-        );
+            if (typeof fileOrFolderDeleteOutput !== "boolean") {
+                helperSrc.writeLog("Service.ts - jobExpire() - fileOrFolderDelete()", fileOrFolderDeleteOutput.toString());
+            }
+        }, helperSrc.PERSISTENCE_SECOND * 1000);
     };
 
     private engineLine = (line: string): void => {
@@ -75,7 +70,7 @@ export default class Service {
         this.limiter = limiter;
         this.controllerUpload = new ControllerUpload();
         this.jobObject = {};
-        this.cq = new Cq(1);
+        this.cq = new Cq(helperSrc.QUEUE);
         this.engineProcess = spawn(`${helperSrc.PATH_ROOT}.venv/bin/python3`, [`${helperSrc.PATH_ROOT}onnx/worker.py`]);
         this.engineResolveObject = {};
 

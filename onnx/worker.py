@@ -22,9 +22,13 @@ def lineWrite(dataObject):
 
 engineObject = engine.Engine()
 
-executorThread = concurrent.futures.ThreadPoolExecutor(1)
+executorThread = concurrent.futures.ThreadPoolExecutor(int(os.environ["MS_FDE_QUEUE"]))
+
+jobObject = {}
 
 def jobDone(uniqueId, future):
+    del jobObject[uniqueId]
+
     if future.exception() is not None:
         print(f"Error: {future.exception()}")
 
@@ -43,11 +47,12 @@ for line in sys.stdin:
     payload = json.loads(line)
 
     if payload["action"] == "cancel":
-        engineObject.raster.isCancel = True
+        if payload["uniqueId"] in jobObject:
+            jobObject[payload["uniqueId"]]["isCancel"] = True
 
         continue
 
-    engineObject.raster.isCancel = False
+    jobObject[payload["uniqueId"]] = {"isCancel": False}
 
-    future = executorThread.submit(engineObject.execute, payload["pathInput"], payload["pathOutput"], payload["password"])
+    future = executorThread.submit(engineObject.execute, payload["pathInput"], payload["pathOutput"], jobObject[payload["uniqueId"]], payload["password"])
     future.add_done_callback(functools.partial(jobDone, payload["uniqueId"]))

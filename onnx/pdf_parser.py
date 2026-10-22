@@ -13,6 +13,74 @@ sys.dont_write_bytecode = True
 # Source
 from helper import spacelessCheck, whitespaceCheck, boxFromPointList
 
+def mergeText(elementList):
+    resultList = []
+
+    current = None
+    pendingList = []
+
+    for a in range(len(elementList)):
+        element = elementList[a]
+
+        if element["type"] != "text":
+            if current is None:
+                resultList.append(element)
+            else:
+                pendingList.append(element)
+        elif current is None:
+            current = element
+        else:
+            size = current["fontSize"] if current.get("fontSize") is not None else 0
+            elementSize = element["fontSize"] if element.get("fontSize") is not None else 0
+
+            if current["isVertical"]:
+                gap = element["y0"] - current["y1"]
+
+                isSameLine = abs(element["x0"] - current["x0"]) <= size * 0.6
+            else:
+                gap = element["x0"] - current["x1"]
+
+                isSameLine = abs(element["y0"] - current["y0"]) <= size * 0.6
+
+            isSameLine = isSameLine and current["isVertical"] == element["isVertical"]
+            isCompatibleSize = elementSize >= size * 0.45 and elementSize <= size * 1.4
+            isClose = gap >= -size * 0.3 and gap <= size * 1.0
+
+            if isSameLine and isCompatibleSize and isClose:
+                previousText = current["text"] if current.get("text") is not None else ""
+                elementText = element["text"] if element.get("text") is not None else ""
+                isSpace = gap > size * 0.15 and whitespaceCheck(previousText[-1:]) == False and whitespaceCheck(elementText[0:1]) == False
+
+                if spacelessCheck(previousText[-1:]) and spacelessCheck(elementText[0:1]):
+                    isSpace = False
+
+                current["text"] = f"{previousText} {elementText}" if isSpace else f"{previousText}{elementText}"
+
+                if current["isVertical"]:
+                    current["y1"] = element["y1"]
+                    current["x0"] = min(current["x0"], element["x0"])
+                    current["x1"] = max(current["x1"], element["x1"])
+                else:
+                    current["x1"] = element["x1"]
+                    current["y0"] = min(current["y0"], element["y0"])
+                    current["y1"] = max(current["y1"], element["y1"])
+            else:
+                resultList.append(current)
+
+                for b in range(len(pendingList)):
+                    resultList.append(pendingList[b])
+
+                pendingList = []
+                current = element
+
+    if current is not None:
+        resultList.append(current)
+
+    for a in range(len(pendingList)):
+        resultList.append(pendingList[a])
+
+    return resultList
+
 class PdfParser:
     def _byteText(self, byteList):
         return byteList.decode("latin-1")
@@ -1890,74 +1958,6 @@ class PdfParser:
             })
 
         self._pathReset()
-
-    def mergeText(self, elementList):
-        resultList = []
-
-        current = None
-        pendingList = []
-
-        for a in range(len(elementList)):
-            element = elementList[a]
-
-            if element["type"] != "text":
-                if current is None:
-                    resultList.append(element)
-                else:
-                    pendingList.append(element)
-            elif current is None:
-                current = element
-            else:
-                size = current["fontSize"] if current.get("fontSize") is not None else 0
-                elementSize = element["fontSize"] if element.get("fontSize") is not None else 0
-
-                if current["isVertical"]:
-                    gap = element["y0"] - current["y1"]
-
-                    isSameLine = abs(element["x0"] - current["x0"]) <= size * 0.6
-                else:
-                    gap = element["x0"] - current["x1"]
-
-                    isSameLine = abs(element["y0"] - current["y0"]) <= size * 0.6
-
-                isSameLine = isSameLine and current["isVertical"] == element["isVertical"]
-                isCompatibleSize = elementSize >= size * 0.45 and elementSize <= size * 1.4
-                isClose = gap >= -size * 0.3 and gap <= size * 1.0
-
-                if isSameLine and isCompatibleSize and isClose:
-                    previousText = current["text"] if current.get("text") is not None else ""
-                    elementText = element["text"] if element.get("text") is not None else ""
-                    isSpace = gap > size * 0.15 and whitespaceCheck(previousText[-1:]) == False and whitespaceCheck(elementText[0:1]) == False
-
-                    if spacelessCheck(previousText[-1:]) and spacelessCheck(elementText[0:1]):
-                        isSpace = False
-
-                    current["text"] = f"{previousText} {elementText}" if isSpace else f"{previousText}{elementText}"
-
-                    if current["isVertical"]:
-                        current["y1"] = element["y1"]
-                        current["x0"] = min(current["x0"], element["x0"])
-                        current["x1"] = max(current["x1"], element["x1"])
-                    else:
-                        current["x1"] = element["x1"]
-                        current["y0"] = min(current["y0"], element["y0"])
-                        current["y1"] = max(current["y1"], element["y1"])
-                else:
-                    resultList.append(current)
-
-                    for b in range(len(pendingList)):
-                        resultList.append(pendingList[b])
-
-                    pendingList = []
-                    current = element
-
-        if current is not None:
-            resultList.append(current)
-
-        for a in range(len(pendingList)):
-            resultList.append(pendingList[a])
-
-        return resultList
 
     def execute(self, pathInput, password):
         with open(pathInput, "rb") as file:

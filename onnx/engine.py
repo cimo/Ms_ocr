@@ -68,7 +68,7 @@ class Engine:
 
         return resultObject
 
-    def execute(self, pathInput, pathOutput, password):
+    def execute(self, pathInput, pathOutput, job, password):
         timeStart = time.perf_counter()
 
         extension = os.path.splitext(pathInput)[1].lower()
@@ -85,9 +85,9 @@ class Engine:
                 os.makedirs(f"{pathOutput}debug/{self.debugNameList[a]}/", exist_ok=True)
 
         if category == "image":
-            resultObject = self.raster.image.execute(pathInput, pathOutput)
+            resultObject = self.raster.image.execute(pathInput, pathOutput, job)
         elif category == "pdf":
-            resultObject = self.raster.pdf.execute(pathInput, pathOutput, password)
+            resultObject = self.raster.pdf.execute(pathInput, pathOutput, password, job)
         else:
             resultObject = self.office.execute(pathInput, pathOutput, extension)
 
